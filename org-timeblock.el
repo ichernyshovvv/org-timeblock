@@ -1295,9 +1295,7 @@ block inside `org-timeblock-mode'"
 
 (defun ot-sched-or-event>(a b)
   ""
-  (cl-macrolet ((get-sched-or-event-time (item) `(ot--timestamp-encode (or (get-text-property 0 'sched ,item)
-									   (get-text-property 0 'event ,item)))))
-    (time-less-p (get-sched-or-event-time b) (get-sched-or-event-time a))))
+  (ot-sched-or-event< b a))
 
 ;;;; Predicates
 
