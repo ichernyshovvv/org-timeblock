@@ -256,9 +256,10 @@ tasks and those tasks that have not been sorted yet.")
      (t
       (let ((a (decode-time a))
             (b (decode-time b)))
-        (and (on decoded-time-year  < a b)
-             (on decoded-time-month < a b)
-             (on decoded-time-day   < a b))))))
+        (and (on decoded-time-year  <= a b)
+             (on decoded-time-month <= a b)
+             (on decoded-time-day   <= a b)
+             (not (ot-ts-date= a b)))))))
 
   (defun ot-order< (a b)
     (on (lambda (item)
