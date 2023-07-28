@@ -641,8 +641,8 @@ Default background color is used when BASE-COLOR is nil."
 		(cl-incf count)))
 	(forward-line))
       (with-temp-file otl-order-cache-file
-	(insert (format "(setq org-timeblock-entries-positions-alist '%S)" otl-entries-pos)
-		(format "\n(setq org-timeblock/sort-line-position '%S)" otl-sort-line-position)))))
+	(insert (format "%S" `(setq org-timeblock-entries-positions-alist ',otl-entries-pos
+				    org-timeblock/sort-line-position ',otl-sort-line-position))))))
   (org-save-all-org-buffers))
 
 (defun ot-quit ()
