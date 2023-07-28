@@ -289,8 +289,9 @@ tasks and those tasks that have not been sorted yet.")
 	(replace-match ot-sel-block-color nil nil nil 1)
 	(org-timeblock-mode)))))
 
-(defun ot-tss-are-in-intersection-p (oe-ts1 oe-ts2)
-  "`TS1-START',`TS2-START' - org-element timestamp objects"
+(defun ot-tss-intersect-p (oe-ts1 oe-ts2)
+  "Check if two timestamps intersect each other. `OE-TS1',`OE-TS2' -
+org-element timestamp objects."
   (when-let ((ts1-start (ot--timestamp-encode oe-ts1))
 	     (ts2-start (ot--timestamp-encode oe-ts2)))
     (let ((ts1-end (ot--timestamp-encode oe-ts1 t))
@@ -441,7 +442,7 @@ Default background color is used when BASE-COLOR is nil."
 					       (eq (cdr (assq (get-text-property 0 'marker x) columns)) k))
 					     placed))
 				  (and (/= (get-text-property 0 'marker el) m)
-				       (ot-tss-are-in-intersection-p
+				       (ot-tss-intersect-p
 					(or (get-text-property 0 'sched entry)
 					    (get-text-property 0 'event entry))
 					(or (get-text-property 0 'sched el)
@@ -461,7 +462,7 @@ Default background color is used when BASE-COLOR is nil."
 					   (seq-filter
 					    (lambda (x)
 					      (unless (equal (get-text-property 0 'marker entry) (get-text-property 0 'marker x))
-						(ot-tss-are-in-intersection-p
+						(ot-tss-intersect-p
 						 (or (get-text-property 0 'sched entry)
 						     (get-text-property 0 'event entry))
 						 (or (get-text-property 0 'sched x)
