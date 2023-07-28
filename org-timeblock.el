@@ -287,12 +287,12 @@ tasks and those tasks that have not been sorted yet.")
   (when-let((ts1-start (ot--timestamp-encode oe-ts1))
 	    (ts2-start (ot--timestamp-encode oe-ts2)))
     (let((ts1-end (ot--timestamp-encode oe-ts1 t))
-	 (ts2-end (ot--timestamp-encode oe-ts2 t))) 
+	 (ts2-end (ot--timestamp-encode oe-ts2 t)))
       (or
        (time-equal-p ts2-start ts1-start)
        (and
 	ts2-end
-	(time-less-p ts2-start ts1-start)    
+	(time-less-p ts2-start ts1-start)
 	(time-less-p ts1-start ts2-end))
        (and
 	ts1-end
@@ -722,7 +722,7 @@ Default background color is used when BASE-COLOR is nil."
 		(decoded-time-minute decoded)
 		(string-to-number (substring time 2 4)))
 	       (encode-time decoded)))
-     until res 
+     until res
      finally return res)))
 
 (defun ot-construct-id(&optional marker)
@@ -835,7 +835,7 @@ Default background color is used when BASE-COLOR is nil."
 		   (/= day-start day-end)
 		   (/= month-start month-end)
 		   (/= year-start year-end)
-		   (and hour-end hour-start (/= hour-start hour-end)) 
+		   (and hour-end hour-start (/= hour-start hour-end))
 		   (and minute-end minute-start (/= minute-start minute-end)))
 	      (encode-time (list 0 (or minute-end 0) (or hour-end 0) day-end month-end year-end 0 nil (car (current-time-zone)))))))
       (encode-time (list 0 (or minute-start 0) (or hour-start 0) day-start month-start year-start 0 nil (car (current-time-zone)))))))
@@ -1352,7 +1352,7 @@ ON format: YYYY-MM-DD"
      :query query ;; run :body on regexp-matched headings after :preambles
      :regexp
      "^SCHEDULED:[ \t]+<.+?>\\(?:--<.+?>\\)?")))
-  :body 
+  :body
   (when-let((on-ts
 	     (when (stringp on)
 	       (if-let (((string-match-p "^[0-9]\\{4\\}-[01][0-9]-[0-3][0-9]$" on))
