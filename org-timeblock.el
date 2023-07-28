@@ -234,33 +234,31 @@ tasks and those tasks that have not been sorted yet.")
    (re-search-forward (format " fill=\"%s\".*? id=\"\\(.+?\\)\"" ot-sel-block-color) nil t)
    (match-string-no-properties 1)))
 
-(defun ot-ts-date=(a b)
-  (cond
-   ((and (null a) b)
-    nil)
-   ((and a (null b))
-    nil)
-   ((and (null a) (null b))
-    t)
-   (t
-    (when-let((a-dec (decode-time a))
-	      (b-dec (decode-time b)))
-      (and (= (decoded-time-day a-dec) (decoded-time-day b-dec))
-	   (= (decoded-time-month a-dec) (decoded-time-month b-dec))
-	   (= (decoded-time-year a-dec) (decoded-time-year b-dec)))))))
+(cl-macrolet ((on (accessor op lhs rhs)
+                `(,op (,accessor ,lhs)
+                      (,accessor ,rhs))))
+  (defun ot-ts-date= (a b)
+    (cond
+     ((and (null a)
+           (null b)))
+     ((and a b)
+      (let ((a (decode-time a))
+            (b (decode-time b)))
+        (and (on decoded-time-year  = a b)
+             (on decoded-time-month = a b)
+             (on decoded-time-day   = a b))))))
 
-(defun ot-ts-date<(a b)
-  (or
-   (and (null a) (null b))
-   (when-let((a-dec (decode-time a))
-	     (b-dec (decode-time b)))
-     (setf (decoded-time-hour a-dec) 0
-	   (decoded-time-minute a-dec) 0
-	   (decoded-time-second a-dec) 0
-	   (decoded-time-hour b-dec) 0
-	   (decoded-time-minute b-dec) 0
-	   (decoded-time-second b-dec) 0)
-     (time-less-p (encode-time a-dec) (encode-time b-dec)))))
+  (defun ot-ts-date< (a b)
+    (cond
+     ;; nil is less than non-nil
+     ((null b) nil)
+     ((null a) t)
+     (t
+      (let ((a (decode-time a))
+            (b (decode-time b)))
+        (and (on decoded-time-year  < a b)
+             (on decoded-time-month < a b)
+             (on decoded-time-day   < a b)))))))
 
 (defun ot-select-block-for-current-entry()
   (when-let(((not
