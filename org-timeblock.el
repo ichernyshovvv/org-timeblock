@@ -234,33 +234,44 @@ tasks and those tasks that have not been sorted yet.")
    (re-search-forward (format " fill=\"%s\".*? id=\"\\(.+?\\)\"" ot-sel-block-color) nil t)
    (match-string-no-properties 1)))
 
-(defun ot-ts-date=(a b)
-  (cond
-   ((and (null a) b)
-    nil)
-   ((and a (null b))
-    nil)
-   ((and (null a) (null b))
-    t)
-   (t
-    (when-let((a-dec (decode-time a))
-	      (b-dec (decode-time b)))
-      (and (= (decoded-time-day a-dec) (decoded-time-day b-dec))
-	   (= (decoded-time-month a-dec) (decoded-time-month b-dec))
-	   (= (decoded-time-year a-dec) (decoded-time-year b-dec)))))))
+(cl-macrolet ((on (accessor op lhs rhs)
+                `(,op (,accessor ,lhs)
+                      (,accessor ,rhs))))
+  (defun ot-ts-date= (a b)
+    (cond
+     ((and (null a)
+           (null b)))
+     ((and a b)
+      (let ((a (decode-time a))
+            (b (decode-time b)))
+        (and (on decoded-time-year  = a b)
+             (on decoded-time-month = a b)
+             (on decoded-time-day   = a b))))))
 
-(defun ot-ts-date<(a b)
-  (or
-   (and (null a) (null b))
-   (when-let((a-dec (decode-time a))
-	     (b-dec (decode-time b)))
-     (setf (decoded-time-hour a-dec) 0
-	   (decoded-time-minute a-dec) 0
-	   (decoded-time-second a-dec) 0
-	   (decoded-time-hour b-dec) 0
-	   (decoded-time-minute b-dec) 0
-	   (decoded-time-second b-dec) 0)
-     (time-less-p (encode-time a-dec) (encode-time b-dec)))))
+  (defun ot-ts-date< (a b)
+    (cond
+     ;; nil is less than non-nil
+     ((null b) nil)
+     ((null a) t)
+     (t
+      (let ((a (decode-time a))
+            (b (decode-time b)))
+        (and (on decoded-time-year  <= a b)
+             (on decoded-time-month <= a b)
+             (on decoded-time-day   <= a b)
+             (not (ot-ts-date= a b)))))))
+
+  (defun ot-order< (a b)
+    (on (lambda (item)
+          (or (get-text-property 0 'order item) 1))
+        < a b))
+
+  (defun ot-sched-or-event< (a b)
+    (on (lambda (item)
+          (ot--timestamp-encode
+           (or (get-text-property 0 'sched item)
+               (get-text-property 0 'event item))))
+        time-less-p a b)))
 
 (defun ot-select-block-for-current-entry()
   (when-let(((not
@@ -269,7 +280,7 @@ tasks and those tasks that have not been sorted yet.")
 		   (get-text-property (line-beginning-position) 'sched)))))
 	    (id (get-text-property (line-beginning-position) 'id))
 	    (inhibit-read-only t)
-	    ((not (ot-timeline-hidden-p))))
+            ((get-buffer-window ot-buffer)))
     (with-current-buffer ot-buffer
       (goto-char (point-min))
       (when (re-search-forward (format " fill=\"\\(%s\\)\"" ot-sel-block-color) nil t)
@@ -287,12 +298,12 @@ tasks and those tasks that have not been sorted yet.")
   (when-let((ts1-start (ot--timestamp-encode oe-ts1))
 	    (ts2-start (ot--timestamp-encode oe-ts2)))
     (let((ts1-end (ot--timestamp-encode oe-ts1 t))
-	 (ts2-end (ot--timestamp-encode oe-ts2 t))) 
+	 (ts2-end (ot--timestamp-encode oe-ts2 t)))
       (or
        (time-equal-p ts2-start ts1-start)
        (and
 	ts2-end
-	(time-less-p ts2-start ts1-start)    
+	(time-less-p ts2-start ts1-start)
 	(time-less-p ts1-start ts2-end))
        (and
 	ts1-end
@@ -699,14 +710,6 @@ Default background color is used when BASE-COLOR is nil."
 		      mend)))))
      'prefix t)))
 
-(defun ot-timeline-hidden-p()
-  (not (seq-find
-	(lambda(window)
-	  (string=
-	   (buffer-name (window-buffer window))
-	   ot-buffer))
-	(window-list))))
-
 (defun ot-read-ts(ts &optional prompt)
   "Change time for TS interactively and return the changed ts object."
   (let((decoded (decode-time ts)))
@@ -722,7 +725,7 @@ Default background color is used when BASE-COLOR is nil."
 		(decoded-time-minute decoded)
 		(string-to-number (substring time 2 4)))
 	       (encode-time decoded)))
-     until res 
+     until res
      finally return res)))
 
 (defun ot-construct-id(&optional marker)
@@ -835,7 +838,7 @@ Default background color is used when BASE-COLOR is nil."
 		   (/= day-start day-end)
 		   (/= month-start month-end)
 		   (/= year-start year-end)
-		   (and hour-end hour-start (/= hour-start hour-end)) 
+		   (and hour-end hour-start (/= hour-start hour-end))
 		   (and minute-end minute-start (/= minute-start minute-end)))
 	      (encode-time (list 0 (or minute-end 0) (or hour-end 0) day-end month-end year-end 0 nil (car (current-time-zone)))))))
       (encode-time (list 0 (or minute-start 0) (or hour-start 0) day-start month-start year-start 0 nil (car (current-time-zone)))))))
@@ -1078,7 +1081,7 @@ and sorted by `SORTING-PROPERTY' property."))
   (when-let ((timestamp (ot--duration (get-text-property (line-beginning-position) 'marker))))
     (ot--update-prefix timestamp (get-text-property (line-beginning-position) 'event))
     (forward-line)
-    (unless (ot-timeline-hidden-p)
+    (when (get-buffer-window ot-buffer)
       (ot-redraw-timeblocks))))
 
 (defun ot-schedule()
@@ -1105,7 +1108,7 @@ block inside `org-timeblock-mode'"
   (when-let((sched (ot--schedule-time (get-text-property (line-beginning-position) 'marker))))
     (ot--update-prefix sched)
     (forward-line)
-    (unless (ot-timeline-hidden-p)
+    (when (get-buffer-window ot-buffer)
       (ot-redraw-timeblocks))))
 
 ;;;; Navigation commands
@@ -1227,25 +1230,16 @@ block inside `org-timeblock-mode'"
 
 (defun otl-toggle-timeblock()
   (interactive)
-  (or
-   (catch 'deleted
-     (dolist (window (window-list))
-       (when (string= (buffer-name (window-buffer window)) ot-buffer)
-	 (delete-window window)
-	 (throw 'deleted t))))
-   (progn
-     (ot-show-timeblocks)
-     (ot-redraw-timeblocks))))
+  (if-let ((window (get-buffer-window ot-buffer)))
+      (delete-window window)
+    (ot-show-timeblocks)
+    (ot-redraw-timeblocks)))
 
 (defun ot-toggle-timeblock-list()
   (interactive)
-  (or
-   (catch 'deleted
-     (dolist (window (window-list))
-       (when (string= (buffer-name (window-buffer window)) otl-buffer)
-	 (delete-window window)
-	 (throw 'deleted t))))
-   (ot-show-timeblock-list))
+  (if-let ((window (get-buffer-window otl-buffer)))
+      (delete-window window)
+    (ot-show-timeblock-list))
   (ot-redraw-buffers))
 
 (defun ot-redraw-buffers()
@@ -1285,27 +1279,8 @@ block inside `org-timeblock-mode'"
 	 (alist-get (format-time-string "%Y-%m-%d" ot-date) otl-sort-line-position nil nil #'equal))
 	(insert (propertize (format "% 37s" "^^^ SORTED ^^^\n") 'sort-ind t 'face '(:extend t :background "#8b0000" :foreground "#ffffff")))
 	(goto-char (point-min)))
-      (unless (ot-timeline-hidden-p)
+      (when (get-buffer-window ot-buffer)
 	(ot-redraw-timeblocks)))))
-
-;;;; Comparators
-
-(defun ot-order<(a b)
-  ""
-  (cl-macrolet ((get-order (item) `(or (get-text-property 0 'order ,item) 1)))
-    (< (get-order a) (get-order b))))
-
-(defun ot-sched-or-event<(a b)
-  ""
-  (cl-macrolet ((get-sched-or-event-time (item) `(ot--timestamp-encode (or (get-text-property 0 'sched ,item)
-									   (get-text-property 0 'event ,item)))))
-    (time-less-p (get-sched-or-event-time a) (get-sched-or-event-time b))))
-
-(defun ot-sched-or-event>(a b)
-  ""
-  (cl-macrolet ((get-sched-or-event-time (item) `(ot--timestamp-encode (or (get-text-property 0 'sched ,item)
-									   (get-text-property 0 'event ,item)))))
-    (time-less-p (get-sched-or-event-time b) (get-sched-or-event-time a))))
 
 ;;;; Predicates
 
@@ -1352,7 +1327,7 @@ ON format: YYYY-MM-DD"
      :query query ;; run :body on regexp-matched headings after :preambles
      :regexp
      "^SCHEDULED:[ \t]+<.+?>\\(?:--<.+?>\\)?")))
-  :body 
+  :body
   (when-let((on-ts
 	     (when (stringp on)
 	       (if-let (((string-match-p "^[0-9]\\{4\\}-[01][0-9]-[0-3][0-9]$" on))
