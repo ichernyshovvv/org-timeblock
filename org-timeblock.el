@@ -258,7 +258,19 @@ tasks and those tasks that have not been sorted yet.")
             (b (decode-time b)))
         (and (on decoded-time-year  < a b)
              (on decoded-time-month < a b)
-             (on decoded-time-day   < a b)))))))
+             (on decoded-time-day   < a b))))))
+
+  (defun ot-order< (a b)
+    (on (lambda (item)
+          (or (get-text-property 0 'order item) 1))
+        < a b))
+
+  (defun ot-sched-or-event< (a b)
+    (on (lambda (item)
+          (ot--timestamp-encode
+           (or (get-text-property 0 'sched item)
+               (get-text-property 0 'event item))))
+        time-less-p a b)))
 
 (defun ot-select-block-for-current-entry()
   (when-let(((not
@@ -1268,23 +1280,6 @@ block inside `org-timeblock-mode'"
 	(goto-char (point-min)))
       (when (get-buffer-window ot-buffer)
 	(ot-redraw-timeblocks)))))
-
-;;;; Comparators
-
-(defun ot-order<(a b)
-  ""
-  (cl-macrolet ((get-order (item) `(or (get-text-property 0 'order ,item) 1)))
-    (< (get-order a) (get-order b))))
-
-(defun ot-sched-or-event<(a b)
-  ""
-  (cl-macrolet ((get-sched-or-event-time (item) `(ot--timestamp-encode (or (get-text-property 0 'sched ,item)
-									   (get-text-property 0 'event ,item)))))
-    (time-less-p (get-sched-or-event-time a) (get-sched-or-event-time b))))
-
-(defun ot-sched-or-event>(a b)
-  ""
-  (ot-sched-or-event< b a))
 
 ;;;; Predicates
 
