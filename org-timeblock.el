@@ -219,13 +219,9 @@ tasks and those tasks that have not been sorted yet.")
   (and
    (re-search-forward (format " fill=\"%s\".*? id=\"\\(.+?\\)\"" ot-sel-block-color) nil t)
    (let ((id (match-string-no-properties 1)))
-     (cdr
-      (seq-find
-       (lambda (x)
-	 (string=
-	  (car x)
-	  id))
-       ot-markers)))))
+     (cdr (seq-find
+	   (lambda (x) (string= (car x) id))
+	   ot-markers)))))
 
 (defun ot-selected-block-id ()
   ""
@@ -591,11 +587,11 @@ Default background color is used when BASE-COLOR is nil."
 		(cons (+ entry-max-width 25) (+ cur-time-indicator 5)))
 	       :fill-color "red"))
 	    (svg-print svg-obj))
-	(let*((window (get-buffer-window ot-buffer))
-	      (window-height (window-body-height window t))
-	      (window-width (window-body-width window t))
-	      (message "No entries found for this date.")
-	      (svg-obj (svg-create window-width window-height)))
+	(let* ((window (get-buffer-window ot-buffer))
+	       (window-height (window-body-height window t))
+	       (window-width (window-body-width window t))
+	       (message "No entries found for this date.")
+	       (svg-obj (svg-create window-width window-height)))
 	  (svg-text
 	   svg-obj message
 	   :y (/ window-height 2)
@@ -847,13 +843,13 @@ Default background color is used when BASE-COLOR is nil."
   (save-window-excursion
     (save-excursion
       (save-restriction
-	(let*((marker-valid-p
-	       (and marker (marker-buffer marker)
-		    (buffer-live-p (marker-buffer marker))))
-	      (point (or (when marker-valid-p marker) (point)))
-	      (buffer (or (when marker-valid-p (marker-buffer marker)) (current-buffer)))
-	      repeat-string warning-string
-	      timestamp)
+	(let* ((marker-valid-p
+		(and marker (marker-buffer marker)
+		     (buffer-live-p (marker-buffer marker))))
+	       (point (or (when marker-valid-p marker) (point)))
+	       (buffer (or (when marker-valid-p (marker-buffer marker)) (current-buffer)))
+	       repeat-string warning-string
+	       timestamp)
 	  (with-current-buffer buffer
 	    (widen)
 	    (goto-char point)
