@@ -2,10 +2,10 @@
 
 (require 'helper)
 
-(describe "org-timeblock-tss-are-in-intersection-p"
-  (it "org-timeblock-tss-are-in-intersection-p"
+(describe "org-timeblock-tss-intersect-p"
+  (it "org-timeblock-tss-intersect-p"
     (expect
-     (ot-tss-are-in-intersection-p
+     (ot-tss-intersect-p
       (org-test-with-temp-text "<2023-07-02 Sun>"
 	(org-element-timestamp-parser))
       (org-test-with-temp-text "<2023-07-02 Sun>"
@@ -14,7 +14,7 @@
      t)
 
     (expect
-     (ot-tss-are-in-intersection-p
+     (ot-tss-intersect-p
       (org-test-with-temp-text "<2023-07-03 Mon>"
 	(org-element-timestamp-parser))
       (org-test-with-temp-text "<2023-07-02 Sun>"
@@ -23,7 +23,7 @@
      nil)
 
     (expect
-     (ot-tss-are-in-intersection-p
+     (ot-tss-intersect-p
       (org-test-with-temp-text "<2023-07-02 Sun 13:00-14:00>"
 	(org-element-timestamp-parser))
       (org-test-with-temp-text "<2023-07-02 Sun 12:00>"
@@ -32,7 +32,7 @@
      nil)
 
     (expect
-     (ot-tss-are-in-intersection-p
+     (ot-tss-intersect-p
       (org-test-with-temp-text "<2023-07-02 Sun 12:00>"
 	(org-element-timestamp-parser))
       (org-test-with-temp-text "<2023-07-02 Sun 13:00-14:00>"

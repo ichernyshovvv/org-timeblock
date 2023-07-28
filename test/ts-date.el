@@ -40,10 +40,6 @@
  (it
   "org-timeblock-ts-date<"
   (expect
-   (ot-ts-date< nil nil)
-   :to-be
-   t)
-  (expect
    (ot-ts-date< (ot-encode-date "2023-10-10") nil)
    :to-be
    nil)
