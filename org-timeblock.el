@@ -269,7 +269,7 @@ tasks and those tasks that have not been sorted yet.")
 		   (get-text-property (line-beginning-position) 'sched)))))
 	    (id (get-text-property (line-beginning-position) 'id))
 	    (inhibit-read-only t)
-	    ((not (ot-timeline-hidden-p))))
+            ((get-buffer-window ot-buffer)))
     (with-current-buffer ot-buffer
       (goto-char (point-min))
       (when (re-search-forward (format " fill=\"\\(%s\\)\"" ot-sel-block-color) nil t)
@@ -699,14 +699,6 @@ Default background color is used when BASE-COLOR is nil."
 		      mend)))))
      'prefix t)))
 
-(defun ot-timeline-hidden-p()
-  (not (seq-find
-	(lambda(window)
-	  (string=
-	   (buffer-name (window-buffer window))
-	   ot-buffer))
-	(window-list))))
-
 (defun ot-read-ts(ts &optional prompt)
   "Change time for TS interactively and return the changed ts object."
   (let((decoded (decode-time ts)))
@@ -1078,7 +1070,7 @@ and sorted by `SORTING-PROPERTY' property."))
   (when-let ((timestamp (ot--duration (get-text-property (line-beginning-position) 'marker))))
     (ot--update-prefix timestamp (get-text-property (line-beginning-position) 'event))
     (forward-line)
-    (unless (ot-timeline-hidden-p)
+    (when (get-buffer-window ot-buffer)
       (ot-redraw-timeblocks))))
 
 (defun ot-schedule()
@@ -1105,7 +1097,7 @@ block inside `org-timeblock-mode'"
   (when-let((sched (ot--schedule-time (get-text-property (line-beginning-position) 'marker))))
     (ot--update-prefix sched)
     (forward-line)
-    (unless (ot-timeline-hidden-p)
+    (when (get-buffer-window ot-buffer)
       (ot-redraw-timeblocks))))
 
 ;;;; Navigation commands
@@ -1285,7 +1277,7 @@ block inside `org-timeblock-mode'"
 	 (alist-get (format-time-string "%Y-%m-%d" ot-date) otl-sort-line-position nil nil #'equal))
 	(insert (propertize (format "% 37s" "^^^ SORTED ^^^\n") 'sort-ind t 'face '(:extend t :background "#8b0000" :foreground "#ffffff")))
 	(goto-char (point-min)))
-      (unless (ot-timeline-hidden-p)
+      (when (get-buffer-window ot-buffer)
 	(ot-redraw-timeblocks)))))
 
 ;;;; Comparators
