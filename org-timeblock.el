@@ -1219,25 +1219,16 @@ block inside `org-timeblock-mode'"
 
 (defun otl-toggle-timeblock()
   (interactive)
-  (or
-   (catch 'deleted
-     (dolist (window (window-list))
-       (when (string= (buffer-name (window-buffer window)) ot-buffer)
-	 (delete-window window)
-	 (throw 'deleted t))))
-   (progn
-     (ot-show-timeblocks)
-     (ot-redraw-timeblocks))))
+  (if-let ((window (get-buffer-window ot-buffer)))
+      (delete-window window)
+    (ot-show-timeblocks)
+    (ot-redraw-timeblocks)))
 
 (defun ot-toggle-timeblock-list()
   (interactive)
-  (or
-   (catch 'deleted
-     (dolist (window (window-list))
-       (when (string= (buffer-name (window-buffer window)) otl-buffer)
-	 (delete-window window)
-	 (throw 'deleted t))))
-   (ot-show-timeblock-list))
+  (if-let ((window (get-buffer-window otl-buffer)))
+      (delete-window window)
+    (ot-show-timeblock-list))
   (ot-redraw-buffers))
 
 (defun ot-redraw-buffers()
