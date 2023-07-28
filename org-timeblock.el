@@ -177,15 +177,15 @@ tasks and those tasks that have not been sorted yet.")
 
 ;; Generate todo commands and bind them to a corresponding key
 (dolist (elem ot-todo-commands)
-  (let((command-name (intern (concat "org-timeblock-" (downcase (car elem))))))
+  (let ((command-name (intern (concat "org-timeblock-" (downcase (car elem))))))
     (defalias command-name
-      (lambda()
+      (lambda ()
 	(interactive)
-	(when-let((m (pcase major-mode
-		       (`org-timeblock-list-mode
-			(get-text-property (line-beginning-position) 'marker))
-		       (`org-timeblock-mode
-			(ot-selected-block-marker)))))
+	(when-let ((m (pcase major-mode
+			(`org-timeblock-list-mode
+			 (get-text-property (line-beginning-position) 'marker))
+			(`org-timeblock-mode
+			 (ot-selected-block-marker)))))
 	  (ot--set-todo m (car elem))
 	  (ot-redraw-buffers))))
     (define-key org-timeblock-list-mode-map (kbd (cdr elem)) command-name)
@@ -204,7 +204,7 @@ tasks and those tasks that have not been sorted yet.")
 
 ;;;; Functions
 
-(defun ot-mouse-pixel-pos()
+(defun ot-mouse-pixel-pos ()
   (when-let ((mouse-pos (cdr (mouse-pixel-position)))
 	     (window (get-buffer-window ot-buffer))
 	     (pos (window-edges window t nil t)))
@@ -213,21 +213,21 @@ tasks and those tasks that have not been sorted yet.")
       (cons (- (car mouse-pos) (car pos))
 	    (- (cdr mouse-pos) (cadr pos))))))
 
-(defun ot-selected-block-marker()
+(defun ot-selected-block-marker ()
   ""
   (goto-char (point-min))
   (and
    (re-search-forward (format " fill=\"%s\".*? id=\"\\(.+?\\)\"" ot-sel-block-color) nil t)
-   (let((id (match-string-no-properties 1)))
+   (let ((id (match-string-no-properties 1)))
      (cdr
       (seq-find
-       (lambda(x)
+       (lambda (x)
 	 (string=
 	  (car x)
 	  id))
        ot-markers)))))
 
-(defun ot-selected-block-id()
+(defun ot-selected-block-id ()
   ""
   (goto-char (point-min))
   (and
@@ -273,14 +273,14 @@ tasks and those tasks that have not been sorted yet.")
                (get-text-property 0 'event item))))
         time-less-p a b)))
 
-(defun ot-select-block-for-current-entry()
-  (when-let(((not
-	      (ot--daterangep
-	       (or (get-text-property (line-beginning-position) 'event)
-		   (get-text-property (line-beginning-position) 'sched)))))
-	    (id (get-text-property (line-beginning-position) 'id))
-	    (inhibit-read-only t)
-            ((get-buffer-window ot-buffer)))
+(defun ot-select-block-for-current-entry ()
+  (when-let (((not
+	       (ot--daterangep
+		(or (get-text-property (line-beginning-position) 'event)
+		    (get-text-property (line-beginning-position) 'sched)))))
+	     (id (get-text-property (line-beginning-position) 'id))
+	     (inhibit-read-only t)
+             ((get-buffer-window ot-buffer)))
     (with-current-buffer ot-buffer
       (goto-char (point-min))
       (when (re-search-forward (format " fill=\"\\(%s\\)\"" ot-sel-block-color) nil t)
@@ -293,12 +293,12 @@ tasks and those tasks that have not been sorted yet.")
 	(replace-match ot-sel-block-color nil nil nil 1)
 	(org-timeblock-mode)))))
 
-(defun ot-tss-are-in-intersection-p(oe-ts1 oe-ts2)
+(defun ot-tss-are-in-intersection-p (oe-ts1 oe-ts2)
   "`TS1-START',`TS2-START' - org-element timestamp objects"
-  (when-let((ts1-start (ot--timestamp-encode oe-ts1))
-	    (ts2-start (ot--timestamp-encode oe-ts2)))
-    (let((ts1-end (ot--timestamp-encode oe-ts1 t))
-	 (ts2-end (ot--timestamp-encode oe-ts2 t)))
+  (when-let ((ts1-start (ot--timestamp-encode oe-ts1))
+	     (ts2-start (ot--timestamp-encode oe-ts2)))
+    (let ((ts1-end (ot--timestamp-encode oe-ts1 t))
+	  (ts2-end (ot--timestamp-encode oe-ts2 t)))
       (or
        (time-equal-p ts2-start ts1-start)
        (and
@@ -374,11 +374,11 @@ Default background color is used when BASE-COLOR is nil."
            (b (funcall fn 2)))
       (format "#%02x%02x%02x" r g b))))
 
-(defun ot-redraw-timeblocks()
+(defun ot-redraw-timeblocks ()
   (with-current-buffer (get-buffer-create ot-buffer)
-    (let((inhibit-read-only t))
+    (let ((inhibit-read-only t))
       (erase-buffer)
-      (if-let((entries (ot-get-entries :sort-func #'ot-sched-or-event< :exclude-dateranges t :with-time t)))
+      (if-let ((entries (ot-get-entries :sort-func #'ot-sched-or-event< :exclude-dateranges t :with-time t)))
 	  (let* ((window (get-buffer-window ot-buffer))
 		 (window-height (window-body-height window t))
 		 (window-width (window-body-width window t))
@@ -386,25 +386,25 @@ Default background color is used when BASE-COLOR is nil."
 		 (entry-max-width (- window-width timeline-left-padding))
 		 (svg-obj (svg-create window-width window-height))
 		 (min-hour
-		  (if-let((ot-view-options)
-			  (hours
-			   (remove
-			    nil
-			    (append
-			     (list (unless (eq ot-view-options 'hide-all)
-				     (decoded-time-hour (decode-time (current-time)))))
-			     (mapcar (lambda(entry)
-				       (if (ot-ts-date<
-					    (ot--timestamp-encode
-					     (or (get-text-property 0 'sched entry)
-						 (get-text-property 0 'event entry)))
-					    ot-date)
-					   0
-					 (org-element-property
-					  :hour-start
-					  (or (get-text-property 0 'sched entry)
-					      (get-text-property 0 'event entry)))))
-				     entries)))))
+		  (if-let ((ot-view-options)
+			   (hours
+			    (remove
+			     nil
+			     (append
+			      (list (unless (eq ot-view-options 'hide-all)
+				      (decoded-time-hour (decode-time (current-time)))))
+			      (mapcar (lambda (entry)
+					(if (ot-ts-date<
+					     (ot--timestamp-encode
+					      (or (get-text-property 0 'sched entry)
+						  (get-text-property 0 'event entry)))
+					     ot-date)
+					    0
+					  (org-element-property
+					   :hour-start
+					   (or (get-text-property 0 'sched entry)
+					       (get-text-property 0 'event entry)))))
+				      entries)))))
 		      (apply #'min hours)
 		    0))
 		 (scale (/ (float window-height) (float (* (- 24 min-hour) 60))))
@@ -416,20 +416,20 @@ Default background color is used when BASE-COLOR is nil."
 		      (* min-hour 60))))
 		 (columns
 		  (mapcar
-		   (lambda(x)
+		   (lambda (x)
 		     (cons (get-text-property 0 'marker x) 1))
 		   entries))
 		 placed
 		 (bg-rgb-sum (apply #'+ (ot--parse-hex-color ot-background-color)))
 		 (get-color
 		  (if (string= ot-background-color (face-attribute 'default :background))
-		      (lambda(title) (cl-callf (lambda(x) (or x (ot--random-color))) (alist-get title ot-colors nil nil #'equal)))
+		      (lambda (title) (cl-callf (lambda (x) (or x (ot--random-color))) (alist-get title ot-colors nil nil #'equal)))
 		    (setq ot-background-color (face-attribute 'default :background))
 		    (setq ot-sel-block-color
 			  (if (> (setq bg-rgb-sum (apply #'+ (ot--parse-hex-color ot-background-color))) 550)
 			      ot-sel-block-color-light
 			    ot-sel-block-color-dark))
-		    (lambda(title) (setf (alist-get title ot-colors nil nil #'equal) (ot--random-color)))))
+		    (lambda (title) (setf (alist-get title ot-colors nil nil #'equal) (ot--random-color)))))
 		 (hour-lines-color
 		  (if (> bg-rgb-sum 550) "#7b435c" "#cdcdcd")))
 	    (dolist (entry entries)
@@ -437,13 +437,13 @@ Default background color is used when BASE-COLOR is nil."
 		(push entry placed)
 		(setcdr (assq m columns)
 			(catch 'found-column
-			  (let((k 1))
+			  (let ((k 1))
 			    (while t
 			      (catch 'next-column
-				(dolist(el (seq-filter
-					    (lambda(x)
-					      (eq (cdr (assq (get-text-property 0 'marker x) columns)) k))
-					    placed))
+				(dolist (el (seq-filter
+					     (lambda (x)
+					       (eq (cdr (assq (get-text-property 0 'marker x) columns)) k))
+					     placed))
 				  (and (/= (get-text-property 0 'marker el) m)
 				       (ot-tss-are-in-intersection-p
 					(or (get-text-property 0 'sched entry)
@@ -459,11 +459,11 @@ Default background color is used when BASE-COLOR is nil."
 	      (let* ((length (1+ (length (seq-uniq
 					  (mapcar
 					   ;; get columns for those entries
-					   (lambda(x)
+					   (lambda (x)
 					     (cdr (assq (get-text-property 0 'marker x) columns)))
 					   ;; find those with which current entry is in intersection
 					   (seq-filter
-					    (lambda(x)
+					    (lambda (x)
 					      (unless (equal (get-text-property 0 'marker entry) (get-text-property 0 'marker x))
 						(ot-tss-are-in-intersection-p
 						 (or (get-text-property 0 'sched entry)
@@ -483,7 +483,7 @@ Default background color is used when BASE-COLOR is nil."
 				    (* (/ (time-convert
 					   (time-subtract
 					    (if (ot-ts-date< ot-date end-ts)
-						(let((decoded (decode-time ot-date)))
+						(let ((decoded (decode-time ot-date)))
 						  (setf
 						   (decoded-time-hour decoded) 23
 						   (decoded-time-minute decoded) 59
@@ -491,7 +491,7 @@ Default background color is used when BASE-COLOR is nil."
 						  (encode-time decoded))
 					      end-ts)
 					    (if (ot-ts-date< start-ts ot-date)
-						(let((decoded (decode-time ot-date)))
+						(let ((decoded (decode-time ot-date)))
 						  (setf
 						   (decoded-time-hour decoded) 0
 						   (decoded-time-minute decoded) 1
@@ -509,7 +509,7 @@ Default background color is used when BASE-COLOR is nil."
 		       (if (> (* (length title) (default-font-width)) entry-width)
 			   (seq-take
 			    (seq-split title (1- (/ entry-width (default-font-width))))
-			    (let((lines-count (round (/ duration (default-font-height)))))
+			    (let ((lines-count (round (/ duration (default-font-height)))))
 			      (if (= 0 lines-count) 1 lines-count)))
 			 `(,title))
 		       (cond
@@ -604,15 +604,15 @@ Default background color is used when BASE-COLOR is nil."
 	  (svg-print svg-obj)))
       (org-timeblock-mode))))
 
-(defun ot-show-timeblocks()
+(defun ot-show-timeblocks ()
   (switch-to-buffer-other-window ot-buffer)
   (other-window 1))
 
-(defun ot-show-timeblock-list()
+(defun ot-show-timeblock-list ()
   (switch-to-buffer-other-window otl-buffer)
   (other-window 1))
 
-(defun otl-toggle-sort-function()
+(defun otl-toggle-sort-function ()
   (interactive)
   (setq ot-sort-function
 	(if (eq ot-sort-function #'ot-order<)
@@ -620,18 +620,18 @@ Default background color is used when BASE-COLOR is nil."
 	  #'ot-order<))
   (ot-redraw-buffers))
 
-(defun otl-save()
+(defun otl-save ()
   "Save orgmode files, sorting line and tasks positions."
   (interactive)
   (unless (eq major-mode 'org-timeblock-list-mode)
     (user-error "Not in org-timeblock buffer"))
-  (let((count 0)
-       (inhibit-read-only t))
+  (let ((count 0)
+	(inhibit-read-only t))
     (save-excursion
       (goto-char (point-min))
       (while (not (eobp))
-	(when-let((m (get-text-property (point) 'marker))
-		  (id (ot-construct-id m)))
+	(when-let ((m (get-text-property (point) 'marker))
+		   (id (ot-construct-id m)))
 	  (setf (alist-get id (alist-get (format-time-string "%Y-%m-%d" ot-date) otl-entries-pos nil nil #'equal) nil nil #'equal)
 		(cl-incf count)))
 	(when (get-text-property (point) 'sort-ind)
@@ -643,12 +643,12 @@ Default background color is used when BASE-COLOR is nil."
 		(format "\n(setq org-timeblock/sort-line-position '%S)" otl-sort-line-position)))))
   (org-save-all-org-buffers))
 
-(defun ot-quit()
+(defun ot-quit ()
   (interactive)
   ;; (ot-reset-markers)
   (quit-window t))
 
-(defun ot--schedule-time(marker)
+(defun ot--schedule-time (marker)
   (let ((timerangep
 	 (eq
 	  (read-char-from-minibuffer
@@ -674,9 +674,9 @@ Default background color is used when BASE-COLOR is nil."
 
 (defun ot--daterangep (timestamp)
   "Return t, if org timestamp object is a daterange with no time."
-  (when-let((day-end (org-element-property :day-end timestamp))
-	    (month-end (org-element-property :month-end timestamp))
-	    (year-end (org-element-property :year-end timestamp)))
+  (when-let ((day-end (org-element-property :day-end timestamp))
+	     (month-end (org-element-property :month-end timestamp))
+	     (year-end (org-element-property :year-end timestamp)))
     (and
      (or
       (/= (org-element-property :day-start timestamp) day-end)
@@ -685,7 +685,7 @@ Default background color is used when BASE-COLOR is nil."
      (null (org-element-property :hour-start timestamp))
      (null (org-element-property :hour-end timestamp)))))
 
-(defun ot--construct-entry-prefix(timestamp &optional eventp)
+(defun ot--construct-entry-prefix (timestamp &optional eventp)
   "Construct an entry prefix for *org-timeblock* buffer."
   (let ((hstart (org-element-property :hour-start timestamp))
 	(mstart (org-element-property :minute-start timestamp))
@@ -710,12 +710,12 @@ Default background color is used when BASE-COLOR is nil."
 		      mend)))))
      'prefix t)))
 
-(defun ot-read-ts(ts &optional prompt)
+(defun ot-read-ts (ts &optional prompt)
   "Change time for TS interactively and return the changed ts object."
-  (let((decoded (decode-time ts)))
+  (let ((decoded (decode-time ts)))
     (cl-loop
      as
-     res = (let(time)
+     res = (let (time)
 	     (while (< (length time) 4)
 	       (setq time (concat time (char-to-string (read-char-exclusive (concat (or prompt "TIME:") time))))))
 	     (when (string-match-p "[[:digit:]]\\{4\\}" time)
@@ -728,7 +728,7 @@ Default background color is used when BASE-COLOR is nil."
      until res
      finally return res)))
 
-(defun ot-construct-id(&optional marker)
+(defun ot-construct-id (&optional marker)
   (let* ((element (org-element-at-point marker))
 	 (title (org-element-property :title element)))
     (md5
@@ -741,9 +741,9 @@ Default background color is used when BASE-COLOR is nil."
        (org-entry-get marker "TIMESTAMP")))
      nil nil 'utf-8)))
 
-(defun ot-get-event-timestamp()
+(defun ot-get-event-timestamp ()
   "Return an org-element timestamp object of an event at point."
-  (when-let((ts (org-entry-get nil "TIMESTAMP")))
+  (when-let ((ts (org-entry-get nil "TIMESTAMP")))
     (with-temp-buffer
       (insert ts)
       (goto-char (point-min))
@@ -754,7 +754,7 @@ Default background color is used when BASE-COLOR is nil."
   (when-let ((files (org-agenda-files)))
     (sort
      (mapcar
-      (lambda(entry)
+      (lambda (entry)
 	;; setting 'order property not inside of `org-ql-select' call
 	;; because when buffers have not been changed, org-ql uses
 	;; cached results and therefore does not update 'order property,
@@ -779,7 +779,7 @@ Default background color is used when BASE-COLOR is nil."
 		  :exclude-dateranges ,exclude-dateranges
 		  :with-time ,with-time))
 	   :action
-	   (lambda()
+	   (lambda ()
 	     (let ((id (ot-construct-id))
 		   (event (ot-get-event-timestamp))
 		   (title (org-get-heading t nil t t)))
@@ -800,7 +800,7 @@ Default background color is used when BASE-COLOR is nil."
 		  :exclude-dateranges ,exclude-dateranges
 		  :with-time ,with-time))
 	   :action
-	   (lambda()
+	   (lambda ()
 	     (let* ((elem (org-element-at-point))
 		    (sched (org-element-property :scheduled elem))
 		    (id (ot-construct-id))
@@ -816,18 +816,18 @@ Default background color is used when BASE-COLOR is nil."
 		'sched sched)))))))
      (or sort-func ot-sort-function))))
 
-(defun ot-get-colors(tags)
+(defun ot-get-colors (tags)
   (catch 'found
     (dolist (tag tags)
       (when-let ((colors (cdr (assoc tag ot-color-tag-alist))))
 	(throw 'found colors)))))
 
-(defun ot--timestamp-encode(ts &optional end)
-  (let((year-start (org-element-property :year-start ts))
-       (month-start (org-element-property :month-start ts))
-       (day-start (org-element-property :day-start ts))
-       (hour-start (org-element-property :hour-start ts))
-       (minute-start (org-element-property :minute-start ts)))
+(defun ot--timestamp-encode (ts &optional end)
+  (let ((year-start (org-element-property :year-start ts))
+	(month-start (org-element-property :month-start ts))
+	(day-start (org-element-property :day-start ts))
+	(hour-start (org-element-property :hour-start ts))
+	(minute-start (org-element-property :minute-start ts)))
     (if end
 	(when-let ((year-end (org-element-property :year-end ts))
 		   (month-end (org-element-property :month-end ts))
@@ -843,7 +843,7 @@ Default background color is used when BASE-COLOR is nil."
 	      (encode-time (list 0 (or minute-end 0) (or hour-end 0) day-end month-end year-end 0 nil (car (current-time-zone)))))))
       (encode-time (list 0 (or minute-start 0) (or hour-start 0) day-start month-start year-start 0 nil (car (current-time-zone)))))))
 
-(defun ot--schedule(start-ts &optional end-ts marker)
+(defun ot--schedule (start-ts &optional end-ts marker)
   (save-window-excursion
     (save-excursion
       (save-restriction
@@ -883,10 +883,10 @@ Default background color is used when BASE-COLOR is nil."
 	      (when (re-search-forward "^SCHEDULED:.+>" (line-end-position) t)
 		(insert "--" (ot-ts-to-org-timerange end-ts nil repeat-string warning-string)))))))))))
 
-(defun ot-delete-event-timestamp()
+(defun ot-delete-event-timestamp ()
   "Delete event timestamp for an entry at point and leave the point
 where the timestamp was."
-  (let((end (save-excursion (outline-next-heading) (point))))
+  (let ((end (save-excursion (outline-next-heading) (point))))
     (while
 	(not (and
 	      (or (re-search-forward org-tr-regexp end t)
@@ -901,13 +901,13 @@ where the timestamp was."
 
 (defun ot-ts-to-org-timerange (ts-start &optional ts-end repeat-string warning-string)
   "Create an Org timestamp range from START-D/T, END-D/T."
-  (when-let((start-date (format-time-string "%Y-%m-%d %a" ts-start)))
+  (when-let ((start-date (format-time-string "%Y-%m-%d %a" ts-start)))
     (let ((start-time
-	   (let((res (format-time-string "%R" ts-start)))
+	   (let ((res (format-time-string "%R" ts-start)))
 	     (and (not (string= res "00:00")) res)))
 	  (end-date (and ts-end (format-time-string "%Y-%m-%d %a" ts-end)))
 	  (end-time (and ts-end
-			 (let((res (format-time-string "%R" ts-end)))
+			 (let ((res (format-time-string "%R" ts-end)))
 			   (and (not (string= res "00:00")) res))))
 	  (timestamp-end
            (concat
@@ -926,8 +926,8 @@ where the timestamp was."
 	   (and end-time (concat " " end-time)))))
        timestamp-end))))
 
-(defun ot--update-prefix(timestamp &optional eventp)
-  (let((inhibit-read-only t))
+(defun ot--update-prefix (timestamp &optional eventp)
+  (let ((inhibit-read-only t))
     (save-excursion
       (beginning-of-line)
       (text-property-search-forward 'prefix nil)
@@ -937,7 +937,7 @@ where the timestamp was."
 	       (ot--construct-entry-prefix timestamp eventp)
 	       (text-properties-at (point)))))))
 
-(defun ot--duration(marker)
+(defun ot--duration (marker)
   (let (new-end-ts timestamp start-ts duration)
     (with-current-buffer (marker-buffer marker)
       (goto-char (marker-position marker))
@@ -950,16 +950,16 @@ where the timestamp was."
       (setq start-ts (ot--timestamp-encode timestamp))
       (while (not
 	      (setq duration
-		    (let((time ""))
+		    (let ((time ""))
 		      (catch 'dur
 			(while t
-			  (when-let((char (read-char-exclusive (concat "DURATION:" time))))
+			  (when-let ((char (read-char-exclusive (concat "DURATION:" time))))
 			    (cond
 			     ((eq ?q char)
 			      (setq time "")
 			      (throw 'dur t))
 			     ((eq ? char)
-			      (let(hours minutes)
+			      (let (hours minutes)
 				(if (not (string-match "^\\(?:\\([0-9]+\\)h\\)?\\([0-9]+\\)?" time))
 				    (setq time "")
 				  (setq hours (and (match-string 1 time) (string-to-number (match-string 1 time))))
@@ -968,7 +968,7 @@ where the timestamp was."
 				    (setq time (number-to-string (+ (or minutes 0) (if hours (* hours 60) 0))))
 				    (throw 'dur t)))))
 			     ((eq ?m char)
-			      (let(hours minutes)
+			      (let (hours minutes)
 				(if (not (string-match "^\\(?:\\([0-9]+\\)h\\)?\\([0-9]+\\)" time))
 				    (setq time "")
 				  (setq hours (and (match-string 1 time) (string-to-number (match-string 1 time))))
@@ -992,13 +992,13 @@ where the timestamp was."
        (org-element-property :scheduled (org-element-at-point))
        (ot-get-event-timestamp)))))
 
-(defun otl-drag-line-backward()
+(defun otl-drag-line-backward ()
   "Drag an agenda line backward by ARG lines."
   (interactive)
   (otl-drag-line-forward t))
 
-(defun ot--set-todo(m todo)
-  (when(and m todo)
+(defun ot--set-todo (m todo)
+  (when (and m todo)
     (with-current-buffer (marker-buffer m)
       (goto-char m)
       (org-fold-show-context 'agenda)
@@ -1031,7 +1031,7 @@ and sorted by `SORTING-PROPERTY' property."))
 ;;;; Main commands
 
 ;;;###autoload
-(defun org-timeblock-list()
+(defun org-timeblock-list ()
   (interactive)
   (switch-to-buffer otl-buffer)
   (setq ot-date (current-time))
@@ -1042,7 +1042,7 @@ and sorted by `SORTING-PROPERTY' property."))
   (ot-redraw-buffers))
 
 ;;;###autoload
-(defun org-timeblock()
+(defun org-timeblock ()
   (interactive)
   (switch-to-buffer ot-buffer)
   (setq ot-date (current-time))
@@ -1054,10 +1054,10 @@ and sorted by `SORTING-PROPERTY' property."))
 
 ;;;; Planning commands
 
-(defun ot-new-task()
+(defun ot-new-task ()
   "Create a task scheduled to the date in the current view"
   (interactive)
-  (let(title)
+  (let (title)
     (while (or (not title)
 	       (string-empty-p title))
       (setq title (read-string "Heading: ")))
@@ -1072,7 +1072,7 @@ and sorted by `SORTING-PROPERTY' property."))
     (kill-buffer))
   (ot-redraw-buffers))
 
-(defun otl-set-duration()
+(defun otl-set-duration ()
   "Change schedule property duration for a task at point inside
 `org-timeblock-list-mode'"
   (interactive)
@@ -1084,28 +1084,28 @@ and sorted by `SORTING-PROPERTY' property."))
     (when (get-buffer-window ot-buffer)
       (ot-redraw-timeblocks))))
 
-(defun ot-schedule()
+(defun ot-schedule ()
   "Reschedule a selected block inside `org-timeblock-mode'"
   (interactive)
-  (when-let((marker (ot-selected-block-marker)))
+  (when-let ((marker (ot-selected-block-marker)))
     (ot--schedule-time marker)
     (ot-redraw-buffers)
     (org-timeblock-mode)))
 
-(defun ot-set-duration()
+(defun ot-set-duration ()
   "Change schedule property duration for a task bound to a selected
 block inside `org-timeblock-mode'"
   (interactive)
-  (when-let((marker (ot-selected-block-marker)))
+  (when-let ((marker (ot-selected-block-marker)))
     (ot--duration marker)
     (ot-redraw-buffers)
     (org-timeblock-mode)))
 
-(defun otl-schedule()
+(defun otl-schedule ()
   (interactive)
   (when (ot--daterangep (get-text-property (line-beginning-position) 'sched))
     (user-error "Can not reschedule entries with daterange timestamp"))
-  (when-let((sched (ot--schedule-time (get-text-property (line-beginning-position) 'marker))))
+  (when-let ((sched (ot--schedule-time (get-text-property (line-beginning-position) 'marker))))
     (ot--update-prefix sched)
     (forward-line)
     (when (get-buffer-window ot-buffer)
@@ -1113,11 +1113,11 @@ block inside `org-timeblock-mode'"
 
 ;;;; Navigation commands
 
-(defun ot-select-block-under-mouse()
+(defun ot-select-block-under-mouse ()
   (interactive)
   (cl-macrolet ((get-number (n) `(string-to-number (match-string-no-properties ,n))))
-    (when-let((pos (ot-mouse-pixel-pos))
-	      (inhibit-read-only t))
+    (when-let ((pos (ot-mouse-pixel-pos))
+	       (inhibit-read-only t))
       (goto-char (point-min))
       (when (re-search-forward (format " fill=\"\\(%s\\)\"" ot-sel-block-color) nil t)
 	(replace-match (or ot-prev-selected-block-color "#ffffff") nil nil nil 1)
@@ -1136,19 +1136,19 @@ block inside `org-timeblock-mode'"
 	(replace-match ot-sel-block-color nil nil nil 1))
       (org-timeblock-mode))))
 
-(defun otl-next-line()
+(defun otl-next-line ()
   (interactive)
   (funcall-interactively 'next-line)
   (ot-select-block-for-current-entry))
 
-(defun otl-previous-line()
+(defun otl-previous-line ()
   (interactive)
   (funcall-interactively 'previous-line)
   (ot-select-block-for-current-entry))
 
-(defun ot-forward-block()
+(defun ot-forward-block ()
   (interactive)
-  (let((inhibit-read-only t))
+  (let ((inhibit-read-only t))
     (goto-char (point-min))
     (when (re-search-forward (format " fill=\"\\(%s\\)\"" ot-sel-block-color) nil t)
       (replace-match ot-prev-selected-block-color nil nil nil 1)
@@ -1162,9 +1162,9 @@ block inside `org-timeblock-mode'"
       (replace-match ot-sel-block-color nil nil nil 1)
       (org-timeblock-mode))))
 
-(defun ot-backward-block()
+(defun ot-backward-block ()
   (interactive)
-  (let((inhibit-read-only t))
+  (let ((inhibit-read-only t))
     (goto-char (point-max))
     (when (re-search-backward (format " fill=\"\\(%s\\)\"" ot-sel-block-color) nil t)
       (replace-match ot-prev-selected-block-color nil nil nil 1)
@@ -1178,48 +1178,48 @@ block inside `org-timeblock-mode'"
       (replace-match ot-sel-block-color nil nil nil 1)
       (org-timeblock-mode))))
 
-(defun ot-forward-day()
+(defun ot-forward-day ()
   (interactive)
   (setq ot-date (time-add ot-date (* 24 60 60)))
   (ot-redraw-buffers))
 
-(defun ot-jump-to-day()
+(defun ot-jump-to-day ()
   (interactive)
-  (when-let((date (org-read-date nil t)))
+  (when-let ((date (org-read-date nil t)))
     (setq ot-date date)
     (ot-redraw-buffers)))
 
-(defun ot-backward-day()
+(defun ot-backward-day ()
   (interactive)
   (setq ot-date (time-subtract ot-date (* 24 60 60)))
   (ot-redraw-buffers))
 
 ;;;; View commands
 
-(defun ot-goto-other-window()
+(defun ot-goto-other-window ()
   (interactive)
   (unless (eq major-mode 'org-timeblock-list-mode)
     (user-error "Not in org-timeblock buffer"))
-  (let((marker (get-text-property (point) 'marker)))
+  (let ((marker (get-text-property (point) 'marker)))
     (switch-to-buffer-other-window (marker-buffer marker))
     (goto-char (marker-position marker))
     (ignore-errors (org-fold-core--isearch-reveal (point)))
     (recenter)))
 
-(defun ot-goto-other-window-svg()
+(defun ot-goto-other-window-svg ()
   (interactive)
   (goto-char (point-min))
   (search-forward "</rect>" nil t)
   (when (re-search-forward (format " fill=\"%s\".*? id=\"\\(.+?\\)\"" ot-sel-block-color) nil t)
-    (when-let((inhibit-read-only t)
-	      (id (match-string-no-properties 1))
-	      (m (cdr (seq-find (lambda(x) (string= (car x) id)) ot-markers))))
+    (when-let ((inhibit-read-only t)
+	       (id (match-string-no-properties 1))
+	       (m (cdr (seq-find (lambda (x) (string= (car x) id)) ot-markers))))
       (switch-to-buffer-other-window (marker-buffer m))
       (goto-char (marker-position m))
       (ignore-errors (org-fold-core--isearch-reveal (point)))
       (recenter))))
 
-(defun ot-switch-view()
+(defun ot-switch-view ()
   (interactive)
   (setq ot-view-options
 	(pcase ot-view-options
@@ -1228,27 +1228,27 @@ block inside `org-timeblock-mode'"
 	  (`t 'nil)))
   (ot-redraw-timeblocks))
 
-(defun otl-toggle-timeblock()
+(defun otl-toggle-timeblock ()
   (interactive)
   (if-let ((window (get-buffer-window ot-buffer)))
       (delete-window window)
     (ot-show-timeblocks)
     (ot-redraw-timeblocks)))
 
-(defun ot-toggle-timeblock-list()
+(defun ot-toggle-timeblock-list ()
   (interactive)
   (if-let ((window (get-buffer-window otl-buffer)))
       (delete-window window)
     (ot-show-timeblock-list))
   (ot-redraw-buffers))
 
-(defun ot-redraw-buffers()
+(defun ot-redraw-buffers ()
   "Redraw org-timeblock-list-mode and org-timeblock-timeline-mode buffer"
   ;; org-timeblock-list-mode and org-timeblock-mode
   (interactive)
   (with-current-buffer (get-buffer-create otl-buffer)
-    (let((inhibit-read-only t)
-	 (entries (ot-get-entries)))
+    (let ((inhibit-read-only t)
+	  (entries (ot-get-entries)))
       (erase-buffer)
       (org-timeblock-list-mode)
       (setq
@@ -1267,7 +1267,7 @@ block inside `org-timeblock-mode'"
 	'face 'otl-header))
       (insert "\n")
       (dolist (entry entries)
-	(let((colors (ot-get-colors (get-text-property 0 'tags entry))))
+	(let ((colors (ot-get-colors (get-text-property 0 'tags entry))))
 	  (insert
 	   (propertize
 	    (concat entry "\n")
@@ -1284,7 +1284,7 @@ block inside `org-timeblock-mode'"
 
 ;;;; Predicates
 
-(org-ql-defpred active-timestamp(&key on exclude-dateranges with-time)
+(org-ql-defpred active-timestamp (&key on exclude-dateranges with-time)
   "Search for entries that are `SCHEDULED' to ON
 ON format: YYYY-MM-DD"
   :preambles
@@ -1294,20 +1294,20 @@ ON format: YYYY-MM-DD"
      :regexp
      (concat "<.+?>\\(--<.+?>\\)?"))))
   :body
-  (when-let((on-ts
-	     (when (stringp on)
-	       (if-let (((string-match-p "^[0-9]\\{4\\}-[01][0-9]-[0-3][0-9]$" on))
-			(time (parse-time-string on))
-			((setf (decoded-time-hour time) 0
-			       (decoded-time-minute time) 0
-			       (decoded-time-second time) 0)))
-		   (encode-time time)
-		 (user-error "wrong date format = %s" on))))
-	    (timestamp (ot-get-event-timestamp))
-	    ((not (and exclude-dateranges (ot--daterangep timestamp))))
-	    ((or (not with-time) (org-element-property :hour-start timestamp)))
-	    (start-ts (ot--timestamp-encode timestamp)))
-    (let((end-ts (ot--timestamp-encode timestamp t)))
+  (when-let ((on-ts
+	      (when (stringp on)
+		(if-let (((string-match-p "^[0-9]\\{4\\}-[01][0-9]-[0-3][0-9]$" on))
+			 (time (parse-time-string on))
+			 ((setf (decoded-time-hour time) 0
+				(decoded-time-minute time) 0
+				(decoded-time-second time) 0)))
+		    (encode-time time)
+		  (user-error "wrong date format = %s" on))))
+	     (timestamp (ot-get-event-timestamp))
+	     ((not (and exclude-dateranges (ot--daterangep timestamp))))
+	     ((or (not with-time) (org-element-property :hour-start timestamp)))
+	     (start-ts (ot--timestamp-encode timestamp)))
+    (let ((end-ts (ot--timestamp-encode timestamp t)))
       (or
        (ot-ts-date= start-ts on-ts)
        (ot-ts-date= end-ts on-ts)
@@ -1318,7 +1318,7 @@ ON format: YYYY-MM-DD"
 
 ;; See https://github.com/alphapapa/org-ql/pull/237
 ;; TODO delete `org-ql' prefix
-(org-ql-defpred ot-org-ql-scheduled(&key on exclude-dateranges with-time)
+(org-ql-defpred ot-org-ql-scheduled (&key on exclude-dateranges with-time)
   "Search for entries that have `SCHEDULED' set to ON date
 ON format: YYYY-MM-DD"
   :preambles
@@ -1328,20 +1328,20 @@ ON format: YYYY-MM-DD"
      :regexp
      "^SCHEDULED:[ \t]+<.+?>\\(?:--<.+?>\\)?")))
   :body
-  (when-let((on-ts
-	     (when (stringp on)
-	       (if-let (((string-match-p "^[0-9]\\{4\\}-[01][0-9]-[0-3][0-9]$" on))
-			(time (parse-time-string on))
-			((setf (decoded-time-hour time) 0
-			       (decoded-time-minute time) 0
-			       (decoded-time-second time) 0)))
-		   (encode-time time)
-		 (user-error "wrong date format = %s" on))))
-	    (sched (org-element-property :scheduled (org-element-at-point)))
-	    ((not (and exclude-dateranges (ot--daterangep sched))))
-	    ((or (not with-time) (org-element-property :hour-start sched)))
-	    (start-ts (ot--timestamp-encode sched)))
-    (let((end-ts (ot--timestamp-encode sched t)))
+  (when-let ((on-ts
+	      (when (stringp on)
+		(if-let (((string-match-p "^[0-9]\\{4\\}-[01][0-9]-[0-3][0-9]$" on))
+			 (time (parse-time-string on))
+			 ((setf (decoded-time-hour time) 0
+				(decoded-time-minute time) 0
+				(decoded-time-second time) 0)))
+		    (encode-time time)
+		  (user-error "wrong date format = %s" on))))
+	     (sched (org-element-property :scheduled (org-element-at-point)))
+	     ((not (and exclude-dateranges (ot--daterangep sched))))
+	     ((or (not with-time) (org-element-property :hour-start sched)))
+	     (start-ts (ot--timestamp-encode sched)))
+    (let ((end-ts (ot--timestamp-encode sched t)))
       (or
        (ot-ts-date= start-ts on-ts)
        (ot-ts-date= end-ts on-ts)
@@ -1356,7 +1356,7 @@ ON format: YYYY-MM-DD"
 
 ;; Local Variables:
 ;;   outline-regexp: "^\\(;\\{3,\\} \\)"
-;;   eval: (progn (outline-minor-mode 1) (outline-hide-region-body(point-min)(point-max)))
+;;   eval: (progn (outline-minor-mode 1) (outline-hide-region-body (point-min) (point-max)))
 ;;   read-symbol-shorthands: (("ot-" . "org-timeblock-") ("otl-" . "org-timeblock-list-"))
 ;; End:
 
