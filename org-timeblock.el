@@ -83,15 +83,20 @@ as `describe-key'."
   :group 'org-timeblock
   :type 'boolean)
 
-(defcustom ot-color-tag-alist
+(defcustom ot-color-tag-list
   nil
-  "List of lists where each list is of the form `(\"tagname\"
-\"background color\" \"foreground color\")'. Colors are set in hex
-format. Example:
+  "List of lists where each list is of the form
+(\"tagname\" \"background color\" \"foreground color\"). Colors
+are set in hex format. Example:
 
-`((\"tag1\" \"#f3d000\" \"#000000\")
-  (\"tag2\" \"#ff8f88\" \"#000000\"))'"
-  :type 'alist
+((\"tag1\" \"#f3d000\" \"#000000\")
+ (\"tag2\" \"#ff8f88\" \"#000000\"))
+
+In org-timeblock-mode, timeblocks tagged with a tag in car are
+painted in background color. In org-timeblock-list-mode, both
+background and foreground colors are used to colorize items that
+are tagged with a tag in car."
+  :type 'list
   :group 'org-timeblock)
 
 ;;;; Variables
@@ -816,7 +821,7 @@ Default background color is used when BASE-COLOR is nil."
 (defun ot-get-colors (tags)
   (catch 'found
     (dolist (tag tags)
-      (when-let ((colors (cdr (assoc tag ot-color-tag-alist))))
+      (when-let ((colors (cdr (seq-find (lambda (x) (string= (car x) tag)) ot-color-tag-list))))
 	(throw 'found colors)))))
 
 (defun ot--timestamp-encode (ts &optional end)
@@ -1269,7 +1274,7 @@ block inside `org-timeblock-mode'"
 	   (propertize
 	    (concat entry "\n")
 	    'face
-	    `(:background ,(car colors) :foreground ,(cdr colors))))))
+	    `(:background ,(car colors) :foreground ,(cadr colors))))))
       (goto-char (point-min))
       (when (eq ot-sort-function #'ot-order<)
 	(forward-line
