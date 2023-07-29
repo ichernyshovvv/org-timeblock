@@ -117,6 +117,3 @@ For now, only manual installation is available. To install:
 - org-timeblock-color-tag-alist. List of lists where each list is of
   the form ~'("tagname" "background color" "foreground color")~. Colors are set in hex format.
 
-** TODOs (patches/PRs are welcome)
-
-- [ ] org-timeblock-mode: Rewrite the algrorithm for placing timeblocks

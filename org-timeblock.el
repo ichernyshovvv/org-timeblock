@@ -51,8 +51,7 @@
 
 (defcustom ot-inbox-file
   (expand-file-name "inbox.org" org-directory)
-  "Orgmode file path used to create a new task via
-`org-timeblock-new-task' command"
+  "Org file in which new tasks are created when using `org-timeblock-new-task' command."
   :group 'org-timeblock
   :type 'file)
 
@@ -60,9 +59,9 @@
   "Options that are used to decide which part of visual schedule must be hidden."
   :group 'org-timeblock
   :type '(choice
-	  (const :tag "Hide passed and free time" t)
-	  (const :tag "Do not hide anything" nil)
-	  (const :tag "Hide space of free, passed and not passed time" hide-all)))
+	  (const :tag "Hide hours in the past (if there are no timeblocks)." t)
+	  (const :tag "Do not hide anything.  All 24 hours will be displayed." nil)
+	  (const :tag "Hide all free hours before the first timeblock." hide-all)))
 
 (defcustom ot-todo-commands
   '(("TODO" . "1")
@@ -229,7 +228,7 @@ tasks and those tasks that have not been sorted yet.")
 	    (- (cdr mouse-pos) (cadr pos))))))
 
 (defun ot-selected-block-marker ()
-  ""
+  "Return a marker pointing to the org entry of selected timeblock."
   (goto-char (point-min))
   (and
    (re-search-forward (format " fill=\"%s\".*? id=\"\\(.+?\\)\"" ot-sel-block-color) nil t)
@@ -673,7 +672,7 @@ Default background color is used when BASE-COLOR is nil."
       (org-element-property :scheduled (org-element-at-point)))))
 
 (defun ot--daterangep (timestamp)
-  "Return t, if org timestamp object is a daterange with no time."
+  "Return t if org timestamp object TIMESTAMP is a daterange with no time."
   (when-let ((day-end (org-element-property :day-end timestamp))
 	     (month-end (org-element-property :month-end timestamp))
 	     (year-end (org-element-property :year-end timestamp)))
@@ -686,7 +685,11 @@ Default background color is used when BASE-COLOR is nil."
      (null (org-element-property :hour-end timestamp)))))
 
 (defun ot--construct-entry-prefix (timestamp &optional eventp)
-  "Construct an entry prefix for *org-timeblock* buffer."
+  "Construct an entry prefix for *org-timeblock-list* buffer.
+
+TIMESTAMP is org-element timestamp object which is used to
+construct a timerange inside the prefix.  If EVENTP is non-nil,
+insert \"EVENT\" in the prefix."
   (let ((hstart (org-element-property :hour-start timestamp))
 	(mstart (org-element-property :minute-start timestamp))
 	(hend (org-element-property :hour-end timestamp))
@@ -710,14 +713,18 @@ Default background color is used when BASE-COLOR is nil."
 		      mend)))))
      'prefix t)))
 
-(defun ot-read-ts (ts &optional prompt)
-  "Change time for TS interactively and return the changed ts object."
-  (let ((decoded (decode-time ts)))
+(cl-defun ot-read-ts (time &optional (prompt "TIME:"))
+  "Read a time in \"HHMM\" format and set it to internal time object TIME.
+
+Return the changed time object.
+
+PROMPT can overwrite the default prompt."
+  (let ((decoded (decode-time time)))
     (cl-loop
      as
      res = (let (time)
 	     (while (< (length time) 4)
-	       (setq time (concat time (char-to-string (read-char-exclusive (concat (or prompt "TIME:") time))))))
+	       (setq time (concat time (char-to-string (read-char-exclusive (concat prompt time))))))
 	     (when (string-match-p "[[:digit:]]\\{4\\}" time)
 	       (setf
 		(decoded-time-hour decoded)
@@ -750,7 +757,17 @@ Default background color is used when BASE-COLOR is nil."
       (org-element-timestamp-parser))))
 
 (cl-defun ot-get-entries (&key sort-func exclude-dateranges with-time)
-  "Get entries relevant to `org-timeblock-date'."
+  "Get entries relevant to `org-timeblock-date'.
+
+SORT-FUNC is either nil, in which case items are sorted via
+`ot-sort-function'; or a function that accepts two items as
+arguments and returns nil or non-nil.
+
+When EXCLUDE-DATERANGES is non-nil, exclude scheduled entries or
+events with a daterange with no times.
+
+When WITH-TIME is non-nil, each entry must contain a timestamp
+with time (timerange or just start time)."
   (when-let ((files (org-agenda-files)))
     (sort
      (mapcar
@@ -1009,8 +1026,7 @@ where the timestamp was."
 When the optional argument `backward' is non-nil, move backward."
   (interactive)
   (unless (eq ot-sort-function #'ot-order<)
-    (user-error "Can't drag lines if entries aren't displayed
-and sorted by `SORTING-PROPERTY' property."))
+    (user-error "Can't drag lines if entries aren't displayed and sorted by `SORTING-PROPERTY' property"))
   (unless (or (get-text-property (point) 'marker)
 	      (get-text-property (point) 'sort-ind))
     (user-error "Can not move this line"))
@@ -1199,6 +1215,7 @@ block inside `org-timeblock-mode'"
 ;;;; View commands
 
 (defun ot-goto-other-window ()
+  "Jump to the org heading of an entry at point."
   (interactive)
   (unless (eq major-mode 'org-timeblock-list-mode)
     (user-error "Not in org-timeblock buffer"))
@@ -1209,6 +1226,7 @@ block inside `org-timeblock-mode'"
     (recenter)))
 
 (defun ot-goto-other-window-svg ()
+  "Jump to the org heading of selected timeblock."
   (interactive)
   (goto-char (point-min))
   (search-forward "</rect>" nil t)
@@ -1222,6 +1240,12 @@ block inside `org-timeblock-mode'"
       (recenter))))
 
 (defun ot-switch-view ()
+  "Switch between different views in org-timeblock-mode.
+
+Available view options:
+1. Do not hide anything.  All 24 hours will be displayed.
+2. Hide hours in the past (if there are no timeblocks).
+3. Hide all free hours before the first timeblock."
   (interactive)
   (setq ot-view-options
 	(pcase ot-view-options
@@ -1231,6 +1255,7 @@ block inside `org-timeblock-mode'"
   (ot-redraw-timeblocks))
 
 (defun otl-toggle-timeblock ()
+  "Toggle the display of the window with org-timeblock-mode."
   (interactive)
   (if-let ((window (get-buffer-window ot-buffer)))
       (delete-window window)
@@ -1238,6 +1263,7 @@ block inside `org-timeblock-mode'"
     (ot-redraw-timeblocks)))
 
 (defun ot-toggle-timeblock-list ()
+  "Toggle the display of the window with org-timeblock-list-mode."
   (interactive)
   (if-let ((window (get-buffer-window otl-buffer)))
       (delete-window window)
@@ -1245,7 +1271,7 @@ block inside `org-timeblock-mode'"
   (ot-redraw-buffers))
 
 (defun ot-redraw-buffers ()
-  "Redraw org-timeblock-list-mode and org-timeblock-timeline-mode buffer"
+  "Redraw org-timeblock-list-mode and org-timeblock-timeline-mode buffers."
   ;; org-timeblock-list-mode and org-timeblock-mode
   (interactive)
   (with-current-buffer (get-buffer-create otl-buffer)
@@ -1287,8 +1313,13 @@ block inside `org-timeblock-mode'"
 ;;;; Predicates
 
 (org-ql-defpred active-timestamp (&key on exclude-dateranges with-time)
-  "Search for entries that are `SCHEDULED' to ON
-ON format: YYYY-MM-DD"
+  "Search for events that have a timestamp set to ON
+ON format: \"YYYY-MM-DD\"
+
+When EXCLUDE-DATERANGES is non-nil, exclude events with a daterange with no times.
+
+When WITH-TIME is non-nil, each event must contain a timestamp
+with time (timerange or just start time)."
   :preambles
   ((`(active-timestamp . ,on)
     (list
@@ -1304,7 +1335,7 @@ ON format: YYYY-MM-DD"
 				(decoded-time-minute time) 0
 				(decoded-time-second time) 0)))
 		    (encode-time time)
-		  (user-error "wrong date format = %s" on))))
+		  (user-error "Wrong date format = %s" on))))
 	     (timestamp (ot-get-event-timestamp))
 	     ((not (and exclude-dateranges (ot--daterangep timestamp))))
 	     ((or (not with-time) (org-element-property :hour-start timestamp)))
@@ -1322,7 +1353,13 @@ ON format: YYYY-MM-DD"
 ;; TODO delete `org-ql' prefix
 (org-ql-defpred ot-org-ql-scheduled (&key on exclude-dateranges with-time)
   "Search for entries that have `SCHEDULED' set to ON date
-ON format: YYYY-MM-DD"
+ON format: \"YYYY-MM-DD\"
+
+When EXCLUDE-DATERANGES is non-nil, exclude scheduled entries
+with a daterange with no times.
+
+When WITH-TIME is non-nil, each entry must be scheduled to a
+timestamp with time (timerange or just start time)."
   :preambles
   ((`(ot-org-ql-scheduled . ,on)
     (list
@@ -1338,7 +1375,7 @@ ON format: YYYY-MM-DD"
 				(decoded-time-minute time) 0
 				(decoded-time-second time) 0)))
 		    (encode-time time)
-		  (user-error "wrong date format = %s" on))))
+		  (user-error "Wrong date format = %s" on))))
 	     (sched (org-element-property :scheduled (org-element-at-point)))
 	     ((not (and exclude-dateranges (ot--daterangep sched))))
 	     ((or (not with-time) (org-element-property :hour-start sched)))
