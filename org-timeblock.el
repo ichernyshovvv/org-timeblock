@@ -209,6 +209,16 @@ tasks and those tasks that have not been sorted yet.")
 
 ;;;; Functions
 
+(cl-defsubst ot-get-sched (&optional object (position 0))
+  (get-text-property position 'sched object))
+
+(cl-defsubst ot-get-event (&optional object (position 0))
+  (get-text-property position 'event object))
+
+(cl-defsubst ot-get-sched-or-event (&optional object (position 0))
+  (or (ot-get-sched object position)
+      (ot-get-event object position)))
+
 (defun ot-mouse-pixel-pos ()
   (when-let ((mouse-pos (cdr (mouse-pixel-position)))
 	     (window (get-buffer-window ot-buffer))
@@ -270,15 +280,13 @@ tasks and those tasks that have not been sorted yet.")
   (defun ot-sched-or-event< (a b)
     (on (lambda (item)
           (ot--timestamp-encode
-           (or (get-text-property 0 'sched item)
-               (get-text-property 0 'event item))))
+           (ot-get-sched-or-event item)))
         time-less-p a b)))
 
 (defun ot-select-block-for-current-entry ()
   (when-let (((not
 	       (ot--daterangep
-		(or (get-text-property (line-beginning-position) 'event)
-		    (get-text-property (line-beginning-position) 'sched)))))
+                (ot-get-sched-or-event nil (line-beginning-position)))))
 	     (id (get-text-property (line-beginning-position) 'id))
 	     (inhibit-read-only t)
              ((get-buffer-window ot-buffer)))
@@ -395,18 +403,13 @@ Default background color is used when BASE-COLOR is nil."
 			     (append
 			      (list (unless (eq ot-view-options 'hide-all)
 				      (decoded-time-hour (decode-time (current-time)))))
-			      (mapcar (lambda (entry)
-					(if (ot-ts-date<
-					     (ot--timestamp-encode
-					      (or (get-text-property 0 'sched entry)
-						  (get-text-property 0 'event entry)))
-					     ot-date)
-					    0
-					  (org-element-property
-					   :hour-start
-					   (or (get-text-property 0 'sched entry)
-					       (get-text-property 0 'event entry)))))
-				      entries)))))
+			      (mapcar
+                               (lambda (entry)
+				 (let ((s-or-e (ot-get-sched-or-event entry)))
+                                   (if (ot-ts-date< (ot--timestamp-encode s-or-e) ot-date)
+				       0
+				     (org-element-property :hour-start s-or-e))))
+			       entries)))))
 		      (apply #'min hours)
 		    0))
 		 (scale (/ (float window-height) (float (* (- 24 min-hour) 60))))
@@ -448,10 +451,8 @@ Default background color is used when BASE-COLOR is nil."
 					     placed))
 				  (and (/= (get-text-property 0 'marker el) m)
 				       (ot-tss-intersect-p
-					(or (get-text-property 0 'sched entry)
-					    (get-text-property 0 'event entry))
-					(or (get-text-property 0 'sched el)
-					    (get-text-property 0 'event el)))
+                                        (ot-get-sched-or-event entry)
+                                        (ot-get-sched-or-event el))
 				       (cl-incf k)
 				       (throw 'next-column t)))
 				(throw 'found-column k))))))))
@@ -468,16 +469,13 @@ Default background color is used when BASE-COLOR is nil."
 					    (lambda (x)
 					      (unless (equal (get-text-property 0 'marker entry) (get-text-property 0 'marker x))
 						(ot-tss-intersect-p
-						 (or (get-text-property 0 'sched entry)
-						     (get-text-property 0 'event entry))
-						 (or (get-text-property 0 'sched x)
-						     (get-text-property 0 'event x)))))
+                                                 (ot-get-sched-or-event entry)
+                                                 (ot-get-sched-or-event x))))
 					    entries))
 					  #'eq))))
 		     (x (+ timeline-left-padding (round (* (1- (cdr (assq (get-text-property 0 'marker entry) columns))) (/ entry-max-width length)))))
 		     (entry-width (round (/ entry-max-width length)))
-		     (timestamp (or (get-text-property 0 'sched entry)
-				    (get-text-property 0 'event entry)))
+		     (timestamp (ot-get-sched-or-event entry))
 		     (start-ts (ot--timestamp-encode timestamp))
 		     (end-ts (ot--timestamp-encode timestamp t))
 		     (duration (if (and start-ts end-ts)
