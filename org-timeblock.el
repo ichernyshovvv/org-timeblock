@@ -536,8 +536,8 @@ Default background color is used when BASE-COLOR is nil."
 		  'rect
 		  `((height . ,duration)
 		    (width . ,entry-width)
-		    (stroke . ,(if (get-text-property 0 'event entry) "#5b0103" "#cdcdcd"))
-		    (stroke-width . ,(if (get-text-property 0 'event entry) 2 1))
+		    (stroke . ,(if (ot-get-event entry) "#5b0103" "#cdcdcd"))
+		    (stroke-width . ,(if (ot-get-event entry) 2 1))
 		    (opacity . "0.95")
 		    (y . ,y)
 		    (x . ,x)
@@ -1092,10 +1092,10 @@ When the optional argument `backward' is non-nil, move backward."
   "Change schedule property duration for a task at point inside
 `org-timeblock-list-mode'"
   (interactive)
-  (when (ot--daterangep (get-text-property (line-beginning-position) 'sched))
+  (when (ot--daterangep (ot-get-sched nil (line-beginning-position)))
     (user-error "Can not reschedule entries with daterange timestamp"))
   (when-let ((timestamp (ot--duration (get-text-property (line-beginning-position) 'marker))))
-    (ot--update-prefix timestamp (get-text-property (line-beginning-position) 'event))
+    (ot--update-prefix timestamp (ot-get-event nil (line-beginning-position)))
     (forward-line)
     (when (get-buffer-window ot-buffer)
       (ot-redraw-timeblocks))))
@@ -1119,7 +1119,7 @@ block inside `org-timeblock-mode'"
 
 (defun otl-schedule ()
   (interactive)
-  (when (ot--daterangep (get-text-property (line-beginning-position) 'sched))
+  (when (ot--daterangep (ot-get-sched nil (line-beginning-position)))
     (user-error "Can not reschedule entries with daterange timestamp"))
   (when-let ((sched (ot--schedule-time (get-text-property (line-beginning-position) 'marker))))
     (ot--update-prefix sched)
