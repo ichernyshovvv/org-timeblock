@@ -20,7 +20,7 @@ There are two major modes provided by the package:
 - ~org-timeblock-mode~. Displays visual schedule (timeblocks) of org
   tasks that are scheduled or have an active timestamp in their body
   (orgmode events) for selected day. Available commands:
-  - org-timeblock-forward/backward-day ~[C-<down>/<up>]~
+  - org-timeblock-day-earlier/later ~[C-<down>/<up>]~
   - org-timeblock-set-duration ~[d]~
   - org-timeblock-reschedule ~[s]~
   - org-timeblock-new-task ~[+]~
@@ -56,8 +56,8 @@ For both modes, the default date is today. All the tasks and events
 are searched in ~(org-agenda-files)~. You can change the displayed
 date via the following commands:
 
-- org-timeblock-forward-day ~[C-<down>]~
-- org-timeblock-backward-day ~[C-<up>]~
+- org-timeblock-day-later ~[C-<down>]~
+- org-timeblock-day-earlier ~[C-<up>]~
 - org-timeblock-jump-to-day ~[j]~
 
 To navigate between tasks/blocks, use these commands:
