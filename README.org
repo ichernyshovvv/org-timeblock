@@ -17,15 +17,15 @@ Schedule your day visually, using [[https://en.wikipedia.org/wiki/Timeblocking][
 The builtin orgmode package for viewing tasks or events for a
 particular day, org-agenda, does not help you to quickly understand,
 where, for example, you have free time in your day or where you have
-overlapping tasks. Just a list of tasks is not sufficient. This
+overlapping tasks.  Just a list of tasks is not sufficient.  This
 package is created to fix this problem and provide some of the
 functionality that modern calendars provide.
 
 There are two major modes provided by the package:
 
-- ~org-timeblock-mode~. Displays visual schedule (timeblocks) of org
+- ~org-timeblock-mode~.  Displays visual schedule (timeblocks) of org
   tasks that are scheduled or have an active timestamp in their body
-  (orgmode events) for selected day. Available commands:
+  (orgmode events) for selected day (Currently, only day view is available).  Available commands:
   - org-timeblock-day-earlier/later ~[C-<down>/<up>]~
   - org-timeblock-set-duration ~[d]~
   - org-timeblock-reschedule ~[s]~
@@ -36,30 +36,29 @@ There are two major modes provided by the package:
   - org-timeblock-switch-view ~[v]~
   - org-timeblock-jump-to-day ~[j]~
 
-- ~org-timeblock-list-mode~. Displays a list of org tasks that are
-  scheduled or orgmode events for selected day. It's sort of like a
-  light org-agenda. The tasks can be sorted via ~SCHEDULED~ org
+- ~org-timeblock-list-mode~.  Displays a list of org tasks that are
+  scheduled or orgmode events for selected day.  It's sort of like a
+  light org-agenda.  The tasks can be sorted via ~SCHEDULED~ org
   property or manually placed by user via commands
-  ~org-timeblock-list-drag-line-forward/backward [M-<up>/<down>]~. The
+  ~org-timeblock-list-drag-line-forward/backward [M-<up>/<down>]~.  The
   order can be saved in a cache file via ~org-timeblock-list-save
-  [C-s]~ command. The sorting algorithm can be changed via
+  [C-s]~ command.  The sorting algorithm can be changed via
   ~org-timeblock-list-toggle-sort-function [S]~ command.
   - org-timeblock-list-schedule ~[s]~
   - org-timeblock-list-set-duration ~[d]~
   - org-timeblock-todo ~[1]~
   - org-timeblock-done ~[5]~
-  - org-timeblock-list-bulk-reschedule ~[r]~
   - org-timeblock-list-drag-line-forward/backward ~[M-<down>/<up>]~
   - org-timeblock-list-toggle-sort-function ~[S]~
   - org-timeblock-list-toggle-timeblock ~[t]~
 
 ** Quick start
 
-To enter ~org-timeblock-list-mode~, run ~M-x org-timeblock-list~. To
+To enter ~org-timeblock-list-mode~, run ~M-x org-timeblock-list~.  To
 enter ~org-timeblock-mode~, run ~M-x org-timeblock~
 
-For both modes, the default date is today. All the tasks and events
-are searched in ~(org-agenda-files)~. You can change the displayed
+For both modes, the default date is today.  All the tasks and events
+are searched in ~(org-agenda-files)~.  You can change the displayed
 date via the following commands:
 
 - org-timeblock-day-later ~[C-<down>]~
@@ -97,29 +96,29 @@ Requirements:
 - org 9.6.7 (or higher)
 - org-ql 0.7 (or higher)
 
-For now, only manual installation is available. To install:
+For now, only manual installation is available.  To install:
 
-1. Run ~M-x package-install org-ql~
-2. ~git clone https://github.com/ichernyshovvv/org-timeblock~
-3. Add the path of the downloaded folder to ~load-path~ somewhere in your Emacs
-   config:
+1.  Run ~M-x package-install org-ql~
+2.  ~git clone https://github.com/ichernyshovvv/org-timeblock~
+3.  Add the path of the downloaded folder to ~load-path~ somewhere in your Emacs
+    config:
 
 #+begin_src elisp
 (add-to-list 'load-path "path/to/org-timeblock/")
 #+end_src
 
 ** Customization
-- org-timeblock-inbox-file. Orgmode file path used to create a new
+- org-timeblock-inbox-file.  Orgmode file path used to create a new
   task via ~org-timeblock-new-task~ command
-- org-timeblock-view-options. Options that are used to decide which
+- org-timeblock-view-options.  Options that are used to decide which
   part of visual schedule must be hidden
-- org-timeblock-todo-commands. Alist where each cons is an orgmode
-  todo state and a key. For each car a command is created ("TODO" ->
+- org-timeblock-todo-commands.  Alist where each cons is an orgmode
+  todo state and a key.  For each car a command is created ("TODO" ->
   ~org-timeblock-todo~) and then bound inside
   ~org-timeblock-list-mode-map~ and ~org-timeblock-mode-map~ to a key
   in cdr.
-- org-timeblock-current-time-indicator. Whether to show current
+- org-timeblock-current-time-indicator.  Whether to show current
   time indicator in the ~org-timeblock-list~ buffer.
-- org-timeblock-color-tag-alist. List of lists where each list is of
-  the form ~'("tagname" "background color" "foreground color")~. Colors are set in hex format.
+- org-timeblock-color-tag-alist.  List of lists where each list is of
+  the form ~'("tagname" "background color" "foreground color")~.  Colors are set in hex format.
 
