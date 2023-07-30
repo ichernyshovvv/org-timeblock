@@ -2,6 +2,12 @@
 
 Schedule your day visually, using [[https://en.wikipedia.org/wiki/Timeblocking][timeblocking technique]] inside Emacs.
 
+** Screenshots
+
+[[file:screenshots/org-timeblock.png]]
+
+[[file:screenshots/org-timeblock-with-list.png]]
+
 ** Screencast
 
 [[https://youtu.be/tuMcPotV71I]]
