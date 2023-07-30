@@ -4,7 +4,11 @@ Schedule your day visually, using [[https://en.wikipedia.org/wiki/Timeblocking][
 
 ** Screenshots
 
+org-timeblock-mode buffer:
+
 [[file:screenshots/org-timeblock.png]]
+
+You can press [t] to toggle the display org-timeblock-list:
 
 [[file:screenshots/org-timeblock-with-list.png]]
 
@@ -108,17 +112,5 @@ For now, only manual installation is available.  To install:
 #+end_src
 
 ** Customization
-- org-timeblock-inbox-file.  Orgmode file path used to create a new
-  task via ~org-timeblock-new-task~ command
-- org-timeblock-view-options.  Options that are used to decide which
-  part of visual schedule must be hidden
-- org-timeblock-todo-commands.  Alist where each cons is an orgmode
-  todo state and a key.  For each car a command is created ("TODO" ->
-  ~org-timeblock-todo~) and then bound inside
-  ~org-timeblock-list-mode-map~ and ~org-timeblock-mode-map~ to a key
-  in cdr.
-- org-timeblock-current-time-indicator.  Whether to show current
-  time indicator in the ~org-timeblock-list~ buffer.
-- org-timeblock-color-tag-alist.  List of lists where each list is of
-  the form ~'("tagname" "background color" "foreground color")~.  Colors are set in hex format.
 
+~M-x customize-group org-timeblock~ to see available customizable variables.
