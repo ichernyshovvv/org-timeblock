@@ -1,22 +1,40 @@
-* org-timeblock
+#+TITLE: org-timeblock
 
 Schedule your day visually, using [[https://en.wikipedia.org/wiki/Timeblocking][timeblocking technique]] inside Emacs.
 
-** Screenshots
+* Contents
+
+- [[#screenshots][Screenshots]]
+- [[#screencast][Screencast]]
+- [[#description][Description]]
+- [[#installation][Installation]]
+- [[#usage][Usage]]
+- [[#customization][Customization]]
+
+* Screenshots
+:PROPERTIES:
+:CUSTOM_ID: screenshots
+:END:
 
 org-timeblock-mode buffer:
 
 [[file:screenshots/org-timeblock.png]]
 
-You can press [t] to toggle the display org-timeblock-list:
+You can press ~[t]~ to toggle the display of org-timeblock-list-mode buffer:
 
 [[file:screenshots/org-timeblock-with-list.png]]
 
-** Screencast
+* Screencast
+:PROPERTIES:
+:CUSTOM_ID: screencast
+:END:
 
 [[https://youtu.be/tuMcPotV71I]]
 
-** Description
+* Description
+:PROPERTIES:
+:CUSTOM_ID: description
+:END:
 
 The builtin orgmode package for viewing tasks or events for a
 particular day, org-agenda, does not help you to quickly understand,
@@ -56,7 +74,33 @@ There are two major modes provided by the package:
   - org-timeblock-list-toggle-sort-function ~[S]~
   - org-timeblock-list-toggle-timeblock ~[t]~
 
-** Quick start
+* Installation
+:PROPERTIES:
+:CUSTOM_ID: installation
+:END:
+
+Requirements:
+
+- Emacs 28.1 (or higher)
+- SVG support in your Emacs build
+- org 9.6.7 (or higher)
+- org-ql 0.7 (or higher)
+
+For now, only manual installation is available.  To install:
+
+1.  Run ~M-x package-install org-ql~
+2.  ~git clone https://github.com/ichernyshovvv/org-timeblock~
+3.  Add the path of the downloaded folder to ~load-path~ somewhere in your Emacs
+    config:
+
+#+begin_src elisp
+(add-to-list 'load-path "path/to/org-timeblock/")
+#+end_src
+
+* Usage
+:PROPERTIES:
+:CUSTOM_ID: usage
+:END:
 
 To enter ~org-timeblock-list-mode~, run ~M-x org-timeblock-list~.  To
 enter ~org-timeblock-mode~, run ~M-x org-timeblock~
@@ -91,26 +135,9 @@ commands:
   - org-timeblock-schedule ~[s]~
   - org-timeblock-set-duration ~[d]~
 
-** Installation
-
-Requirements:
-
-- Emacs 28.1 (or higher)
-- SVG support in your Emacs build
-- org 9.6.7 (or higher)
-- org-ql 0.7 (or higher)
-
-For now, only manual installation is available.  To install:
-
-1.  Run ~M-x package-install org-ql~
-2.  ~git clone https://github.com/ichernyshovvv/org-timeblock~
-3.  Add the path of the downloaded folder to ~load-path~ somewhere in your Emacs
-    config:
-
-#+begin_src elisp
-(add-to-list 'load-path "path/to/org-timeblock/")
-#+end_src
-
-** Customization
+* Customization
+:PROPERTIES:
+:CUSTOM_ID: customization
+:END:
 
 ~M-x customize-group org-timeblock~ to see available customizable variables.
