@@ -63,16 +63,17 @@
 	  (const :tag "Do not hide anything.  All 24 hours will be displayed." nil)
 	  (const :tag "Hide all free hours before the first timeblock." hide-all)))
 
-(defcustom ot-todo-commands
+(defcustom ot-fast-todo-commands
   '(("TODO" . "1")
     ("DONE" . "5"))
-  "Alist where each cons is an orgmode todo state and a
-key. For each car a command is created (\"TODO\" ->
-`org-timeblock-todo') and then bound inside
-`org-timeblock-list-mode-map' and `org-timeblock-mode-map'
-respectively to a key in cdr.
+  "Fast TODO keyword selection with single keys.
 
-cdr (a key) should be a string in the format returned by commands such
+Alist where each cons is an orgmode todo state and a key.  For
+each car a command is created (\"TODO\" -> `org-timeblock-todo')
+and then bound inside `org-timeblock-list-mode-map' and
+`org-timeblock-mode-map' respectively to a key in cdr.
+
+Keys should be a string in the format returned by commands such
 as `describe-key'."
   :group 'org-timeblock
   :type 'alist)
@@ -82,17 +83,19 @@ as `describe-key'."
   :group 'org-timeblock
   :type 'boolean)
 
-(defcustom ot-color-tag-list
+(defcustom ot-tag-colors
   nil
-  "List of lists where each list is of the form
-(\"tagname\" \"background color\" \"foreground color\"). Colors
-are set in hex format. Example:
+  "Colors for specific tags.
 
-((\"tag1\" \"#f3d000\" \"#000000\")
- (\"tag2\" \"#ff8f88\" \"#000000\"))
+List of lists where each list is of the form
+  (\"tagname\" \"background color\" \"foreground color\").
+Colors are set in hex format.  Example:
 
-In org-timeblock-mode, timeblocks tagged with a tag in car are
-painted in background color. In org-timeblock-list-mode, both
+  ((\"tag1\" \"#f3d000\" \"#000000\")
+   (\"tag2\" \"#ff8f88\" \"#000000\"))
+
+In `org-timeblock-mode', timeblocks tagged with a tag in car are
+painted in background color.  In `org-timeblock-list-mode', both
 background and foreground colors are used to colorize items that
 are tagged with a tag in car."
   :type 'list
@@ -108,13 +111,14 @@ are tagged with a tag in car."
 
 (defvar ot-background-color (face-attribute 'default :background))
 
-(defvar ot-colors nil "")
+(defvar ot-colors nil)
 
 (defvar ot-markers nil)
 
 (defvar otl-entries-pos nil
-  "Nested alist of saved positions of the entries for each date that
-a user have previously opened.")
+  "Saved positions for entries in `org-timeblock-list-mode'.
+Nested alist of saved positions of the entries for each date that
+a user have previously opened in `org-timeblock-list-mode'.")
 
 (defvar ot-prev-selected-block-color nil)
 
@@ -129,9 +133,10 @@ a user have previously opened.")
   "The name of the buffer displaying the list of tasks and events.")
 
 (defvar otl-sort-line-position nil
-  "The line position of the sort line which is displayed in
-`org-timeblock-list-mode', when orgmode tasks are manually
-placed. Used as a simple separator to distinguish manually sorted
+  "Sort indicator line position.
+The line position of the sort line which is displayed in
+`org-timeblock-list-mode' when orgmode tasks are manually
+placed.  Used as a simple separator to distinguish manually sorted
 tasks and those tasks that have not been sorted yet.")
 
 (defvar otl-order-cache-file (expand-file-name ".cache/org-timeblock.el" user-emacs-directory))
@@ -180,7 +185,7 @@ tasks and those tasks that have not been sorted yet.")
     map))
 
 ;; Generate todo commands and bind them to a corresponding key
-(dolist (elem ot-todo-commands)
+(dolist (elem ot-fast-todo-commands)
   (let ((command-name (intern (concat "org-timeblock-" (downcase (car elem))))))
     (defalias command-name
       (lambda ()
@@ -209,16 +214,29 @@ tasks and those tasks that have not been sorted yet.")
 ;;;; Functions
 
 (cl-defsubst ot-get-sched (&optional object (position 0))
+  "Return the value of POSITION's 'sched property, in OBJECT.
+If OBJECT is nil, try to get the property from current buffer at POSITION.
+
+'sched property is an org-element timestamp object."
   (get-text-property position 'sched object))
 
 (cl-defsubst ot-get-event (&optional object (position 0))
+  "Return the value of POSITION's 'event property, in OBJECT.
+If OBJECT is nil, try to get the property from current buffer at POSITION.
+
+'event property is an org-element timestamp object."
   (get-text-property position 'event object))
 
 (cl-defsubst ot-get-sched-or-event (&optional object (position 0))
+  "Return POSITION's 'sched or 'event property, in OBJECT."
   (or (ot-get-sched object position)
       (ot-get-event object position)))
 
 (defun ot-mouse-pixel-pos ()
+  "Return current mouse position in the window of the *org-timeblock* buffer.
+If mouse position is outside of the window, return nil.
+
+Mouse position is of the form (X . Y)."
   (when-let ((mouse-pos (cdr (mouse-pixel-position)))
 	     (window (get-buffer-window ot-buffer))
 	     (pos (window-edges window t nil t)))
@@ -238,7 +256,9 @@ tasks and those tasks that have not been sorted yet.")
 	   ot-markers)))))
 
 (defun ot-selected-block-id ()
-  ""
+  "Return an id of the entry of selected timeblock.
+
+id is constructed via `ot-construct-id'"
   (goto-char (point-min))
   (and
    (re-search-forward (format " fill=\"%s\".*? id=\"\\(.+?\\)\"" ot-sel-block-color) nil t)
@@ -283,6 +303,7 @@ tasks and those tasks that have not been sorted yet.")
         time-less-p a b)))
 
 (defun ot-select-block-for-current-entry ()
+  "Select block for the entry at point in `org-timeblock-list-mode'."
   (when-let (((not
 	       (ot--daterangep
                 (ot-get-sched-or-event nil (line-beginning-position)))))
@@ -302,8 +323,8 @@ tasks and those tasks that have not been sorted yet.")
 	(org-timeblock-mode)))))
 
 (defun ot-tss-intersect-p (oe-ts1 oe-ts2)
-  "Check if two timestamps intersect each other. `OE-TS1',`OE-TS2' -
-org-element timestamp objects."
+  "Check if two timestamps intersect each other.
+`OE-TS1',`OE-TS2' - org-element timestamp objects."
   (when-let ((ts1-start (ot--timestamp-encode oe-ts1))
 	     (ts2-start (ot--timestamp-encode oe-ts2)))
     (let ((ts1-end (ot--timestamp-encode oe-ts1 t))
@@ -384,6 +405,7 @@ Default background color is used when BASE-COLOR is nil."
       (format "#%02x%02x%02x" r g b))))
 
 (defun ot-redraw-timeblocks ()
+  "Redraw *org-timeblock* buffer."
   (with-current-buffer (get-buffer-create ot-buffer)
     (let ((inhibit-read-only t))
       (erase-buffer)
@@ -604,14 +626,22 @@ Default background color is used when BASE-COLOR is nil."
       (org-timeblock-mode))))
 
 (defun ot-show-timeblocks ()
+  "Switch to *org-timeblock* buffer in another window."
   (switch-to-buffer-other-window ot-buffer)
   (other-window 1))
 
 (defun ot-show-timeblock-list ()
+  "Switch to *org-timeblock-list* buffer in another window."
   (switch-to-buffer-other-window otl-buffer)
   (other-window 1))
 
 (defun otl-toggle-sort-function ()
+  "Toggle the sorting strategy in *org-timeblock-list*.
+Available sorting strategies:
+1. Sort by SCHEDULED property.\\<org-timeblock-list-mode-map>
+2. Sort by 'order text property applied to each entry inside
+*org-timeblock-list* which can be changed via `\\[org-timeblock-list-drag-line-forward]'/`\\[org-timeblock-list-drag-line-backward]'
+commands"
   (interactive)
   (setq ot-sort-function
 	(if (eq ot-sort-function #'ot-order<)
@@ -643,11 +673,15 @@ Default background color is used when BASE-COLOR is nil."
   (org-save-all-org-buffers))
 
 (defun ot-quit ()
+  "Exit `org-timeblock-list-mode'."
   (interactive)
-  ;; (ot-reset-markers)
   (quit-window t))
 
 (defun ot--schedule-time (marker)
+  "Schedule the org entry at MARKER to a specified time(range) interactively.
+Schedule date won't be changed.
+
+Time format is \"HHMM\""
   (let ((timerangep
 	 (eq
 	  (read-char-from-minibuffer
@@ -736,6 +770,8 @@ PROMPT can overwrite the default prompt."
      finally return res)))
 
 (defun ot-construct-id (&optional marker)
+  "Construct identifier for the org entry at MARKER.
+If MARKER is nil, use entry at point."
   (let* ((element (org-element-at-point marker))
 	 (title (org-element-property :title element)))
     (md5
@@ -757,7 +793,7 @@ PROMPT can overwrite the default prompt."
       (org-element-timestamp-parser))))
 
 (cl-defun ot-get-entries (&key sort-func exclude-dateranges with-time)
-  "Get entries relevant to `org-timeblock-date'.
+  "Return entries relevant to `org-timeblock-date'.
 
 SORT-FUNC is either nil, in which case items are sorted via
 `ot-sort-function'; or a function that accepts two items as
@@ -834,12 +870,17 @@ with time (timerange or just start time)."
      (or sort-func ot-sort-function))))
 
 (defun ot-get-colors (tags)
+  "Return the colors for TAGS."
   (catch 'found
     (dolist (tag tags)
-      (when-let ((colors (cdr (seq-find (lambda (x) (string= (car x) tag)) ot-color-tag-list))))
+      (when-let ((colors (cdr (seq-find (lambda (x) (string= (car x) tag)) ot-tag-colors))))
 	(throw 'found colors)))))
 
 (defun ot--timestamp-encode (ts &optional end)
+  "Convert TS to internal time representation.
+If END is non-nil, use end part of the timestamp.
+
+TS is a org-element timestamp object."
   (let ((year-start (org-element-property :year-start ts))
 	(month-start (org-element-property :month-start ts))
 	(day-start (org-element-property :day-start ts))
@@ -861,6 +902,10 @@ with time (timerange or just start time)."
       (encode-time (list 0 (or minute-start 0) (or hour-start 0) day-start month-start year-start 0 nil (car (current-time-zone)))))))
 
 (defun ot--schedule (start-ts &optional end-ts marker)
+  "Schedule an entry at MARKER to a timestamp.
+If MARKER is nil, schedule an entry at point.
+
+START-TS and END-TS an Emacs internal time representation."
   (save-window-excursion
     (save-excursion
       (save-restriction
@@ -901,8 +946,8 @@ with time (timerange or just start time)."
 		(insert "--" (ot-ts-to-org-timerange end-ts nil repeat-string warning-string)))))))))))
 
 (defun ot-delete-event-timestamp ()
-  "Delete event timestamp for an entry at point and leave the point
-where the timestamp was."
+  "Delete event timestamp for the entry at point.
+Leave point where the timestamp was."
   (let ((end (save-excursion (outline-next-heading) (point))))
     (while
 	(not (and
@@ -917,7 +962,11 @@ where the timestamp was."
       (replace-match ""))))
 
 (defun ot-ts-to-org-timerange (ts-start &optional ts-end repeat-string warning-string)
-  "Create an Org timestamp range from START-D/T, END-D/T."
+  "Create an Org timestamp range string.
+
+TS-START and TS-END an Emacs internal time representation.
+REPEAT-STRING is a repeater string.
+WARNING-STRING is a warning string of the form \"-[0-9]+[hdwmy]\""
   (when-let ((start-date (format-time-string "%Y-%m-%d %a" ts-start)))
     (let ((start-time
 	   (let ((res (format-time-string "%R" ts-start)))
@@ -944,6 +993,9 @@ where the timestamp was."
        timestamp-end))))
 
 (defun ot--update-prefix (timestamp &optional eventp)
+  "Update the prefix for the entry at point.
+TIMESTAMP is an org-element timestamp object used to construct a new prefix.
+If EVENTP is non-nil the entry is considered as an event."
   (let ((inhibit-read-only t))
     (save-excursion
       (beginning-of-line)
@@ -955,6 +1007,7 @@ where the timestamp was."
 	       (text-properties-at (point)))))))
 
 (defun ot--duration (marker)
+  "Set duration for the entry at MARKER."
   (let (new-end-ts timestamp start-ts duration)
     (with-current-buffer (marker-buffer marker)
       (goto-char (marker-position marker))
@@ -1014,16 +1067,17 @@ where the timestamp was."
   (interactive)
   (otl-drag-line-forward t))
 
-(defun ot--set-todo (m todo)
-  (when (and m todo)
-    (with-current-buffer (marker-buffer m)
-      (goto-char m)
+(defun ot--set-todo (marker todo)
+  "Set TODO state to the entry at MARKER."
+  (when (and marker todo)
+    (with-current-buffer (marker-buffer marker)
+      (goto-char marker)
       (org-fold-show-context 'agenda)
       (org-todo todo))))
 
 (defun otl-drag-line-forward (&optional backward)
   "Drag an agenda line forward by ARG lines.
-When the optional argument `backward' is non-nil, move backward."
+When BACKWARD is non-nil, move backward."
   (interactive)
   (unless (eq ot-sort-function #'ot-order<)
     (user-error "Can't drag lines if entries aren't displayed and sorted by `SORTING-PROPERTY' property"))
@@ -1048,6 +1102,7 @@ When the optional argument `backward' is non-nil, move backward."
 
 ;;;###autoload
 (defun org-timeblock-list ()
+  "Enter `org-timeblock-list-mode'."
   (interactive)
   (switch-to-buffer otl-buffer)
   (setq ot-date (current-time))
@@ -1059,6 +1114,7 @@ When the optional argument `backward' is non-nil, move backward."
 
 ;;;###autoload
 (defun org-timeblock ()
+  "Enter `org-timeblock-mode'."
   (interactive)
   (switch-to-buffer ot-buffer)
   (setq ot-date (current-time))
@@ -1071,7 +1127,8 @@ When the optional argument `backward' is non-nil, move backward."
 ;;;; Planning commands
 
 (defun ot-new-task ()
-  "Create a task scheduled to the date in the current view"
+  "Create a task scheduled to the date in the current view.
+The new task is created in `org-timeblock-inbox-file'"
   (interactive)
   (let (title)
     (while (or (not title)
@@ -1089,8 +1146,7 @@ When the optional argument `backward' is non-nil, move backward."
   (ot-redraw-buffers))
 
 (defun otl-set-duration ()
-  "Change schedule property duration for a task at point inside
-`org-timeblock-list-mode'"
+  "Change schedule property duration for a task at point inside `org-timeblock-list-mode'."
   (interactive)
   (when (ot--daterangep (ot-get-sched nil (line-beginning-position)))
     (user-error "Can not reschedule entries with daterange timestamp"))
@@ -1101,7 +1157,7 @@ When the optional argument `backward' is non-nil, move backward."
       (ot-redraw-timeblocks))))
 
 (defun ot-schedule ()
-  "Reschedule a selected block inside `org-timeblock-mode'"
+  "Reschedule a selected block inside `org-timeblock-mode'."
   (interactive)
   (when-let ((marker (ot-selected-block-marker)))
     (ot--schedule-time marker)
@@ -1109,7 +1165,8 @@ When the optional argument `backward' is non-nil, move backward."
     (org-timeblock-mode)))
 
 (defun ot-set-duration ()
-  "Change schedule property duration for a task bound to a selected
+  "Change duration of the selected block.
+Change schedule property duration for a task bound to a selected
 block inside `org-timeblock-mode'"
   (interactive)
   (when-let ((marker (ot-selected-block-marker)))
@@ -1118,6 +1175,7 @@ block inside `org-timeblock-mode'"
     (org-timeblock-mode)))
 
 (defun otl-schedule ()
+  "Reschedule the entry at point in *org-timeblock-list* buffer."
   (interactive)
   (when (ot--daterangep (ot-get-sched nil (line-beginning-position)))
     (user-error "Can not reschedule entries with daterange timestamp"))
@@ -1130,6 +1188,7 @@ block inside `org-timeblock-mode'"
 ;;;; Navigation commands
 
 (defun ot-select-block-under-mouse ()
+  "Select timeblock under current position of mouse cursor."
   (interactive)
   (cl-macrolet ((get-number (n) `(string-to-number (match-string-no-properties ,n))))
     (when-let ((pos (ot-mouse-pixel-pos))
@@ -1153,16 +1212,19 @@ block inside `org-timeblock-mode'"
       (org-timeblock-mode))))
 
 (defun otl-next-line ()
+  "Move cursor to the next line."
   (interactive)
   (funcall-interactively 'next-line)
   (ot-select-block-for-current-entry))
 
 (defun otl-previous-line ()
+  "Move cursor to the previous line."
   (interactive)
   (funcall-interactively 'previous-line)
   (ot-select-block-for-current-entry))
 
 (defun ot-forward-block ()
+  "Select the next timeblock in *org-timeblock* buffer."
   (interactive)
   (let ((inhibit-read-only t))
     (goto-char (point-min))
@@ -1179,6 +1241,7 @@ block inside `org-timeblock-mode'"
       (org-timeblock-mode))))
 
 (defun ot-backward-block ()
+  "Select the previous timeblock in *org-timeblock* buffer."
   (interactive)
   (let ((inhibit-read-only t))
     (goto-char (point-max))
@@ -1195,19 +1258,24 @@ block inside `org-timeblock-mode'"
       (org-timeblock-mode))))
 
 (defun ot-day-later ()
-  "Go forward in time by one day in org-timeblock-mode."
+  "Go forward in time by one day in `org-timeblock-mode'."
   (interactive)
   (setq ot-date (time-add ot-date (* 24 60 60)))
   (ot-redraw-buffers))
 
-(defun ot-jump-to-day ()
-  (interactive)
-  (when-let ((date (org-read-date nil t)))
+(defun ot-jump-to-day (date)
+  "Jump to DATE in *org-timeblock-list* or *org-timeblock* buffers.
+
+When called interactively, prompt for the date.
+When called from Lisp, DATE should be a date as returned by
+`org-read-date'"
+  (interactive (list (org-read-date nil t)))
+  (when date
     (setq ot-date date)
     (ot-redraw-buffers)))
 
 (defun ot-day-earlier ()
-  "Go backward in time by one day in org-timeblock-mode."
+  "Go backward in time by one day in `org-timeblock-mode'."
   (interactive)
   (setq ot-date (time-subtract ot-date (* 24 60 60)))
   (ot-redraw-buffers))
@@ -1215,7 +1283,7 @@ block inside `org-timeblock-mode'"
 ;;;; View commands
 
 (defun ot-goto-other-window ()
-  "Jump to the org heading of an entry at point."
+  "Jump to the org heading of the entry at point."
   (interactive)
   (unless (eq major-mode 'org-timeblock-list-mode)
     (user-error "Not in org-timeblock buffer"))
@@ -1240,7 +1308,7 @@ block inside `org-timeblock-mode'"
       (recenter))))
 
 (defun ot-switch-view ()
-  "Switch between different views in org-timeblock-mode.
+  "Switch between different views in `org-timeblock-mode'.
 
 Available view options:
 1. Do not hide anything.  All 24 hours will be displayed.
@@ -1255,7 +1323,7 @@ Available view options:
   (ot-redraw-timeblocks))
 
 (defun otl-toggle-timeblock ()
-  "Toggle the display of the window with org-timeblock-mode."
+  "Toggle the display of the window with `org-timeblock-mode'."
   (interactive)
   (if-let ((window (get-buffer-window ot-buffer)))
       (delete-window window)
@@ -1263,7 +1331,7 @@ Available view options:
     (ot-redraw-timeblocks)))
 
 (defun ot-toggle-timeblock-list ()
-  "Toggle the display of the window with org-timeblock-list-mode."
+  "Toggle the display of the window with `org-timeblock-list-mode'."
   (interactive)
   (if-let ((window (get-buffer-window otl-buffer)))
       (delete-window window)
@@ -1271,7 +1339,7 @@ Available view options:
   (ot-redraw-buffers))
 
 (defun ot-redraw-buffers ()
-  "Redraw org-timeblock-list-mode and org-timeblock-timeline-mode buffers."
+  "Redraw `org-timeblock-list-mode' and `org-timeblock-timeline-mode' buffers."
   ;; org-timeblock-list-mode and org-timeblock-mode
   (interactive)
   (with-current-buffer (get-buffer-create otl-buffer)
