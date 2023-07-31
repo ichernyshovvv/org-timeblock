@@ -1007,7 +1007,15 @@ If EVENTP is non-nil the entry is considered as an event."
 	       (text-properties-at (point)))))))
 
 (defun ot--duration (marker)
-  "Set duration for the entry at MARKER."
+  "Interactively set SCHEDULED duration for the org entry at MARKER.
+
+Change SCHEDULED timestamp duration of the org entry at MARKER.
+
+Duration format:
+2h
+2h30m
+2h30
+45"
   (let (new-end-ts timestamp start-ts duration)
     (with-current-buffer (marker-buffer marker)
       (goto-char (marker-position marker))
@@ -1146,7 +1154,16 @@ The new task is created in `org-timeblock-inbox-file'"
   (ot-redraw-buffers))
 
 (defun otl-set-duration ()
-  "Change schedule property duration for a task at point inside `org-timeblock-list-mode'."
+  "Interactively change SCHEDULED duration for the task at point.
+
+Change SCHEDULED timestamp duration of the task at point in
+`org-timeblock-list-mode'.
+
+Duration format:
+2h
+2h30m
+2h30
+45"
   (interactive)
   (when (ot--daterangep (ot-get-sched nil (line-beginning-position)))
     (user-error "Can not reschedule entries with daterange timestamp"))
@@ -1165,9 +1182,16 @@ The new task is created in `org-timeblock-inbox-file'"
     (org-timeblock-mode)))
 
 (defun ot-set-duration ()
-  "Change duration of the selected block.
-Change schedule property duration for a task bound to a selected
-block inside `org-timeblock-mode'"
+  "Interactively change SCHEDULED duration of the selected block.
+
+Change SCHEDULED timestamp duration of the task bound to the selected
+block in `org-timeblock-mode'.
+
+Duration format:
+2h
+2h30m
+2h30
+45"
   (interactive)
   (when-let ((marker (ot-selected-block-marker)))
     (ot--duration marker)
