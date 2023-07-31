@@ -113,7 +113,7 @@ are tagged with a tag in car."
 
 (defvar ot-colors nil)
 
-(defvar ot-markers nil)
+(defvar ot-data nil)
 
 (defvar otl-entries-pos nil
   "Saved positions for entries in `org-timeblock-list-mode'.
@@ -251,9 +251,11 @@ Mouse position is of the form (X . Y)."
   (and
    (re-search-forward (format " fill=\"%s\".*? id=\"\\(.+?\\)\"" ot-sel-block-color) nil t)
    (let ((id (match-string-no-properties 1)))
-     (cdr (seq-find
-	   (lambda (x) (string= (car x) id))
-	   ot-markers)))))
+     (cadr (seq-find (lambda (x) (string= (car x) id)) ot-data)))))
+
+(defun ot-block-eventp (id)
+  "Return t if block with ID is an event."
+  (caddr (seq-find (lambda (x) (string= (car x) id)) ot-data)))
 
 (defun ot-selected-block-id ()
   "Return an id of the entry of selected timeblock.
@@ -284,12 +286,14 @@ id is constructed via `ot-construct-id'"
      ((null b) nil)
      ((null a) t)
      (t
-      (let ((ad (decode-time a))
-            (bd (decode-time b)))
-        (and (on decoded-time-year  <= ad bd)
-             (on decoded-time-month <= ad bd)
-             (on decoded-time-day   <= ad bd)
-             (not (ot-ts-date= a b)))))))
+      (let ((a (decode-time a))
+            (b (decode-time b)))
+        (or (on decoded-time-year < a b)
+	    (and
+	     (on decoded-time-year = a b)
+	     (or (on decoded-time-month < a b)
+		 (and (on decoded-time-month = a b)
+		      (on decoded-time-day < a b)))))))))
 
   (defun ot-order< (a b)
     (on (lambda (item)
@@ -459,7 +463,8 @@ Default background color is used when BASE-COLOR is nil."
 		 (hour-lines-color
 		  (if (> bg-rgb-sum 550) "#7b435c" "#cdcdcd")))
 	    (dolist (entry entries)
-	      (let ((m (get-text-property 0 'marker entry)))
+	      (let ((m (get-text-property 0 'marker entry))
+		    (id (get-text-property 0 'id entry)))
 		(push entry placed)
 		(setcdr (assq m columns)
 			(catch 'found-column
@@ -470,7 +475,7 @@ Default background color is used when BASE-COLOR is nil."
 					     (lambda (x)
 					       (eq (cdr (assq (get-text-property 0 'marker x) columns)) k))
 					     placed))
-				  (and (/= (get-text-property 0 'marker el) m)
+				  (and (not (string= (get-text-property 0 'id el) id))
 				       (ot-tss-intersect-p
                                         (ot-get-sched-or-event entry)
                                         (ot-get-sched-or-event el))
@@ -488,7 +493,7 @@ Default background color is used when BASE-COLOR is nil."
 					   ;; find those with which current entry is in intersection
 					   (seq-filter
 					    (lambda (x)
-					      (unless (equal (get-text-property 0 'marker entry) (get-text-property 0 'marker x))
+					      (unless (equal (get-text-property 0 'id entry) (get-text-property 0 'id x))
 						(ot-tss-intersect-p
                                                  (ot-get-sched-or-event entry)
                                                  (ot-get-sched-or-event x))))
@@ -550,7 +555,7 @@ Default background color is used when BASE-COLOR is nil."
 						   0
 						 (org-element-property :minute-start timestamp))))
 		     (y (round (* scale (- minutes (* min-hour 60))))))
-		(push (cons (get-text-property 0 'id entry) (get-text-property 0 'marker entry)) ot-markers)
+		(push (list (get-text-property 0 'id entry) (get-text-property 0 'marker entry) (ot-get-event entry)) ot-data)
 		;; Appending generated rectangle for current entry
 		(svg--append
 		 svg-obj
@@ -660,7 +665,7 @@ commands"
       (goto-char (point-min))
       (while (not (eobp))
 	(when-let ((m (get-text-property (point) 'marker))
-		   (id (ot-construct-id m)))
+		   (id (ot-construct-id m (ot-get-event nil (line-beginning-position)))))
 	  (setf (alist-get id (alist-get (format-time-string "%Y-%m-%d" ot-date) otl-entries-pos nil nil #'equal) nil nil #'equal)
 		(cl-incf count)))
 	(when (get-text-property (point) 'sort-ind)
@@ -677,33 +682,44 @@ commands"
   (interactive)
   (quit-window t))
 
-(defun ot--schedule-time (marker)
-  "Schedule the org entry at MARKER to a specified time(range) interactively.
-Schedule date won't be changed.
+(defun ot--schedule-time (marker eventp)
+  "Change the timestamp of the org entry at MARKER to a specified time(range) interactively.
+If EVENTP is non-nil, change timestamp of the event.
+
+Schedule or event date won't be changed.
 
 Time format is \"HHMM\""
-  (let ((timerangep
-	 (eq
-	  (read-char-from-minibuffer
-	   "Schedule: [s]tart timestamp only, time[r]ange"
-	   '(?s ?r))
-	  ?r))
-	(new-start-ts (ot-read-ts ot-date "START-TIME: "))
-	new-end-ts start-ts end-ts duration timestamp)
-    (with-current-buffer (marker-buffer marker)
-      (goto-char (marker-position marker))
-      (org-fold-show-context 'agenda)
-      (setq timestamp (org-element-property :scheduled (org-element-at-point)))
+  (with-current-buffer (marker-buffer marker)
+    (goto-char (marker-position marker))
+    (org-fold-show-context 'agenda)
+    (let* ((timerangep
+	    (eq
+	     (read-char-from-minibuffer
+	      "Schedule: [s]tart timestamp only, time[r]ange"
+	      '(?s ?r))
+	     ?r))
+	   (timestamp (if eventp
+			  (ot-get-event-timestamp)
+			(org-element-property :scheduled (org-element-at-point))))
+	   (start-ts (ot--timestamp-encode timestamp))
+	   (end-ts (ot--timestamp-encode timestamp t))
+	   (duration (when (and start-ts end-ts) (/ (time-convert (time-subtract end-ts start-ts) 'integer) 60)))
+	   (new-start-ts (ot-read-ts ot-date "START-TIME: "))
+	   (new-end-ts
+	    (if timerangep
+		(ot-read-ts ot-date "END-TIME: ")
+	      (when duration (time-add new-start-ts (* 60 duration))))))
       (unless timestamp
 	(user-error "Scheduled property not found"))
-      (setq start-ts (ot--timestamp-encode timestamp))
-      (setq end-ts (ot--timestamp-encode timestamp t))
-      (setq duration (when (and start-ts end-ts) (/ (time-convert (time-subtract end-ts start-ts) 'integer) 60)))
-      (setq new-end-ts (if timerangep
-			   (ot-read-ts ot-date "END-TIME: ")
-			 (when duration (time-add new-start-ts (* 60 duration)))))
-      (ot--schedule new-start-ts new-end-ts)
-      (org-element-property :scheduled (org-element-at-point)))))
+      (if eventp
+	  (progn
+	    (save-excursion
+	      (ot-delete-event-timestamp)
+	      (insert
+	       (ot-ts-to-org-timerange new-start-ts new-end-ts)))
+	    (ot-get-event-timestamp))
+	(ot--schedule new-start-ts new-end-ts)
+	(org-element-property :scheduled (org-element-at-point))))))
 
 (defun ot--daterangep (timestamp)
   "Return t if org timestamp object TIMESTAMP is a daterange with no time."
@@ -769,7 +785,7 @@ PROMPT can overwrite the default prompt."
      until res
      finally return res)))
 
-(defun ot-construct-id (&optional marker)
+(defun ot-construct-id (&optional marker eventp)
   "Construct identifier for the org entry at MARKER.
 If MARKER is nil, use entry at point."
   (let* ((element (org-element-at-point marker))
@@ -777,11 +793,13 @@ If MARKER is nil, use entry at point."
     (md5
      (concat
       (if (stringp title) title (car title)) ;; TODO
-      (or
-       (org-element-property
-	:raw-value
-	(org-element-property :scheduled element))
-       (org-entry-get marker "TIMESTAMP")))
+      (if eventp
+	  (org-entry-get marker "TIMESTAMP")
+	(concat
+	 "S"
+	 (org-element-property
+	  :raw-value
+	  (org-element-property :scheduled element)))))
      nil nil 'utf-8)))
 
 (defun ot-get-event-timestamp ()
@@ -833,7 +851,7 @@ with time (timerange or just start time)."
 		  :with-time ,with-time))
 	   :action
 	   (lambda ()
-	     (let ((id (ot-construct-id))
+	     (let ((id (ot-construct-id nil t))
 		   (event (ot-get-event-timestamp))
 		   (title (org-get-heading t nil t t)))
 	       (propertize
@@ -902,8 +920,8 @@ TS is a org-element timestamp object."
       (encode-time (list 0 (or minute-start 0) (or hour-start 0) day-start month-start year-start 0 nil (car (current-time-zone)))))))
 
 (defun ot--schedule (start-ts &optional end-ts marker)
-  "Schedule an entry at MARKER to a timestamp.
-If MARKER is nil, schedule an entry at point.
+  "Schedule the entry at MARKER to a timestamp.
+If MARKER is nil, schedule the entry at point.
 
 START-TS and END-TS an Emacs internal time representation."
   (save-window-excursion
@@ -1006,69 +1024,67 @@ If EVENTP is non-nil the entry is considered as an event."
 	       (ot--construct-entry-prefix timestamp eventp)
 	       (text-properties-at (point)))))))
 
-(defun ot--duration (marker)
-  "Interactively set SCHEDULED duration for the org entry at MARKER.
-
-Change SCHEDULED timestamp duration of the org entry at MARKER.
+(defun ot-read-duration ()
+  "Read duration and return an integer in minutes.
 
 Duration format:
 2h
 2h30m
 2h30
 45"
-  (let (new-end-ts timestamp start-ts duration)
-    (with-current-buffer (marker-buffer marker)
-      (goto-char (marker-position marker))
-      (org-fold-show-context 'agenda)
-      (setq timestamp (or (org-element-property :scheduled (org-element-at-point))
-			  (ot-get-event-timestamp)))
+  (let (dur)
+    (catch 'dur
+      (while t
+	(let ((char (read-char-exclusive (concat "DURATION:" dur))))
+	  (pcase char
+	    ((guard (and (< char 58) (> char 47)))
+	     (setq dur (concat dur (char-to-string char))))
+	    (?q (throw 'dur nil))
+	    (?
+	     (when (and (> (length dur) 0) (string-match "^\\(?:\\([0-9]+\\)h\\)?\\([0-9]+\\)?" dur))
+	       (let ((hours (and (match-string 1 dur) (string-to-number (match-string 1 dur))))
+		     (minutes (and (match-string 2 dur) (string-to-number (match-string 2 dur)))))
+		 (throw 'dur (+ (or minutes 0) (if hours (* hours 60) 0))))))
+	    (?m
+	     (if (string-match "^\\(?:\\([0-9]+\\)h\\)?\\([0-9]+\\)m" (concat dur "m"))
+		 (let ((hours (and (match-string 1 dur) (string-to-number (match-string 1 dur))))
+		       (minutes (string-to-number (match-string 2 dur))))
+		   (throw 'dur (+ minutes (if hours (* hours 60) 0))))
+	       (setq dur nil)))
+	    (?h
+	     (unless (= 0 (length dur))
+	       (setq dur (concat dur (char-to-string char)))))
+	    (?\C-?
+	     (unless (= 0 (length dur))
+	       (setq dur (substring dur 0 -1))))))))))
+
+(defun ot--duration (duration marker &optional eventp)
+  "Set SCHEDULED duration to DURATION for the org entry at MARKER.
+
+Change SCHEDULED timestamp duration of the org entry at MARKER.
+
+Return the changed org-element timestamp object."
+  (with-current-buffer (marker-buffer marker)
+    (goto-char (marker-position marker))
+    (org-fold-show-context 'agenda)
+    (let* ((timestamp
+	    (if eventp
+		(ot-get-event-timestamp)
+	      (org-element-property :scheduled (org-element-at-point))))
+	   (start-ts (ot--timestamp-encode timestamp))
+	   (new-end-ts (when duration (time-add start-ts (* 60 duration)))))
       (unless (and (org-element-property :hour-start timestamp)
 		   (org-element-property :minute-start timestamp))
 	(user-error "No scheduled time specified for this entry"))
-      (setq start-ts (ot--timestamp-encode timestamp))
-      (while (not
-	      (setq duration
-		    (let ((time ""))
-		      (catch 'dur
-			(while t
-			  (when-let ((char (read-char-exclusive (concat "DURATION:" time))))
-			    (cond
-			     ((eq ?q char)
-			      (setq time "")
-			      (throw 'dur t))
-			     ((eq ? char)
-			      (let (hours minutes)
-				(if (not (string-match "^\\(?:\\([0-9]+\\)h\\)?\\([0-9]+\\)?" time))
-				    (setq time "")
-				  (setq hours (and (match-string 1 time) (string-to-number (match-string 1 time))))
-				  (setq minutes (and (match-string 2 time) (string-to-number (match-string 2 time))))
-				  (unless (= (length time) 0)
-				    (setq time (number-to-string (+ (or minutes 0) (if hours (* hours 60) 0))))
-				    (throw 'dur t)))))
-			     ((eq ?m char)
-			      (let (hours minutes)
-				(if (not (string-match "^\\(?:\\([0-9]+\\)h\\)?\\([0-9]+\\)" time))
-				    (setq time "")
-				  (setq hours (and (match-string 1 time) (string-to-number (match-string 1 time))))
-				  (setq minutes (and (match-string 2 time) (string-to-number (match-string 2 time))))
-				  (setq time (number-to-string (+ minutes (if hours (* hours 60) 0))))
-				  (throw 'dur t))))
-			     ((and (< char 58) (> char 47))
-			      (setq time (concat time (char-to-string char))))
-			     ((eq ?h char)
-			      (unless (= 0 (length time))
-				(setq time (concat time (char-to-string char)))))))))
-		      (and time (string-to-number time))))))
-      (setq new-end-ts (when duration (time-add start-ts (* 60 duration))))
-      (if (org-element-property :scheduled (org-element-at-point))
-	  (ot--schedule start-ts new-end-ts)
-	(save-excursion
-	  (ot-delete-event-timestamp)
-	  (insert
-	   (ot-ts-to-org-timerange start-ts new-end-ts))))
-      (or
-       (org-element-property :scheduled (org-element-at-point))
-       (ot-get-event-timestamp)))))
+      (if eventp
+	  (progn
+	    (save-excursion
+	      (ot-delete-event-timestamp)
+	      (insert
+	       (ot-ts-to-org-timerange start-ts new-end-ts)))
+	    (ot-get-event-timestamp))
+	(ot--schedule start-ts new-end-ts)
+	(org-element-property :scheduled (org-element-at-point))))))
 
 (defun otl-drag-line-backward ()
   "Drag an agenda line backward by ARG lines."
@@ -1165,19 +1181,24 @@ Duration format:
 2h30
 45"
   (interactive)
-  (when (ot--daterangep (ot-get-sched nil (line-beginning-position)))
+  (when (ot--daterangep (ot-get-sched-or-event nil (line-beginning-position)))
     (user-error "Can not reschedule entries with daterange timestamp"))
-  (when-let ((timestamp (ot--duration (get-text-property (line-beginning-position) 'marker))))
-    (ot--update-prefix timestamp (ot-get-event nil (line-beginning-position)))
-    (forward-line)
-    (when (get-buffer-window ot-buffer)
-      (ot-redraw-timeblocks))))
+  (let((eventp (ot-get-event nil (line-beginning-position))))
+    (when-let ((duration (ot-read-duration))
+	       (timestamp (ot--duration duration (get-text-property (line-beginning-position) 'marker) eventp)))
+      (ot--update-prefix timestamp eventp)
+      (forward-line)
+      (when (get-buffer-window ot-buffer)
+	(ot-redraw-timeblocks)))))
 
 (defun ot-schedule ()
-  "Reschedule a selected block inside `org-timeblock-mode'."
+  "Change the timestamp for the selected block.
+The org-element timestamp object may be from an event or from a
+SCHEDULED property."
   (interactive)
-  (when-let ((marker (ot-selected-block-marker)))
-    (ot--schedule-time marker)
+  (when-let ((id (ot-selected-block-id))
+	     (marker (ot-selected-block-marker)))
+    (ot--schedule-time marker (ot-block-eventp id))
     (ot-redraw-buffers)
     (org-timeblock-mode)))
 
@@ -1193,21 +1214,29 @@ Duration format:
 2h30
 45"
   (interactive)
-  (when-let ((marker (ot-selected-block-marker)))
-    (ot--duration marker)
+  (when-let ((marker (ot-selected-block-marker))
+	     (id (ot-selected-block-id))
+	     (duration (ot-read-duration)))
+    (ot--duration duration marker (ot-block-eventp id))
     (ot-redraw-buffers)
     (org-timeblock-mode)))
 
 (defun otl-schedule ()
-  "Reschedule the entry at point in *org-timeblock-list* buffer."
+  "Reschedule the entry at point in *org-timeblock-list* buffer.
+The org-element timestamp object may be from an event or from a
+SCHEDULED property."
   (interactive)
   (when (ot--daterangep (ot-get-sched nil (line-beginning-position)))
     (user-error "Can not reschedule entries with daterange timestamp"))
-  (when-let ((sched (ot--schedule-time (get-text-property (line-beginning-position) 'marker))))
-    (ot--update-prefix sched)
-    (forward-line)
-    (when (get-buffer-window ot-buffer)
-      (ot-redraw-timeblocks))))
+  (let((eventp (ot-get-event nil (line-beginning-position))))
+    (when-let ((timestamp
+		(ot--schedule-time
+		 (get-text-property (line-beginning-position) 'marker)
+		 eventp)))
+      (ot--update-prefix timestamp eventp)
+      (forward-line)
+      (when (get-buffer-window ot-buffer)
+	(ot-redraw-timeblocks)))))
 
 ;;;; Navigation commands
 
@@ -1325,7 +1354,7 @@ When called from Lisp, DATE should be a date as returned by
   (when (re-search-forward (format " fill=\"%s\".*? id=\"\\(.+?\\)\"" ot-sel-block-color) nil t)
     (when-let ((inhibit-read-only t)
 	       (id (match-string-no-properties 1))
-	       (m (cdr (seq-find (lambda (x) (string= (car x) id)) ot-markers))))
+	       (m (cadr (seq-find (lambda (x) (string= (car x) id)) ot-data))))
       (switch-to-buffer-other-window (marker-buffer m))
       (goto-char (marker-position m))
       (ignore-errors (org-fold-core--isearch-reveal (point)))

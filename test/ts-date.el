@@ -55,6 +55,12 @@
    (ot-ts-date< (ot-encode-date "2023-10-10") (ot-encode-date "2023-10-15"))
    :to-be
    t)
+
+  (expect
+   (ot-ts-date< (ot-encode-date "2023-07-31") (ot-encode-date "2023-08-01"))
+   :to-be
+   t)
+  
   (expect
    (ot-ts-date< (ot-encode-date "2023-10-15") (ot-encode-date "2023-10-10"))
    :to-be
