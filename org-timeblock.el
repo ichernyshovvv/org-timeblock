@@ -52,7 +52,7 @@
 
 (defcustom ot-inbox-file
   (expand-file-name "inbox.org" org-directory)
-  "Org file in which new tasks are created when using `org-timeblock-new-task' command."
+  "Org file in which new tasks are created via `org-timeblock-new-task'."
   :group 'org-timeblock
   :type 'file)
 
@@ -216,21 +216,21 @@ tasks and those tasks that have not been sorted yet.")
 ;;;; Functions
 
 (cl-defsubst ot-get-sched (&optional object (position 0))
-  "Return the value of POSITION's 'sched property, in OBJECT.
+  "Return the value of POSITION's \\='sched property, in OBJECT.
 If OBJECT is nil, try to get the property from current buffer at POSITION.
 
-'sched property is an org-element timestamp object."
+\\='sched property is an org-element timestamp object."
   (get-text-property position 'sched object))
 
 (cl-defsubst ot-get-event (&optional object (position 0))
-  "Return the value of POSITION's 'event property, in OBJECT.
+  "Return the value of POSITION's \\='event property, in OBJECT.
 If OBJECT is nil, try to get the property from current buffer at POSITION.
 
-'event property is an org-element timestamp object."
+\\='event property is an org-element timestamp object."
   (get-text-property position 'event object))
 
 (cl-defsubst ot-get-sched-or-event (&optional object (position 0))
-  "Return POSITION's 'sched or 'event property, in OBJECT."
+  "Return POSITION's \\='sched or \\='event property, in OBJECT."
   (or (ot-get-sched object position)
       (ot-get-event object position)))
 
@@ -627,7 +627,7 @@ Default background color is used when BASE-COLOR is nil."
   "Toggle the sorting strategy in *org-timeblock-list*.
 Available sorting strategies:
 1. Sort by SCHEDULED property.\\<org-timeblock-list-mode-map>
-2. Sort by 'order text property applied to each entry inside
+2. Sort by \\='order text property applied to each entry inside
 *org-timeblock-list* which can be changed via `\\[org-timeblock-list-drag-line-forward]'/`\\[org-timeblock-list-drag-line-backward]'
 commands"
   (interactive)
@@ -770,7 +770,8 @@ PROMPT can overwrite the default prompt."
 
 (defun ot-construct-id (&optional marker eventp)
   "Construct identifier for the org entry at MARKER.
-If MARKER is nil, use entry at point."
+If MARKER is nil, use entry at point.
+If EVENTP is non-nil, use entry's TIMESTAMP property."
   (let* ((element (org-element-at-point marker))
 	 (title (org-element-property :title element)))
     (md5
@@ -1043,10 +1044,9 @@ Duration format:
 
 (defun ot--duration (duration marker &optional eventp)
   "Set SCHEDULED duration to DURATION for the org entry at MARKER.
-
 Change SCHEDULED timestamp duration of the org entry at MARKER.
-
-Return the changed org-element timestamp object."
+Return the changed org-element timestamp object.
+If EVENTP is non-nil, use entry's timestamp."
   (with-current-buffer (marker-buffer marker)
     (goto-char (marker-position marker))
     (org-fold-show-context 'agenda)
@@ -1420,7 +1420,7 @@ Available view options:
   "Search for events that have a timestamp set to ON
 ON format: \"YYYY-MM-DD\"
 
-When EXCLUDE-DATERANGES is non-nil, exclude events with a daterange with no times.
+When EXCLUDE-DATERANGES is non-nil, exclude events with daterange and no time.
 
 When WITH-TIME is non-nil, each event must contain a timestamp
 with time (timerange or just start time)."
