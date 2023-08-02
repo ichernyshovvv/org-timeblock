@@ -202,11 +202,12 @@ tasks and those tasks that have not been sorted yet.")
 
 ;;;; Modes
 
+(defvar image-auto-resize)
 (define-derived-mode org-timeblock-mode image-mode "Org-Timeblock" :interactive nil
-  (setq image-auto-resize nil
-	header-line-format
-	(format-time-string "[%Y-%m-%d %a]" ot-date)
-	buffer-read-only t))
+  (setq-local image-auto-resize nil
+	            header-line-format
+	            (format-time-string "[%Y-%m-%d %a]" ot-date)
+	            buffer-read-only t))
 
 (define-derived-mode org-timeblock-list-mode special-mode "Org-Timeblock-List" :interactive nil
   (setq truncate-lines t))
