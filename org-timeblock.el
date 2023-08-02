@@ -35,6 +35,7 @@
 
 (require 'org)
 (require 'svg)
+(require 'color)
 (require 'org-ql)
 
 ;;;; Faces
@@ -346,27 +347,8 @@ id is constructed via `ot-construct-id'"
 	(time-less-p ts2-start ts1-end))))))
 
 (defun ot--parse-hex-color (hex)
-  "Convert a HEX color code to a RGB list.
-i.e.
-#99ccff => (153 204 255)
-#33a    => (51 51 170)"
-  (let (result)
-    (when (string-match
-           "^\\s-*\\#\\([0-9a-fA-F]\\)\\([0-9a-fA-F]\\)\\([0-9a-fA-F]\\)\\s-*$"
-           hex)
-      (let ((m1 (match-string 1 hex))
-            (m2 (match-string 2 hex))
-            (m3 (match-string 3 hex)))
-        (setq result (list (read (format "#x%s%s" m1 m1))
-                           (read (format "#x%s%s" m2 m2))
-                           (read (format "#x%s%s" m3 m3))))))
-    (when (string-match
-           "^\\s-*\\#\\([0-9a-fA-F]\\{2\\}\\)\\([0-9a-fA-F]\\{2\\}\\)\\([0-9a-fA-F]\\{2\\}\\)\\s-*$"
-           hex)
-      (setq result (list (read (format "#x%s" (match-string 1 hex)))
-                         (read (format "#x%s" (match-string 2 hex)))
-                         (read (format "#x%s" (match-string 3 hex))))))
-    result))
+  "Convert a HEX color code to a RGB list of form (R G B)."
+  (cl-loop for scale in (color-name-to-rgb hex) collect (* scale 255)))
 
 (defun ot--random-color ()
   "Generate random color based on BASE-COLOR and RANGE.
