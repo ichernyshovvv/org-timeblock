@@ -83,7 +83,7 @@ Requirements:
 
 - Emacs 28.1 (or higher)
 - SVG support in your Emacs build
-- org 9.6.7 (or higher)
+- org 9.0 (or higher)
 - org-ql 0.7 (or higher)
 
 For now, only manual installation is available.  To install:

@@ -4,7 +4,7 @@
 
 ;; Author: Ilya Chernyshov <ichernyshovvv@gmail.com>
 ;; Version: 0.1
-;; Package-Requires: ((emacs "28.1") (org-ql "0.7") (org "9.6.7") svg)
+;; Package-Requires: ((emacs "28.1") (org-ql "0.7") (org "9.0") svg)
 ;; Keywords: org, calendar, timeblocking, agenda
 ;; URL: https://github.com/ichernyshovvv/org-timeblock
 
@@ -206,9 +206,9 @@ tasks and those tasks that have not been sorted yet.")
 (defvar image-auto-resize)
 (define-derived-mode org-timeblock-mode image-mode "Org-Timeblock" :interactive nil
   (setq-local image-auto-resize nil
-	            header-line-format
-	            (format-time-string "[%Y-%m-%d %a]" ot-date)
-	            buffer-read-only t))
+	      header-line-format
+	      (format-time-string "[%Y-%m-%d %a]" ot-date)
+	      buffer-read-only t))
 
 (define-derived-mode org-timeblock-list-mode special-mode "Org-Timeblock-List" :interactive nil
   (setq truncate-lines t))
@@ -674,7 +674,9 @@ Schedule or event date won't be changed.
 Time format is \"HHMM\""
   (with-current-buffer (marker-buffer marker)
     (goto-char (marker-position marker))
-    (org-fold-show-context 'agenda)
+    (if (version< org-version "9.6")
+	(org-show-context 'agenda)
+      (org-fold-show-context 'agenda))
     (let* ((timerangep
 	    (eq
 	     (read-char-from-minibuffer
@@ -772,7 +774,7 @@ PROMPT can overwrite the default prompt."
   "Construct identifier for the org entry at MARKER.
 If MARKER is nil, use entry at point.
 If EVENTP is non-nil, use entry's TIMESTAMP property."
-  (let* ((element (org-element-at-point marker))
+  (let* ((element (org-with-point-at marker (org-element-at-point)))
 	 (title (org-element-property :title element)))
     (md5
      (concat
@@ -1049,7 +1051,9 @@ Return the changed org-element timestamp object.
 If EVENTP is non-nil, use entry's timestamp."
   (with-current-buffer (marker-buffer marker)
     (goto-char (marker-position marker))
-    (org-fold-show-context 'agenda)
+    (if (version< org-version "9.6")
+	(org-show-context 'agenda)
+      (org-fold-show-context 'agenda))
     (let* ((timestamp
 	    (if eventp
 		(ot-get-event-timestamp)
@@ -1079,7 +1083,9 @@ If EVENTP is non-nil, use entry's timestamp."
   (when (and marker todo)
     (with-current-buffer (marker-buffer marker)
       (goto-char marker)
-      (org-fold-show-context 'agenda)
+      (if (version< org-version "9.6")
+	(org-show-context 'agenda)
+      (org-fold-show-context 'agenda))
       (org-todo todo))))
 
 (defun otl-drag-line-forward (&optional backward)
@@ -1091,10 +1097,10 @@ When BACKWARD is non-nil, move backward."
   (unless (or (get-text-property (point) 'marker)
 	      (get-text-property (point) 'sort-ind))
     (user-error "Can not move this line"))
-  (if (or (and backward (= (line-number-at-pos) 2))
-	  (and (not backward) (= (count-lines (point-min) (point-max))
-				 (line-number-at-pos))))
-      (user-error "Can not move further"))
+  (when (or (and backward (= (line-number-at-pos) 2))
+	    (and (not backward) (= (count-lines (point-min) (point-max))
+				   (line-number-at-pos))))
+    (user-error "Can not move further"))
   (let ((inhibit-read-only t)
 	(end (save-excursion (move-beginning-of-line 2) (point)))
 	line)
@@ -1499,7 +1505,6 @@ timestamp with time (timerange or just start time)."
 
 ;; Local Variables:
 ;;   outline-regexp: "^\\(;\\{3,\\} \\)"
-;;   eval: (progn (outline-minor-mode 1) (outline-hide-region-body (point-min) (point-max)))
 ;;   read-symbol-shorthands: (("ot-" . "org-timeblock-") ("otl-" . "org-timeblock-list-"))
 ;; End:
 
