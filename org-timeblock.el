@@ -203,17 +203,21 @@ tasks and those tasks that have not been sorted yet.")
 
 ;;;; Modes
 
-(defvar image-auto-resize)
 (define-derived-mode org-timeblock-mode image-mode "Org-Timeblock" :interactive nil
-  (setq-local image-auto-resize nil
-	      header-line-format
-	      (format-time-string "[%Y-%m-%d %a]" ot-date)
-	      buffer-read-only t))
+  (setq image-transform-resize nil
+	header-line-format (format-time-string "[%Y-%m-%d %a]" ot-date)
+	buffer-read-only t))
 
 (define-derived-mode org-timeblock-list-mode special-mode "Org-Timeblock-List" :interactive nil
   (setq truncate-lines t))
 
 ;;;; Functions
+
+(defun ot-show-context ()
+  "Make sure point and context are visible."
+  (if (version< org-version "9.6")
+      (org-show-context 'agenda)
+    (org-fold-show-context 'agenda)))
 
 (cl-defsubst ot-get-sched (&optional object (position 0))
   "Return the value of POSITION's \\='sched property, in OBJECT.
@@ -666,17 +670,17 @@ commands"
   (quit-window t))
 
 (defun ot--schedule-time (marker eventp)
-  "Change the timestamp of the org entry at MARKER to a specified time(range) interactively.
+  "Interactively change time for Org entry timestamp at MARKER.
+
 If EVENTP is non-nil, change timestamp of the event.
 
-Schedule or event date won't be changed.
+Schedule or event date won't be changed.  The time might be a
+timerange which depends on user interactive choice.
 
 Time format is \"HHMM\""
   (with-current-buffer (marker-buffer marker)
     (goto-char (marker-position marker))
-    (if (version< org-version "9.6")
-	(org-show-context 'agenda)
-      (org-fold-show-context 'agenda))
+    (ot-show-context)
     (let* ((timerangep
 	    (eq
 	     (read-char-from-minibuffer
@@ -1051,9 +1055,7 @@ Return the changed org-element timestamp object.
 If EVENTP is non-nil, use entry's timestamp."
   (with-current-buffer (marker-buffer marker)
     (goto-char (marker-position marker))
-    (if (version< org-version "9.6")
-	(org-show-context 'agenda)
-      (org-fold-show-context 'agenda))
+    (ot-show-context)
     (let* ((timestamp
 	    (if eventp
 		(ot-get-event-timestamp)
@@ -1083,9 +1085,7 @@ If EVENTP is non-nil, use entry's timestamp."
   (when (and marker todo)
     (with-current-buffer (marker-buffer marker)
       (goto-char marker)
-      (if (version< org-version "9.6")
-	(org-show-context 'agenda)
-      (org-fold-show-context 'agenda))
+      (ot-show-context)
       (org-todo todo))))
 
 (defun otl-drag-line-forward (&optional backward)
@@ -1332,7 +1332,7 @@ When called from Lisp, DATE should be a date as returned by
   (let ((marker (get-text-property (point) 'marker)))
     (switch-to-buffer-other-window (marker-buffer marker))
     (goto-char (marker-position marker))
-    (ignore-errors (org-fold-core--isearch-reveal (point)))
+    (ot-show-context)
     (recenter)))
 
 (defun ot-goto-other-window-svg ()
@@ -1346,7 +1346,7 @@ When called from Lisp, DATE should be a date as returned by
 	       (m (cadr (seq-find (lambda (x) (string= (car x) id)) ot-data))))
       (switch-to-buffer-other-window (marker-buffer m))
       (goto-char (marker-position m))
-      (ignore-errors (org-fold-core--isearch-reveal (point)))
+      (ot-show-context)
       (recenter))))
 
 (defun ot-switch-view ()
