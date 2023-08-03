@@ -209,7 +209,7 @@ tasks and those tasks that have not been sorted yet.")
 (defvar image-transform-resize)
 (define-derived-mode org-timeblock-mode image-mode "Org-Timeblock" :interactive nil
   (setq image-transform-resize nil
-	header-line-format (format-time-string "[%Y-%m-%d %a]" ot-date)
+	header-line-format (ts-format "[%Y-%m-%d %a]" ot-date)
 	buffer-read-only t))
 
 (define-derived-mode org-timeblock-list-mode special-mode "Org-Timeblock-List" :interactive nil
@@ -284,11 +284,9 @@ id is constructed via `ot-construct-id'"
      ((and (null a)
            (null b)))
      ((and a b)
-      (let ((a (decode-time a))
-            (b (decode-time b)))
-        (and (on decoded-time-year  = a b)
-             (on decoded-time-month = a b)
-             (on decoded-time-day   = a b))))))
+      (and (on ts-year  = a b)
+           (on ts-month = a b)
+           (on ts-day   = a b)))))
 
   (defun ot-ts-date< (a b)
     (cond
@@ -296,14 +294,12 @@ id is constructed via `ot-construct-id'"
      ((null b) nil)
      ((null a) t)
      (t
-      (let ((a (decode-time a))
-            (b (decode-time b)))
-        (or (on decoded-time-year < a b)
-	    (and
-	     (on decoded-time-year = a b)
-	     (or (on decoded-time-month < a b)
-		 (and (on decoded-time-month = a b)
-		      (on decoded-time-day < a b)))))))))
+      (or (on ts-year < a b)
+	  (and
+	   (on ts-year = a b)
+	   (or (on ts-month < a b)
+	       (and (on ts-month = a b)
+		    (on ts-day < a b))))))))
 
   (defun ot-order< (a b)
     (on (lambda (item)
@@ -312,9 +308,9 @@ id is constructed via `ot-construct-id'"
 
   (defun ot-sched-or-event< (a b)
     (on (lambda (item)
-          (ot--timestamp-encode
+          (ot--parse-org-element-ts
            (ot-get-sched-or-event item)))
-        time-less-p a b)))
+        ts< a b)))
 
 (defun ot-select-block-for-current-entry ()
   "Select block for the entry at point in `org-timeblock-list-mode'."
@@ -339,20 +335,20 @@ id is constructed via `ot-construct-id'"
 (defun ot-tss-intersect-p (oe-ts1 oe-ts2)
   "Check if two timestamps intersect each other.
 `OE-TS1',`OE-TS2' - org-element timestamp objects."
-  (when-let ((ts1-start (ot--timestamp-encode oe-ts1))
-	     (ts2-start (ot--timestamp-encode oe-ts2)))
-    (let ((ts1-end (ot--timestamp-encode oe-ts1 t))
-	  (ts2-end (ot--timestamp-encode oe-ts2 t)))
+  (when-let ((ts1-start (ot--parse-org-element-ts oe-ts1))
+	     (ts2-start (ot--parse-org-element-ts oe-ts2)))
+    (let ((ts1-end (ot--parse-org-element-ts oe-ts1 t))
+	  (ts2-end (ot--parse-org-element-ts oe-ts2 t)))
       (or
-       (time-equal-p ts2-start ts1-start)
+       (ts= ts2-start ts1-start)
        (and
 	ts2-end
-	(time-less-p ts2-start ts1-start)
-	(time-less-p ts1-start ts2-end))
+	(ts< ts2-start ts1-start)
+	(ts< ts1-start ts2-end))
        (and
 	ts1-end
-	(time-less-p ts1-start ts2-start)
-	(time-less-p ts2-start ts1-end))))))
+	(ts< ts1-start ts2-start)
+	(ts< ts2-start ts1-end))))))
 
 (defun ot--parse-hex-color (hex)
   "Convert a HEX color code to a RGB list of form (R G B)."
@@ -418,22 +414,22 @@ Default background color is used when BASE-COLOR is nil."
 			     nil
 			     (append
 			      (list (unless (eq ot-view-options 'hide-all)
-				      (decoded-time-hour (decode-time (current-time)))))
+				      (ts-hour (ts-now))))
 			      (mapcar
                                (lambda (entry)
 				 (let ((s-or-e (ot-get-sched-or-event entry)))
-                                   (if (ot-ts-date< (ot--timestamp-encode s-or-e) ot-date)
+                                   (if (ot-ts-date< (ot--parse-org-element-ts s-or-e) ot-date)
 				       0
 				     (org-element-property :hour-start s-or-e))))
 			       entries)))))
 		      (apply #'min hours)
 		    0))
 		 (scale (/ (float window-height) (float (* (- 24 min-hour) 60))))
-		 (cur-time (decode-time (current-time)))
+		 (cur-time (ts-now))
 		 (cur-time-indicator
 		  (* scale
 		     (-
-		      (+ (* (decoded-time-hour cur-time) 60) (decoded-time-minute cur-time)) ;; minutes
+		      (+ (* (ts-hour cur-time) 60) (ts-minute cur-time)) ;; minutes
 		      (* min-hour 60))))
 		 (columns
 		  (mapcar
@@ -493,29 +489,17 @@ Default background color is used when BASE-COLOR is nil."
 		     (x (+ timeline-left-padding (round (* (1- (cdr (assq (get-text-property 0 'marker entry) columns))) (/ entry-max-width length)))))
 		     (entry-width (round (/ entry-max-width length)))
 		     (timestamp (ot-get-sched-or-event entry))
-		     (start-ts (ot--timestamp-encode timestamp))
-		     (end-ts (ot--timestamp-encode timestamp t))
+		     (start-ts (ot--parse-org-element-ts timestamp))
+		     (end-ts (ot--parse-org-element-ts timestamp t))
 		     (duration (if (and start-ts end-ts)
 				   (round
-				    (* (/ (time-convert
-					   (time-subtract
-					    (if (ot-ts-date< ot-date end-ts)
-						(let ((decoded (decode-time ot-date)))
-						  (setf
-						   (decoded-time-hour decoded) 23
-						   (decoded-time-minute decoded) 59
-						   (decoded-time-second decoded) 0)
-						  (encode-time decoded))
-					      end-ts)
-					    (if (ot-ts-date< start-ts ot-date)
-						(let ((decoded (decode-time ot-date)))
-						  (setf
-						   (decoded-time-hour decoded) 0
-						   (decoded-time-minute decoded) 1
-						   (decoded-time-second decoded) 0)
-						  (encode-time decoded))
-					      start-ts))
-					   'integer)
+				    (* (/ (round (ts-diff
+						  (if (ot-ts-date< ot-date end-ts)
+						      (ts-apply :hour 23 :minute 59 :second 0 ot-date)
+						    end-ts)
+						  (if (ot-ts-date< start-ts ot-date)
+						      (ts-apply :hour 0 :minute 1 :second 0 ot-date)
+						    start-ts)))
 					  60)
 				       scale))
 				 5))
@@ -599,7 +583,7 @@ Default background color is used when BASE-COLOR is nil."
 		 :fill (face-attribute 'default :foreground))))
 	    ;; Drawing current time indicator
 	    (when (and ot-current-time-indicator
-		       (ot-ts-date= ot-date (current-time)))
+		       (ot-ts-date= ot-date (ts-now)))
 	      (svg-polygon
 	       svg-obj
 	       (list
@@ -657,10 +641,10 @@ commands"
       (while (not (eobp))
 	(when-let ((m (get-text-property (point) 'marker))
 		   (id (ot-construct-id m (ot-get-event nil (line-beginning-position)))))
-	  (setf (alist-get id (alist-get (format-time-string "%Y-%m-%d" ot-date) ot-list-entries-pos nil nil #'equal) nil nil #'equal)
+	  (setf (alist-get id (alist-get (ts-format "%Y-%m-%d" ot-date) ot-list-entries-pos nil nil #'equal) nil nil #'equal)
 		(cl-incf count)))
 	(when (get-text-property (point) 'sort-ind)
-	  (setf (alist-get (format-time-string "%Y-%m-%d" ot-date) ot-list-sort-line-position nil nil 'equal)
+	  (setf (alist-get (ts-format "%Y-%m-%d" ot-date) ot-list-sort-line-position nil nil 'equal)
 		(cl-incf count)))
 	(forward-line))
       (with-temp-file ot-list-order-cache-file
@@ -688,20 +672,20 @@ Time format is \"HHMM\""
     (let* ((timerangep
 	    (eq
 	     (read-char-from-minibuffer
-	      "Schedule: [s]tart timestamp only, time[r]ange"
+	      "Schedule: time[s]tamp, time[r]ange"
 	      '(?s ?r))
 	     ?r))
 	   (timestamp (if eventp
 			  (ot-get-event-timestamp)
 			(org-element-property :scheduled (org-element-at-point))))
-	   (start-ts (ot--timestamp-encode timestamp))
-	   (end-ts (ot--timestamp-encode timestamp t))
-	   (duration (when (and start-ts end-ts) (/ (time-convert (time-subtract end-ts start-ts) 'integer) 60)))
+	   (start-ts (ot--parse-org-element-ts timestamp))
+	   (end-ts (ot--parse-org-element-ts timestamp t))
+	   (duration (when (and start-ts end-ts) (/ (round (ts-diff end-ts start-ts)) 60)))
 	   (new-start-ts (ot-read-ts ot-date "START-TIME: "))
 	   (new-end-ts
 	    (if timerangep
 		(ot-read-ts ot-date "END-TIME: ")
-	      (when duration (time-add new-start-ts (* 60 duration))))))
+	      (when duration (ts-inc 'minute duration new-start-ts)))))
       (unless timestamp
 	(user-error "Scheduled property not found"))
       (if eventp
@@ -756,27 +740,26 @@ insert \"EVENT\" in the prefix."
 		      mend)))))
      'prefix t)))
 
-(cl-defun ot-read-ts (time &optional (prompt "TIME:"))
-  "Read a time in \"HHMM\" format and set it to internal time object TIME.
+(cl-defun ot-read-ts (ts &optional (prompt "TIME:"))
+  "Read a time in \"HHMM\" format and set it to ts.el object TS.
 
 Return the changed time object.
 
 PROMPT can overwrite the default prompt."
-  (let ((decoded (decode-time time)))
-    (cl-loop
-     as
-     res = (let (time)
-	     (while (< (length time) 4)
-	       (setq time (concat time (char-to-string (read-char-exclusive (concat prompt time))))))
-	     (when (string-match-p "[[:digit:]]\\{4\\}" time)
-	       (setf
-		(decoded-time-hour decoded)
-		(string-to-number (substring time 0 2))
-		(decoded-time-minute decoded)
-		(string-to-number (substring time 2 4)))
-	       (encode-time decoded)))
-     until res
-     finally return res)))
+  (cl-loop
+   as
+   res = (let (time)
+	   (while (< (length time) 4)
+	     (setq time (concat time (char-to-string (read-char-exclusive (concat prompt time))))))
+	   (when (string-match-p "[[:digit:]]\\{4\\}" time)
+	     (ts-apply
+	      :hour
+	      (string-to-number (substring time 0 2))
+	      :minute
+	      (string-to-number (substring time 2 4))
+	      ts)))
+   until res
+   finally return res))
 
 (defun ot-construct-id (&optional marker eventp)
   "Construct identifier for the org entry at MARKER.
@@ -829,7 +812,7 @@ with time (timerange or just start time)."
 	 'order (alist-get
 		 (get-text-property 0 'id entry)
 		 (alist-get
-		  (format-time-string "%Y-%m-%d" ot-date)
+		  (ts-format "%Y-%m-%d" ot-date)
 		  ot-list-entries-pos
 		  nil nil #'equal)
 		 nil nil #'equal)
@@ -840,7 +823,7 @@ with time (timerange or just start time)."
 	 (org-ql-select
 	   files
 	   `(and (active-timestamp
-		  :on ,(format-time-string "%Y-%m-%d" ot-date)
+		  :on ,(ts-format "%Y-%m-%d" ot-date)
 		  :exclude-dateranges ,exclude-dateranges
 		  :with-time ,with-time))
 	   :action
@@ -861,7 +844,7 @@ with time (timerange or just start time)."
 	   files
 	   `(and (not (done))
 		 (ot-org-ql-scheduled
-		  :on ,(format-time-string "%Y-%m-%d" ot-date)
+		  :on ,(ts-format "%Y-%m-%d" ot-date)
 		  :exclude-dateranges ,exclude-dateranges
 		  :with-time ,with-time))
 	   :action
@@ -888,8 +871,8 @@ with time (timerange or just start time)."
       (when-let ((colors (cdr (seq-find (lambda (x) (string= (car x) tag)) ot-tag-colors))))
 	(throw 'found colors)))))
 
-(defun ot--timestamp-encode (ts &optional end)
-  "Convert TS to internal time representation.
+(defun ot--parse-org-element-ts (ts &optional end)
+  "Convert TS to ts.el ts object.
 If END is non-nil, use end part of the timestamp.
 
 TS is a org-element timestamp object."
@@ -910,14 +893,16 @@ TS is a org-element timestamp object."
 		   (/= year-start year-end)
 		   (and hour-end hour-start (/= hour-start hour-end))
 		   (and minute-end minute-start (/= minute-start minute-end)))
-	      (encode-time (list 0 (or minute-end 0) (or hour-end 0) day-end month-end year-end 0 nil (car (current-time-zone)))))))
-      (encode-time (list 0 (or minute-start 0) (or hour-start 0) day-start month-start year-start 0 nil (car (current-time-zone)))))))
+	      (make-ts :year year-end :month month-end :day day-end
+		       :hour (or hour-end 0) :minute (or minute-end 0) :second 0))))
+      (make-ts :year year-start :month month-start :day day-start
+	       :hour (or hour-start 0) :minute (or minute-start 0) :second 0))))
 
 (defun ot--schedule (start-ts &optional end-ts marker)
   "Schedule the entry at MARKER to a timestamp.
 If MARKER is nil, schedule the entry at point.
 
-START-TS and END-TS an Emacs internal time representation."
+START-TS and END-TS are ts.el time objects."
   (save-window-excursion
     (save-excursion
       (save-restriction
@@ -976,16 +961,16 @@ Leave point where the timestamp was."
 (defun ot-ts-to-org-timerange (ts-start &optional ts-end repeat-string warning-string)
   "Create an Org timestamp range string.
 
-TS-START and TS-END an Emacs internal time representation.
+TS-START and TS-END are ts.el time objects.
 REPEAT-STRING is a repeater string.
 WARNING-STRING is a warning string of the form \"-[0-9]+[hdwmy]\""
-  (when-let ((start-date (format-time-string "%Y-%m-%d %a" ts-start)))
+  (when-let ((start-date (ts-format "%Y-%m-%d %a" ts-start)))
     (let ((start-time
-	   (let ((res (format-time-string "%R" ts-start)))
+	   (let ((res (ts-format "%R" ts-start)))
 	     (and (not (string= res "00:00")) res)))
-	  (end-date (and ts-end (format-time-string "%Y-%m-%d %a" ts-end)))
+	  (end-date (and ts-end (ts-format "%Y-%m-%d %a" ts-end)))
 	  (end-time (and ts-end
-			 (let ((res (format-time-string "%R" ts-end)))
+			 (let ((res (ts-format "%R" ts-end)))
 			   (and (not (string= res "00:00")) res))))
 	  (timestamp-end
            (concat
@@ -1064,8 +1049,8 @@ If EVENTP is non-nil, use entry's timestamp."
 	    (if eventp
 		(ot-get-event-timestamp)
 	      (org-element-property :scheduled (org-element-at-point))))
-	   (start-ts (ot--timestamp-encode timestamp))
-	   (new-end-ts (when duration (time-add start-ts (* 60 duration)))))
+	   (start-ts (ts-parse-org-element timestamp))
+	   (new-end-ts (when duration (ts-inc 'minute duration start-ts))))
       (unless (and (org-element-property :hour-start timestamp)
 		   (org-element-property :minute-start timestamp))
 	(user-error "No scheduled time specified for this entry"))
@@ -1122,7 +1107,7 @@ When BACKWARD is non-nil, move backward."
   "Enter `org-timeblock-list-mode'."
   (interactive)
   (switch-to-buffer ot-list-buffer)
-  (setq ot-date (current-time))
+  (setq ot-date (ts-now))
   (unless (file-exists-p ot-list-order-cache-file)
     (make-directory (file-name-directory ot-list-order-cache-file) t)
     (with-temp-file ot-list-order-cache-file))
@@ -1134,7 +1119,7 @@ When BACKWARD is non-nil, move backward."
   "Enter `org-timeblock-mode'."
   (interactive)
   (switch-to-buffer ot-buffer)
-  (setq ot-date (current-time))
+  (setq ot-date (ts-now))
   (unless (file-exists-p ot-list-order-cache-file)
     (make-directory (file-name-directory ot-list-order-cache-file) t)
     (with-temp-file ot-list-order-cache-file))
@@ -1156,7 +1141,7 @@ The new task is created in `org-timeblock-inbox-file'"
     (insert "\n")
     (org-insert-heading nil t t)
     (insert "TODO " title " ")
-    (org-schedule nil (format-time-string "%Y-%m-%d" ot-date))
+    (org-schedule nil (ts-format "%Y-%m-%d" ot-date))
     (save-buffer)
     (setq org-ql-cache (clrhash org-ql-cache))
     (kill-buffer))
@@ -1306,7 +1291,7 @@ SCHEDULED property."
 (defun ot-day-later ()
   "Go forward in time by one day in `org-timeblock-mode'."
   (interactive)
-  (setq ot-date (time-add ot-date (* 24 60 60)))
+  (setq ot-date (ts-inc 'day 1 ot-date))
   (ot-redraw-buffers))
 
 (defun ot-jump-to-day (date)
@@ -1315,7 +1300,7 @@ SCHEDULED property."
 When called interactively, prompt for the date.
 When called from Lisp, DATE should be a date as returned by
 `org-read-date'"
-  (interactive (list (org-read-date nil t)))
+  (interactive (list (ts-parse (org-read-date nil))))
   (when date
     (setq ot-date date)
     (ot-redraw-buffers)))
@@ -1323,7 +1308,7 @@ When called from Lisp, DATE should be a date as returned by
 (defun ot-day-earlier ()
   "Go backward in time by one day in `org-timeblock-mode'."
   (interactive)
-  (setq ot-date (time-subtract ot-date (* 24 60 60)))
+  (setq ot-date (ts-dec 'day 1 ot-date))
   (ot-redraw-buffers))
 
 ;;;; View commands
@@ -1404,8 +1389,8 @@ Available view options:
       (insert
        (propertize
 	(concat
-	 (format-time-string "[%Y-%m-%d %a]" ot-date)
-	 (and (ot-ts-date= ot-date (current-time)) " Today"))
+	 (ts-format "[%Y-%m-%d %a]" ot-date)
+	 (and (ot-ts-date= ot-date (ts-now)) " Today"))
 	'face 'ot-list-header))
       (insert "\n")
       (dolist (entry entries)
@@ -1418,7 +1403,7 @@ Available view options:
       (goto-char (point-min))
       (when (eq ot-sort-function #'ot-order<)
 	(forward-line
-	 (alist-get (format-time-string "%Y-%m-%d" ot-date) ot-list-sort-line-position nil nil #'equal))
+	 (alist-get (ts-format "%Y-%m-%d" ot-date) ot-list-sort-line-position nil nil #'equal))
 	(insert (propertize (format "% 37s" "^^^ SORTED ^^^\n") 'sort-ind t 'face '(:extend t :background "#8b0000" :foreground "#ffffff")))
 	(goto-char (point-min)))
       (when (get-buffer-window ot-buffer)
@@ -1443,18 +1428,14 @@ with time (timerange or just start time)."
   :body
   (when-let ((on-ts
 	      (when (stringp on)
-		(if-let (((string-match-p "^[0-9]\\{4\\}-[01][0-9]-[0-3][0-9]$" on))
-			 (time (parse-time-string on))
-			 ((setf (decoded-time-hour time) 0
-				(decoded-time-minute time) 0
-				(decoded-time-second time) 0)))
-		    (encode-time time)
+		(if (string-match-p "^[0-9]\\{4\\}-[01][0-9]-[0-3][0-9]$" on)
+		    (ts-apply :hour 0 :minute 0 :second 0 (ts-parse on))
 		  (user-error "Wrong date format = %s" on))))
 	     (timestamp (ot-get-event-timestamp))
 	     ((not (and exclude-dateranges (ot--daterangep timestamp))))
 	     ((or (not with-time) (org-element-property :hour-start timestamp)))
-	     (start-ts (ot--timestamp-encode timestamp)))
-    (let ((end-ts (ot--timestamp-encode timestamp t)))
+	     (start-ts (ot--parse-org-element-ts timestamp)))
+    (let ((end-ts (ot--parse-org-element-ts timestamp t)))
       (or
        (ot-ts-date= start-ts on-ts)
        (ot-ts-date= end-ts on-ts)
@@ -1483,18 +1464,14 @@ timestamp with time (timerange or just start time)."
   :body
   (when-let ((on-ts
 	      (when (stringp on)
-		(if-let (((string-match-p "^[0-9]\\{4\\}-[01][0-9]-[0-3][0-9]$" on))
-			 (time (parse-time-string on))
-			 ((setf (decoded-time-hour time) 0
-				(decoded-time-minute time) 0
-				(decoded-time-second time) 0)))
-		    (encode-time time)
+		(if (string-match-p "^[0-9]\\{4\\}-[01][0-9]-[0-3][0-9]$" on)
+		    (ts-apply :hour 0 :minute 0 :second 0 (ts-parse on))
 		  (user-error "Wrong date format = %s" on))))
 	     (sched (org-element-property :scheduled (org-element-at-point)))
 	     ((not (and exclude-dateranges (ot--daterangep sched))))
 	     ((or (not with-time) (org-element-property :hour-start sched)))
-	     (start-ts (ot--timestamp-encode sched)))
-    (let ((end-ts (ot--timestamp-encode sched t)))
+	     (start-ts (ot--parse-org-element-ts sched)))
+    (let ((end-ts (ot--parse-org-element-ts sched t)))
       (or
        (ot-ts-date= start-ts on-ts)
        (ot-ts-date= end-ts on-ts)

@@ -1,6 +1,6 @@
 ;; -*- lexical-binding: t; -*-
 
-(require 'helper)
+(require 'org-timeblock-test)
 
 (describe
     "org-timeblock-schedule"
@@ -11,7 +11,7 @@
      (ot-with-temp-org-file
       (insert "* test :tag1:")
       (ot--schedule
-       (ot-test-encode-time "2022-10-15")))
+       (ts-parse "2022-10-15")))
      :to-equal
      (string-join
       '("* test :tag1:"
@@ -23,7 +23,7 @@
      (ot-with-temp-org-file
       (insert "* test :tag1:")
       (ot--schedule
-       (ot-test-encode-time "2022-10-15 20:15")))
+       (ts-parse "2022-10-15 20:15")))
      :to-equal
      (string-join
       '("* test :tag1:"
@@ -35,8 +35,8 @@
      (ot-with-temp-org-file
       (insert "* test :tag1:")
       (ot--schedule
-       (ot-test-encode-time "2022-10-15 20:15")
-       (ot-test-encode-time "2022-10-15 21:15")))
+       (ts-parse "2022-10-15 20:15")
+       (ts-parse "2022-10-15 21:15")))
      :to-equal
      (string-join
       '("* test :tag1:"
@@ -48,8 +48,8 @@
      (ot-with-temp-org-file
       (insert "* test :tag1:")
       (ot--schedule
-       (ot-test-encode-time "2022-10-15 20:15")
-       (ot-test-encode-time "2022-10-16 21:15")))
+       (ts-parse "2022-10-15 20:15")
+       (ts-parse "2022-10-16 21:15")))
      :to-equal
      (string-join
       '("* test :tag1:"
@@ -61,8 +61,8 @@
      (ot-with-temp-org-file
       (insert "* test :tag1:")
       (ot--schedule
-       (ot-test-encode-time "2022-10-15 20:15")
-       (ot-test-encode-time "2022-10-16 21:15")))
+       (ts-parse "2022-10-15 20:15")
+       (ts-parse "2022-10-16 21:15")))
      :to-equal
      (string-join
       '("* test :tag1:"
@@ -79,7 +79,7 @@
 	  "")
 	"\n"))
       (ot--schedule
-       (ot-test-encode-time "2022-10-15 20:15")))
+       (ts-parse "2022-10-15 20:15")))
      :to-equal
      (string-join
       '("* test :tag1:"
@@ -92,7 +92,7 @@
      (ot-with-temp-org-file
       (insert "* test :tag1:\nSCHEDULED: <2022-10-16 Sun>")
       (ot--schedule
-       (ot-test-encode-time "2022-10-15")))
+       (ts-parse "2022-10-15")))
      :to-equal
      (string-join
       '("* test :tag1:"
@@ -105,7 +105,7 @@
      (ot-with-temp-org-file
       (insert "* test :tag1:\nSCHEDULED: <2022-10-16 Sun +1d>")
       (ot--schedule
-       (ot-test-encode-time "2022-10-15")))
+       (ts-parse "2022-10-15")))
      :to-equal
      (string-join
       '("* test :tag1:"
@@ -118,7 +118,7 @@
      (ot-with-temp-org-file
       (insert "* test :tag1:\nSCHEDULED: <2022-10-16 Sun 12:00-13:00 +1d>")
       (ot--schedule
-       (ot-test-encode-time "2022-10-15")))
+       (ts-parse "2022-10-15")))
      :to-equal
      (string-join
       '("* test :tag1:"
@@ -131,7 +131,7 @@
      (ot-with-temp-org-file
       (insert "* test :tag1:\nSCHEDULED: <2022-10-14 Fri 12:00 +1d>--<2022-10-15 Sat 13:00 +1d>")
       (ot--schedule
-       (ot-test-encode-time "2022-10-15")))
+       (ts-parse "2022-10-15")))
      :to-equal
      (string-join
       '("* test :tag1:"
@@ -144,8 +144,8 @@
      (ot-with-temp-org-file
       (insert "* test :tag1:\nSCHEDULED: <2022-10-15 Sat +1d>")
       (ot--schedule
-       (ot-test-encode-time "2022-10-14 12:00")
-       (ot-test-encode-time "2022-10-15 13:00")))
+       (ts-parse "2022-10-14 12:00")
+       (ts-parse "2022-10-15 13:00")))
      :to-equal
      (string-join
       '("* test :tag1:"
@@ -158,8 +158,8 @@
      (ot-with-temp-org-file
       (insert "* test :tag1:\nSCHEDULED: <2022-10-15 Sat +1d>")
       (ot--schedule
-       (ot-test-encode-time "2022-10-14 12:00")
-       (ot-test-encode-time "2022-10-14 13:00")))
+       (ts-parse "2022-10-14 12:00")
+       (ts-parse "2022-10-14 13:00")))
      :to-equal
      (string-join
       '("* test :tag1:"
