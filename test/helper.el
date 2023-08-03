@@ -34,21 +34,11 @@ otherwise place the point at the beginning of the inserted text."
 (defun ot-get-file-contents(filename)
   (with-temp-buffer (insert-file-contents filename) (buffer-string)))
 
-(defun ot-org-test-settings()
-  "Orgmode settings"
-  (setq org-log-done nil
-	org-id-files nil
-	org-property-format "%s %s"
-        org-tags-column 0
-	org-id-locations-file ,(make-temp-file "org-push-caldav-")
-	org-directory (make-temp-file "org-push-caldav-" t)
-	org-agenda-files `(,org-directory)))
-
 (defmacro ot-with-temp-org-file (&rest body)
   "Move to buffer and point of point-or-marker POM for the duration of BODY."
   `(let((org-property-format "%s %s")
 	(org-tags-column 0)
-	(org-file (make-temp-file "org-ts-functions-" nil ".org")))
+	(org-file (make-temp-file "org-timeblock-" nil ".org")))
      (with-current-buffer (find-file-noselect org-file)
        ,@body
        (save-buffer))

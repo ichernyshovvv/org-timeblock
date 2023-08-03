@@ -36,12 +36,15 @@
 (require 'org)
 (require 'svg)
 (require 'color)
+(require 'seq)
 (require 'org-ql)
+(require 'text-property-search)
 
 ;;;; Faces
 
-(defface otl-header '((t (:inherit org-agenda-structure)))
-  "Face used in agenda for `org-super-agenda' group name header.")
+(defface ot-list-header '((t (:inherit org-agenda-structure)))
+  "Face used in agenda for `org-super-agenda' group name header."
+  :group 'org-timeblock)
 
 ;;;; Custom Variables
 
@@ -116,7 +119,7 @@ are tagged with a tag in car."
 
 (defvar ot-data nil)
 
-(defvar otl-entries-pos nil
+(defvar ot-list-entries-pos nil
   "Saved positions for entries in `org-timeblock-list-mode'.
 Nested alist of saved positions of the entries for each date that
 a user have previously opened in `org-timeblock-list-mode'.")
@@ -130,17 +133,17 @@ a user have previously opened in `org-timeblock-list-mode'.")
 
 (defvar ot-buffer "*org-timeblock*" "The name of the buffer displaying visual schedule.")
 
-(defvar otl-buffer "*org-timeblock-list*"
+(defvar ot-list-buffer "*org-timeblock-list*"
   "The name of the buffer displaying the list of tasks and events.")
 
-(defvar otl-sort-line-position nil
+(defvar ot-list-sort-line-position nil
   "Sort indicator line position.
 The line position of the sort line which is displayed in
 `org-timeblock-list-mode' when orgmode tasks are manually
 placed.  Used as a simple separator to distinguish manually sorted
 tasks and those tasks that have not been sorted yet.")
 
-(defvar otl-order-cache-file (expand-file-name ".cache/org-timeblock.el" user-emacs-directory))
+(defvar ot-list-order-cache-file (expand-file-name ".cache/org-timeblock.el" user-emacs-directory))
 
 ;;;; Keymaps
 
@@ -163,21 +166,21 @@ tasks and those tasks that have not been sorted yet.")
 
 (defvar org-timeblock-list-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "s") 'otl-schedule)
-    (define-key map (kbd "r") 'otl-bulk-reschedule)
+    (define-key map (kbd "s") 'ot-list-schedule)
+    (define-key map (kbd "r") 'ot-list-bulk-reschedule)
     (define-key map (kbd "<tab>") 'ot-goto-other-window)
     (define-key map (kbd "q") 'ot-quit)
-    (define-key map (kbd "C-s") 'otl-save)
-    (define-key map (kbd "M-<down>") 'otl-drag-line-forward)
-    (define-key map (kbd "M-<up>") 'otl-drag-line-backward)
-    (define-key map (kbd "d") 'otl-set-duration)
+    (define-key map (kbd "C-s") 'ot-list-save)
+    (define-key map (kbd "M-<down>") 'ot-list-drag-line-forward)
+    (define-key map (kbd "M-<up>") 'ot-list-drag-line-backward)
+    (define-key map (kbd "d") 'ot-list-set-duration)
     (define-key map (kbd "g") 'ot-redraw-buffers)
-    (define-key map (kbd "t") 'otl-toggle-timeblock)
-    (define-key map (kbd "<down>") 'otl-next-line)
-    (define-key map (kbd "<up>") 'otl-previous-line)
-    (define-key map (kbd "S") 'otl-toggle-sort-function)
-    (define-key map (kbd "5") 'otl-done)
-    (define-key map (kbd "1") 'otl-todo)
+    (define-key map (kbd "t") 'ot-list-toggle-timeblock)
+    (define-key map (kbd "<down>") 'ot-list-next-line)
+    (define-key map (kbd "<up>") 'ot-list-previous-line)
+    (define-key map (kbd "S") 'ot-list-toggle-sort-function)
+    (define-key map (kbd "5") 'ot-list-done)
+    (define-key map (kbd "1") 'ot-list-todo)
     (define-key map (kbd "+") 'ot-new-task)
     (define-key map (kbd "v") 'ot-switch-view)
     (define-key map (kbd "C-<up>") 'ot-day-earlier)
@@ -203,6 +206,7 @@ tasks and those tasks that have not been sorted yet.")
 
 ;;;; Modes
 
+(defvar image-transform-resize)
 (define-derived-mode org-timeblock-mode image-mode "Org-Timeblock" :interactive nil
   (setq image-transform-resize nil
 	header-line-format (format-time-string "[%Y-%m-%d %a]" ot-date)
@@ -521,7 +525,7 @@ Default background color is used when BASE-COLOR is nil."
 		      (append
 		       (if (> (* (length title) (default-font-width)) entry-width)
 			   (seq-take
-			    (seq-split title (1- (/ entry-width (default-font-width))))
+			    (seq-partition title (/ entry-width (default-font-width)))
 			    (let ((lines-count (round (/ duration (default-font-height)))))
 			      (if (= 0 lines-count) 1 lines-count)))
 			 `(,title))
@@ -573,7 +577,7 @@ Default background color is used when BASE-COLOR is nil."
 			`((x . 0)
 			  (y . ,(cl-incf y-start (default-font-height)))
 			  (fill . ,(face-attribute 'default :foreground))
-			  (font-size . 14))
+			  (font-size . ,(aref (font-info (face-font 'default)) 2)))
 			(svg--encode-text heading-part))
 		       result)))))))
 	    ;; Drawing hour lines
@@ -624,10 +628,10 @@ Default background color is used when BASE-COLOR is nil."
 
 (defun ot-show-timeblock-list ()
   "Switch to *org-timeblock-list* buffer in another window."
-  (switch-to-buffer-other-window otl-buffer)
+  (switch-to-buffer-other-window ot-list-buffer)
   (other-window 1))
 
-(defun otl-toggle-sort-function ()
+(defun ot-list-toggle-sort-function ()
   "Toggle the sorting strategy in *org-timeblock-list*.
 Available sorting strategies:
 1. Sort by SCHEDULED property.\\<org-timeblock-list-mode-map>
@@ -641,7 +645,7 @@ commands"
 	  #'ot-order<))
   (ot-redraw-buffers))
 
-(defun otl-save ()
+(defun ot-list-save ()
   "Save orgmode files, sorting line and tasks positions."
   (interactive)
   (unless (eq major-mode 'org-timeblock-list-mode)
@@ -653,15 +657,15 @@ commands"
       (while (not (eobp))
 	(when-let ((m (get-text-property (point) 'marker))
 		   (id (ot-construct-id m (ot-get-event nil (line-beginning-position)))))
-	  (setf (alist-get id (alist-get (format-time-string "%Y-%m-%d" ot-date) otl-entries-pos nil nil #'equal) nil nil #'equal)
+	  (setf (alist-get id (alist-get (format-time-string "%Y-%m-%d" ot-date) ot-list-entries-pos nil nil #'equal) nil nil #'equal)
 		(cl-incf count)))
 	(when (get-text-property (point) 'sort-ind)
-	  (setf (alist-get (format-time-string "%Y-%m-%d" ot-date) otl-sort-line-position nil nil 'equal)
+	  (setf (alist-get (format-time-string "%Y-%m-%d" ot-date) ot-list-sort-line-position nil nil 'equal)
 		(cl-incf count)))
 	(forward-line))
-      (with-temp-file otl-order-cache-file
-	(insert (format "%S" `(setq org-timeblock-entries-positions-alist ',otl-entries-pos
-				    org-timeblock/sort-line-position ',otl-sort-line-position))))))
+      (with-temp-file ot-list-order-cache-file
+	(insert (format "%S" `(setq org-timeblock-entries-positions-alist ',ot-list-entries-pos
+				    org-timeblock/sort-line-position ',ot-list-sort-line-position))))))
   (org-save-all-org-buffers))
 
 (defun ot-quit ()
@@ -826,7 +830,7 @@ with time (timerange or just start time)."
 		 (get-text-property 0 'id entry)
 		 (alist-get
 		  (format-time-string "%Y-%m-%d" ot-date)
-		  otl-entries-pos
+		  ot-list-entries-pos
 		  nil nil #'equal)
 		 nil nil #'equal)
 	 entry)
@@ -1075,10 +1079,10 @@ If EVENTP is non-nil, use entry's timestamp."
 	(ot--schedule start-ts new-end-ts)
 	(org-element-property :scheduled (org-element-at-point))))))
 
-(defun otl-drag-line-backward ()
+(defun ot-list-drag-line-backward ()
   "Drag an agenda line backward by ARG lines."
   (interactive)
-  (otl-drag-line-forward t))
+  (ot-list-drag-line-forward t))
 
 (defun ot--set-todo (marker todo)
   "Set TODO state to the entry at MARKER."
@@ -1088,7 +1092,7 @@ If EVENTP is non-nil, use entry's timestamp."
       (ot-show-context)
       (org-todo todo))))
 
-(defun otl-drag-line-forward (&optional backward)
+(defun ot-list-drag-line-forward (&optional backward)
   "Drag an agenda line forward by ARG lines.
 When BACKWARD is non-nil, move backward."
   (interactive)
@@ -1117,12 +1121,12 @@ When BACKWARD is non-nil, move backward."
 (defun org-timeblock-list ()
   "Enter `org-timeblock-list-mode'."
   (interactive)
-  (switch-to-buffer otl-buffer)
+  (switch-to-buffer ot-list-buffer)
   (setq ot-date (current-time))
-  (unless (file-exists-p otl-order-cache-file)
-    (make-directory (file-name-directory otl-order-cache-file) t)
-    (with-temp-file otl-order-cache-file))
-  (load (expand-file-name otl-order-cache-file) nil t t)
+  (unless (file-exists-p ot-list-order-cache-file)
+    (make-directory (file-name-directory ot-list-order-cache-file) t)
+    (with-temp-file ot-list-order-cache-file))
+  (load (expand-file-name ot-list-order-cache-file) nil t t)
   (ot-redraw-buffers))
 
 ;;;###autoload
@@ -1131,10 +1135,10 @@ When BACKWARD is non-nil, move backward."
   (interactive)
   (switch-to-buffer ot-buffer)
   (setq ot-date (current-time))
-  (unless (file-exists-p otl-order-cache-file)
-    (make-directory (file-name-directory otl-order-cache-file) t)
-    (with-temp-file otl-order-cache-file))
-  (load (expand-file-name otl-order-cache-file) nil t t)
+  (unless (file-exists-p ot-list-order-cache-file)
+    (make-directory (file-name-directory ot-list-order-cache-file) t)
+    (with-temp-file ot-list-order-cache-file))
+  (load (expand-file-name ot-list-order-cache-file) nil t t)
   (ot-redraw-buffers))
 
 ;;;; Planning commands
@@ -1158,7 +1162,7 @@ The new task is created in `org-timeblock-inbox-file'"
     (kill-buffer))
   (ot-redraw-buffers))
 
-(defun otl-set-duration ()
+(defun ot-list-set-duration ()
   "Interactively change SCHEDULED duration for the task at point.
 
 Change SCHEDULED timestamp duration of the task at point in
@@ -1210,7 +1214,7 @@ Duration format:
     (ot-redraw-buffers)
     (org-timeblock-mode)))
 
-(defun otl-schedule ()
+(defun ot-list-schedule ()
   "Reschedule the entry at point in *org-timeblock-list* buffer.
 The org-element timestamp object may be from an event or from a
 SCHEDULED property."
@@ -1253,13 +1257,13 @@ SCHEDULED property."
 	(replace-match ot-sel-block-color nil nil nil 1))
       (org-timeblock-mode))))
 
-(defun otl-next-line ()
+(defun ot-list-next-line ()
   "Move cursor to the next line."
   (interactive)
   (funcall-interactively 'next-line)
   (ot-select-block-for-current-entry))
 
-(defun otl-previous-line ()
+(defun ot-list-previous-line ()
   "Move cursor to the previous line."
   (interactive)
   (funcall-interactively 'previous-line)
@@ -1364,7 +1368,7 @@ Available view options:
 	  (`t 'nil)))
   (ot-redraw-timeblocks))
 
-(defun otl-toggle-timeblock ()
+(defun ot-list-toggle-timeblock ()
   "Toggle the display of the window with `org-timeblock-mode'."
   (interactive)
   (if-let ((window (get-buffer-window ot-buffer)))
@@ -1375,7 +1379,7 @@ Available view options:
 (defun ot-toggle-timeblock-list ()
   "Toggle the display of the window with `org-timeblock-list-mode'."
   (interactive)
-  (if-let ((window (get-buffer-window otl-buffer)))
+  (if-let ((window (get-buffer-window ot-list-buffer)))
       (delete-window window)
     (ot-show-timeblock-list))
   (ot-redraw-buffers))
@@ -1384,7 +1388,7 @@ Available view options:
   "Redraw `org-timeblock-list-mode' and `org-timeblock-timeline-mode' buffers."
   ;; org-timeblock-list-mode and org-timeblock-mode
   (interactive)
-  (with-current-buffer (get-buffer-create otl-buffer)
+  (with-current-buffer (get-buffer-create ot-list-buffer)
     (let ((inhibit-read-only t)
 	  (entries (ot-get-entries)))
       (erase-buffer)
@@ -1402,7 +1406,7 @@ Available view options:
 	(concat
 	 (format-time-string "[%Y-%m-%d %a]" ot-date)
 	 (and (ot-ts-date= ot-date (current-time)) " Today"))
-	'face 'otl-header))
+	'face 'ot-list-header))
       (insert "\n")
       (dolist (entry entries)
 	(let ((colors (ot-get-colors (get-text-property 0 'tags entry))))
@@ -1414,7 +1418,7 @@ Available view options:
       (goto-char (point-min))
       (when (eq ot-sort-function #'ot-order<)
 	(forward-line
-	 (alist-get (format-time-string "%Y-%m-%d" ot-date) otl-sort-line-position nil nil #'equal))
+	 (alist-get (format-time-string "%Y-%m-%d" ot-date) ot-list-sort-line-position nil nil #'equal))
 	(insert (propertize (format "% 37s" "^^^ SORTED ^^^\n") 'sort-ind t 'face '(:extend t :background "#8b0000" :foreground "#ffffff")))
 	(goto-char (point-min)))
       (when (get-buffer-window ot-buffer)
@@ -1505,7 +1509,7 @@ timestamp with time (timerange or just start time)."
 
 ;; Local Variables:
 ;;   outline-regexp: "^\\(;\\{3,\\} \\)"
-;;   read-symbol-shorthands: (("ot-" . "org-timeblock-") ("otl-" . "org-timeblock-list-"))
+;;   read-symbol-shorthands: (("ot-" . "org-timeblock-"))
 ;; End:
 
 ;;; org-timeblock.el ends here

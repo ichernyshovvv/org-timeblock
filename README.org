@@ -86,7 +86,17 @@ Requirements:
 - org 9.0 (or higher)
 - org-ql 0.7 (or higher)
 
-For now, only manual installation is available.  To install:
+** Quelpa
+
+1. Install ~quelpa-use-package~ (which can be installed directly from MELPA).
+2. Add this form to your init file:
+
+#+begin_src elisp
+(use-package org-timeblock
+  :quelpa (org-timeblock :fetcher github :repo "ichernyshovvv/org-timeblock"))
+#+end_src
+
+** Manual
 
 1.  Run ~M-x package-install org-ql~
 2.  ~git clone https://github.com/ichernyshovvv/org-timeblock~
