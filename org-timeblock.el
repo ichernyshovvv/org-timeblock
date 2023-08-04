@@ -4,7 +4,7 @@
 
 ;; Author: Ilya Chernyshov <ichernyshovvv@gmail.com>
 ;; Version: 0.1
-;; Package-Requires: ((emacs "28.1") (org-ql "0.7") (org "9.0") svg)
+;; Package-Requires: ((emacs "28.1") (compat "29.1") (org-ql "0.7") (org "9.0") svg)
 ;; Keywords: org, calendar, timeblocking, agenda
 ;; URL: https://github.com/ichernyshovvv/org-timeblock
 
@@ -39,6 +39,8 @@
 (require 'seq)
 (require 'org-ql)
 (require 'text-property-search)
+(require 'compat)
+(require 'compat-macs)
 
 ;;;; Faces
 
@@ -217,11 +219,15 @@ tasks and those tasks that have not been sorted yet.")
 
 ;;;; Functions
 
+(compat-version "29.1")
+
+(compat-defun org-fold-show-context (&optional key)
+  "Make sure point and context are visible."
+  (org-show-context key))
+
 (defun ot-show-context ()
   "Make sure point and context are visible."
-  (if (version< org-version "9.6")
-      (org-show-context 'agenda)
-    (org-fold-show-context 'agenda)))
+  (compat-call org-fold-show-context 'agenda))
 
 (cl-defsubst ot-get-sched (&optional object (position 0))
   "Return the value of POSITION's \\='sched property, in OBJECT.
