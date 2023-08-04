@@ -61,6 +61,15 @@
   :group 'org-timeblock
   :type 'file)
 
+(defcustom ot-new-task-time
+  "12:00"
+  "Time to which new tasks are scheduled via `org-timeblock-new-task'.
+Time is of the format \"HH:MM\"."
+  :group 'org-timeblock
+  :type '(choice
+	  (const :tag "Unspecified.  The new task will be scheduled to a date with no time" nil)
+	  (string :tag "Time")))
+
 (defcustom ot-view-options t
   "Options that are used to decide which part of visual schedule must be hidden."
   :group 'org-timeblock
@@ -1138,6 +1147,8 @@ When BACKWARD is non-nil, move backward."
   "Create a task scheduled to the date in the current view.
 The new task is created in `org-timeblock-inbox-file'"
   (interactive)
+  (unless (member ot-inbox-file (org-agenda-files))
+    (user-error "`org-timeblock-inbox-file' must be present in `org-agenda-files'"))
   (let (title)
     (while (or (not title)
 	       (string-empty-p title))
@@ -1147,7 +1158,7 @@ The new task is created in `org-timeblock-inbox-file'"
     (insert "\n")
     (org-insert-heading nil t t)
     (insert "TODO " title " ")
-    (org-schedule nil (ts-format "%Y-%m-%d" ot-date))
+    (org-schedule nil (concat (ts-format "%Y-%m-%d " ot-date) ot-new-task-time))
     (save-buffer)
     (setq org-ql-cache (clrhash org-ql-cache))
     (kill-buffer))
