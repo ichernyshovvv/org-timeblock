@@ -86,6 +86,12 @@ Requirements:
 - org 9.0 (or higher)
 - org-ql 0.7 (or higher)
 
+** package-vc-install (Emacs 29)
+
+If you use Emacs 29, you can install the package via
+
+~M-x package-vc-install RET https://github.com/ichernyshovvv/org-timeblock/ RET~
+
 ** Quelpa
 
 1. Install ~quelpa-use-package~ (which can be installed directly from MELPA).
