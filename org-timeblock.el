@@ -130,6 +130,9 @@ are tagged with a tag in car."
 
 (defvar ot-data nil)
 
+(defvar ot-svg-width)
+(defvar ot-svg-height)
+
 (defvar ot-list-entries-pos nil
   "Saved positions for entries in `org-timeblock-list-mode'.
 Nested alist of saved positions of the entries for each date that
@@ -219,9 +222,13 @@ tasks and those tasks that have not been sorted yet.")
 
 (defvar image-transform-resize)
 (define-derived-mode org-timeblock-mode image-mode "Org-Timeblock" :interactive nil
-  (setq image-transform-resize nil
-	header-line-format (ts-format "[%Y-%m-%d %a]" ot-date)
-	buffer-read-only t))
+  (if-let ((window (get-buffer-window ot-buffer))
+	   ((or (< (window-body-height window t) ot-svg-height)
+		(< (window-body-width window t) ot-svg-width))))
+      (ot-redraw-timeblocks)
+    (setq image-transform-resize nil
+	  header-line-format (ts-format "[%Y-%m-%d %a]" ot-date)
+	  buffer-read-only t)))
 
 (define-derived-mode org-timeblock-list-mode special-mode "Org-Timeblock-List" :interactive nil
   (setq truncate-lines t))
@@ -417,8 +424,8 @@ Default background color is used when BASE-COLOR is nil."
       (erase-buffer)
       (if-let ((entries (ot-get-entries :sort-func #'ot-sched-or-event< :exclude-dateranges t :with-time t)))
 	  (let* ((window (get-buffer-window ot-buffer))
-		 (window-height (window-body-height window t))
-		 (window-width (window-body-width window t))
+		 (window-height (setq ot-svg-height (window-body-height window t)))
+		 (window-width (setq ot-svg-width (window-body-width window t)))
 		 (timeline-left-padding 25)
 		 (entry-max-width (- window-width timeline-left-padding))
 		 (svg-obj (svg-create window-width window-height))
@@ -428,8 +435,7 @@ Default background color is used when BASE-COLOR is nil."
 			    (remove
 			     nil
 			     (append
-			      (list (unless (eq ot-view-options 'hide-all)
-				      (ts-hour (ts-now))))
+			      (list (unless (eq ot-view-options 'hide-all) (ts-hour (ts-now))))
 			      (mapcar
                                (lambda (entry)
 				 (let ((s-or-e (ot-get-sched-or-event entry)))
