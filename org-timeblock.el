@@ -274,7 +274,7 @@ Mouse position is of the form (X . Y)."
   "Return a marker pointing to the org entry of selected timeblock."
   (goto-char (point-min))
   (and
-   (re-search-forward (format " fill=\"%s\".*? id=\"\\(.+?\\)\"" ot-sel-block-color) nil t)
+   (re-search-forward (format "<rect .*? id=\"\\([^\"]+\\)\" fill=\"%s\"" ot-sel-block-color) nil t)
    (let ((id (match-string-no-properties 1)))
      (cadr (seq-find (lambda (x) (string= (car x) id)) ot-data)))))
 
@@ -288,7 +288,7 @@ Mouse position is of the form (X . Y)."
 id is constructed via `ot-construct-id'"
   (goto-char (point-min))
   (and
-   (re-search-forward (format " fill=\"%s\".*? id=\"\\(.+?\\)\"" ot-sel-block-color) nil t)
+   (re-search-forward (format "<rect .*? id=\"\\([^\"]+\\)\" fill=\"%s\"" ot-sel-block-color) nil t)
    (match-string-no-properties 1)))
 
 (cl-macrolet ((on (accessor op lhs rhs)
@@ -342,7 +342,7 @@ id is constructed via `ot-construct-id'"
 	(goto-char (point-min)))
       (when (and (search-forward (format " id=\"%s\"" id) nil t)
 		 (search-backward "<rect " nil t)
-		 (re-search-forward " fill=\"\\([^\"]+?\\)\"" nil t))
+		 (re-search-forward " fill=\"\\([^\"]+\\)\"" nil t))
 	(setq ot-prev-selected-block-color (match-string 1))
 	(replace-match ot-sel-block-color nil nil nil 1)
 	(org-timeblock-mode)))))
@@ -547,38 +547,21 @@ Default background color is used when BASE-COLOR is nil."
 		     (y (round (* scale (- minutes (* min-hour 60))))))
 		(push (list (get-text-property 0 'id entry) (get-text-property 0 'marker entry) (ot-get-event entry)) ot-data)
 		;; Appending generated rectangle for current entry
-		(svg--append
-		 svg-obj
-		 (dom-node
-		  'rect
-		  `((height . ,duration)
-		    (width . ,entry-width)
-		    (stroke . ,(if (ot-get-event entry) "#5b0103" "#cdcdcd"))
-		    (stroke-width . ,(if (ot-get-event entry) 2 1))
-		    (opacity . "0.95")
-		    (y . ,y)
-		    (x . ,x)
-		    (fill . ,(or (car (ot-get-colors (get-text-property 0 'tags entry)))
-				 (funcall get-color title)))
-		    (id . ,(get-text-property 0 'id entry)))))
+		(svg-rectangle svg-obj x y entry-width duration
+			       :stroke (if (ot-get-event entry) "#5b0103" "#cdcdcd")
+			       :stroke-width (if (ot-get-event entry) 2 1)
+			       :opacity "0.95"
+			       :fill (or (car (ot-get-colors (get-text-property 0 'tags entry)))
+					 (funcall get-color title))
+			       :id (get-text-property 0 'id entry))
 		;; Setting the title of current entry
-		(svg--append
-		 svg-obj
-		 (apply
-		  'dom-node
-		  'g
-		  `((transform . ,(format "translate(%d,%d)" x y)))
-		  (let ((y-start -5) result)
-		    (dolist (heading-part heading-list (nreverse result))
-		      (push
-		       (dom-node
-			'text
-			`((x . 0)
-			  (y . ,(cl-incf y-start (default-font-height)))
-			  (fill . ,(face-attribute 'default :foreground))
-			  (font-size . ,(aref (font-info (face-font 'default)) 2)))
-			(svg--encode-text heading-part))
-		       result)))))))
+		(let((y (- y 5)))
+		  (dolist (heading-part heading-list)
+		    (svg-text svg-obj heading-part
+			      :x x
+			      :y (cl-incf y (default-font-height))
+			      :fill (face-attribute 'default :foreground)
+			      :font-size (aref (font-info (face-font 'default)) 2))))))
 	    ;; Drawing hour lines
 	    (let ((iter (if (> min-hour 0) (1- min-hour) 0)) y)
 	      (while (< (cl-incf iter) 24)
@@ -1248,13 +1231,13 @@ SCHEDULED property."
       (when (catch 'found
 	      (goto-char (point-min))
 	      (search-forward "</rect>" nil t)
-	      (while (re-search-forward " height=\"\\(.+?\\)\" width=\"\\(.+?\\)\".*? y=\"\\(.+?\\)\" x=\"\\(.+?\\)\".*? id=\"\\(.+?\\)\"" nil t)
-		(and (> (car pos) (get-number 4))
-		     (<= (car pos) (+ (get-number 4) (get-number 2)))
-		     (<= (cdr pos) (+ (get-number 3) (get-number 1)))
-		     (> (cdr pos) (get-number 3))
+	      (while (re-search-forward "<rect width=\"\\([^\"]+\\)\" height=\"\\([^\"]+\\)\" x=\"\\([^\"]+\\)\" y=\"\\([^\"]+\\)\" id=\"\\([^\"]+\\)\"" nil t)
+		(and (> (car pos) (get-number 3))
+		     (<= (car pos) (+ (get-number 3) (get-number 1)))
+		     (<= (cdr pos) (+ (get-number 4) (get-number 2)))
+		     (> (cdr pos) (get-number 4))
 		     (throw 'found t))))
-	(re-search-backward " fill=\"\\(.+?\\)\"" nil t)
+	(re-search-forward " fill=\"\\([^\"]+\\)\"" nil t)
 	(setq ot-prev-selected-block-color (match-string-no-properties 1))
 	(replace-match ot-sel-block-color nil nil nil 1))
       (org-timeblock-mode))))
@@ -1280,10 +1263,10 @@ SCHEDULED property."
       (replace-match ot-prev-selected-block-color nil nil nil 1)
       (unless (save-excursion
 		(search-forward "</rect>" nil t)
-		(re-search-forward " id=\".+?\"" nil t))
+		(re-search-forward " id=\"[^\"]+\"" nil t))
 	(goto-char (point-min))))
     (search-forward "</rect>" nil t)
-    (when (re-search-forward "<rect .*?fill=\"\\(.+?\\)\".*? id=\".+?\"" nil t)
+    (when (re-search-forward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t)
       (setq ot-prev-selected-block-color (match-string-no-properties 1))
       (replace-match ot-sel-block-color nil nil nil 1)
       (org-timeblock-mode))))
@@ -1297,10 +1280,10 @@ SCHEDULED property."
       (replace-match ot-prev-selected-block-color nil nil nil 1)
       (unless (save-excursion
 		(search-backward "</rect>" nil t)
-		(re-search-backward " id=\".+?\"" nil t))
+		(re-search-backward " id=\"[^\"]+\"" nil t))
 	(goto-char (point-max))))
     (search-backward "</rect>" nil t)
-    (when (re-search-backward " fill=\"\\(.+?\\)\"*+? id=\".+?\"" nil t)
+    (when (re-search-backward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t)
       (setq ot-prev-selected-block-color (match-string-no-properties 1))
       (replace-match ot-sel-block-color nil nil nil 1)
       (org-timeblock-mode))))
@@ -1348,7 +1331,7 @@ When called from Lisp, DATE should be a date as returned by
     (user-error "Not in *org-timeblock* buffer"))
   (goto-char (point-min))
   (search-forward "</rect>" nil t)
-  (when (re-search-forward (format " fill=\"%s\".*? id=\"\\(.+?\\)\"" ot-sel-block-color) nil t)
+  (when (re-search-forward (format "<rect .*? id=\"\\([^\"]+\\)\" fill=\"%s\"" ot-sel-block-color) nil t)
     (when-let ((inhibit-read-only t)
 	       (id (match-string-no-properties 1))
 	       (m (cadr (seq-find (lambda (x) (string= (car x) id)) ot-data))))
