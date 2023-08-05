@@ -4,6 +4,7 @@
 
 ;; Author: Ilya Chernyshov <ichernyshovvv@gmail.com>
 ;; Version: 0.1
+;; Package-Version: 20230805.101012
 ;; Package-Requires: ((emacs "28.1") (compat "29.1") (org-ql "0.7") (org "9.0") svg)
 ;; Keywords: org, calendar, timeblocking, agenda
 ;; URL: https://github.com/ichernyshovvv/org-timeblock
@@ -167,6 +168,7 @@ tasks and those tasks that have not been sorted yet.")
     (define-key map (kbd "<down>") 'ot-forward-block)
     (define-key map (kbd "<up>") 'ot-backward-block)
     (define-key map (kbd "<tab>") 'ot-goto-other-window)
+    (define-key map (kbd "<RET>") 'ot-goto-same-window)
     (define-key map [mouse-1] 'ot-select-block-under-mouse)
     (define-key map (kbd "C-<up>") 'ot-day-earlier)
     (define-key map (kbd "C-<down>") 'ot-day-later)
@@ -180,6 +182,7 @@ tasks and those tasks that have not been sorted yet.")
     (define-key map (kbd "s") 'ot-list-schedule)
     (define-key map (kbd "r") 'ot-list-bulk-reschedule)
     (define-key map (kbd "<tab>") 'ot-list-goto-other-window)
+    (define-key map (kbd "<RET>") 'ot-list-goto-same-window)
     (define-key map (kbd "q") 'ot-quit)
     (define-key map (kbd "C-s") 'ot-list-save)
     (define-key map (kbd "M-<down>") 'ot-list-drag-line-forward)
@@ -1324,6 +1327,17 @@ When called from Lisp, DATE should be a date as returned by
     (ot-show-context)
     (recenter)))
 
+(defun ot-list-goto-same-window ()
+  "Jump to the org heading of the entry at point in the same window."
+  (interactive)
+  (unless (eq major-mode 'org-timeblock-list-mode)
+    (user-error "Not in *org-timeblock-list* buffer"))
+  (let ((marker (get-text-property (point) 'marker)))
+    (pop-to-buffer-same-window (marker-buffer marker))
+    (goto-char (marker-position marker))
+    (ot-show-context)
+    (recenter)))
+
 (defun ot-goto-other-window ()
   "Jump to the org heading of selected timeblock."
   (interactive)
@@ -1336,6 +1350,22 @@ When called from Lisp, DATE should be a date as returned by
 	       (id (match-string-no-properties 1))
 	       (m (cadr (seq-find (lambda (x) (string= (car x) id)) ot-data))))
       (switch-to-buffer-other-window (marker-buffer m))
+      (goto-char (marker-position m))
+      (ot-show-context)
+      (recenter))))
+
+(defun ot-goto-same-window ()
+  "Jump to the org heading of selected timeblock in the same window."
+  (interactive)
+  (unless (eq major-mode 'org-timeblock-mode)
+    (user-error "Not in *org-timeblock* buffer"))
+  (goto-char (point-min))
+  (search-forward "</rect>" nil t)
+  (when (re-search-forward (format "<rect .*? id=\"\\([^\"]+\\)\" fill=\"%s\"" ot-sel-block-color) nil t)
+    (when-let ((inhibit-read-only t)
+	             (id (match-string-no-properties 1))
+	             (m (cadr (seq-find (lambda (x) (string= (car x) id)) ot-data))))
+      (pop-to-buffer-same-window (marker-buffer m))
       (goto-char (marker-position m))
       (ot-show-context)
       (recenter))))
