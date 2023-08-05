@@ -55,6 +55,13 @@
   :group 'org
   :link '(url-link "https://github.com/ichernyshovvv/org-timeblock"))
 
+(defcustom ot-show-outline-path nil
+  "Non-nil means show outline path in echo area for the selected item."
+  :group 'org-timeblock
+  :type '(choice
+	  (const :tag "Don't show outline path with prepended file name.." nil)
+	  (const :tag "Show outline path." t)))
+
 (defcustom ot-inbox-file
   (expand-file-name "inbox.org" org-directory)
   "Org file in which new tasks are created via `org-timeblock-new-task'."
@@ -561,7 +568,7 @@ Default background color is used when BASE-COLOR is nil."
 					 (funcall get-color title))
 			       :id (get-text-property 0 'id entry))
 		;; Setting the title of current entry
-		(let((y (- y 5)))
+		(let ((y (- y 5)))
 		  (dolist (heading-part heading-list)
 		    (svg-text svg-obj heading-part
 			      :x x
@@ -1246,19 +1253,22 @@ SCHEDULED property."
 	(re-search-forward " fill=\"\\([^\"]+\\)\"" nil t)
 	(setq ot-prev-selected-block-color (match-string-no-properties 1))
 	(replace-match ot-sel-block-color nil nil nil 1))
-      (org-timeblock-mode))))
+      (org-timeblock-mode)
+      (ot-show-olp-maybe (ot-selected-block-marker)))))
 
 (defun ot-list-next-line ()
   "Move cursor to the next line."
   (interactive)
   (funcall-interactively 'next-line)
-  (ot-select-block-for-current-entry))
+  (ot-select-block-for-current-entry)
+  (ot-show-olp-maybe (get-text-property (line-beginning-position) 'marker)))
 
 (defun ot-list-previous-line ()
   "Move cursor to the previous line."
   (interactive)
   (funcall-interactively 'previous-line)
-  (ot-select-block-for-current-entry))
+  (ot-select-block-for-current-entry)
+  (ot-show-olp-maybe (get-text-property (line-beginning-position) 'marker)))
 
 (defun ot-forward-block ()
   "Select the next timeblock in *org-timeblock* buffer."
@@ -1275,7 +1285,16 @@ SCHEDULED property."
     (when (re-search-forward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t)
       (setq ot-prev-selected-block-color (match-string-no-properties 1))
       (replace-match ot-sel-block-color nil nil nil 1)
-      (org-timeblock-mode))))
+      (org-timeblock-mode)
+      (ot-show-olp-maybe (ot-selected-block-marker)))))
+
+(defun ot-show-olp-maybe (marker)
+  "Show outline path in echo area for the selected item.
+If `ot-show-outline-path' is non-nil, display the path in the
+echo area."
+  (when (and ot-show-outline-path marker (marker-buffer marker)
+	     (buffer-live-p (marker-buffer marker))) 
+    (org-with-point-at marker (org-display-outline-path t))))
 
 (defun ot-backward-block ()
   "Select the previous timeblock in *org-timeblock* buffer."
@@ -1292,7 +1311,8 @@ SCHEDULED property."
     (when (re-search-backward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t)
       (setq ot-prev-selected-block-color (match-string-no-properties 1))
       (replace-match ot-sel-block-color nil nil nil 1)
-      (org-timeblock-mode))))
+      (org-timeblock-mode)
+      (ot-show-olp-maybe (ot-selected-block-marker)))))
 
 (defun ot-day-later ()
   "Go forward in time by one day in `org-timeblock-mode'."
