@@ -177,6 +177,7 @@ tasks and those tasks that have not been sorted yet.")
     (define-key map (kbd "<down>") 'ot-forward-block)
     (define-key map (kbd "<up>") 'ot-backward-block)
     (define-key map (kbd "<tab>") 'ot-goto-other-window)
+    (define-key map (kbd "<RET>") 'ot-goto)
     (define-key map [mouse-1] 'ot-select-block-under-mouse)
     (define-key map (kbd "C-<up>") 'ot-day-earlier)
     (define-key map (kbd "C-<down>") 'ot-day-later)
@@ -190,6 +191,7 @@ tasks and those tasks that have not been sorted yet.")
     (define-key map (kbd "s") 'ot-list-schedule)
     (define-key map (kbd "r") 'ot-list-bulk-reschedule)
     (define-key map (kbd "<tab>") 'ot-list-goto-other-window)
+    (define-key map (kbd "<RET>") 'ot-list-goto)
     (define-key map (kbd "q") 'ot-quit)
     (define-key map (kbd "C-s") 'ot-list-save)
     (define-key map (kbd "M-<down>") 'ot-list-drag-line-forward)
@@ -1290,10 +1292,10 @@ SCHEDULED property."
 
 (defun ot-show-olp-maybe (marker)
   "Show outline path in echo area for the selected item.
-If `ot-show-outline-path' is non-nil, display the path in the
-echo area."
+If `ot-show-outline-path' is non-nil, display the path of the
+heading at MARKER in the echo area."
   (when (and ot-show-outline-path marker (marker-buffer marker)
-	     (buffer-live-p (marker-buffer marker))) 
+	     (buffer-live-p (marker-buffer marker)))
     (org-with-point-at marker (org-display-outline-path t))))
 
 (defun ot-backward-block ()
@@ -1344,11 +1346,25 @@ When called from Lisp, DATE should be a date as returned by
   (interactive)
   (unless (eq major-mode 'org-timeblock-list-mode)
     (user-error "Not in *org-timeblock-list* buffer"))
-  (let ((marker (get-text-property (point) 'marker)))
+  (let ((marker (get-text-property (line-beginning-position) 'marker)))
     (switch-to-buffer-other-window (marker-buffer marker))
     (goto-char (marker-position marker))
     (ot-show-context)
     (recenter)))
+
+(defun ot-list-goto ()
+  "Go to the heading of the entry at point in the same window."
+  (interactive)
+  (unless (eq major-mode 'org-timeblock-list-mode)
+    (user-error "Not in *org-timeblock-list* buffer"))
+  (when-let ((marker (get-text-property (line-beginning-position) 'marker))
+	     (buffer (marker-buffer marker))
+	     (pos (marker-position marker)))
+    (unless buffer (user-error "Trying to switch to non-existent buffer"))
+    (pop-to-buffer-same-window buffer)
+    (widen)
+    (goto-char pos)
+    (ot-show-context)))
 
 (defun ot-goto-other-window ()
   "Jump to the org heading of selected timeblock."
@@ -1365,6 +1381,20 @@ When called from Lisp, DATE should be a date as returned by
       (goto-char (marker-position m))
       (ot-show-context)
       (recenter))))
+
+(defun ot-goto ()
+  "Go to the heading of the selected block in the same window."
+  (interactive)
+  (unless (eq major-mode 'org-timeblock-mode)
+    (user-error "Not in *org-timeblock* buffer"))
+  (when-let ((marker (ot-selected-block-marker))
+	     (buffer (marker-buffer marker))
+	     (pos (marker-position marker)))
+    (unless buffer (user-error "Trying to switch to non-existent buffer"))
+    (pop-to-buffer-same-window buffer)
+    (widen)
+    (goto-char pos)
+    (ot-show-context)))
 
 (defun ot-switch-view ()
   "Switch between different views in `org-timeblock-mode'.
