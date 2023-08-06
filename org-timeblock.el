@@ -307,41 +307,40 @@ id is constructed via `ot-construct-id'"
    (re-search-forward (format "<rect .*? id=\"\\([^\"]+\\)\" fill=\"%s\"" ot-sel-block-color) nil t)
    (match-string-no-properties 1)))
 
-(cl-macrolet ((on (accessor op lhs rhs)
-                `(,op (,accessor ,lhs)
-                      (,accessor ,rhs))))
-  (defun ot-ts-date= (a b)
-    (cond
-     ((and (null a)
-           (null b)))
-     ((and a b)
-      (and (on ts-year  = a b)
-           (on ts-month = a b)
-           (on ts-day   = a b)))))
+(defmacro ot-on (accessor op lhs rhs)
+  `(,op (,accessor ,lhs)
+        (,accessor ,rhs)))
 
-  (defun ot-ts-date< (a b)
-    (cond
-     ;; nil is less than non-nil
-     ((null b) nil)
-     ((null a) t)
-     (t
-      (or (on ts-year < a b)
-	  (and
-	   (on ts-year = a b)
-	   (or (on ts-month < a b)
-	       (and (on ts-month = a b)
-		    (on ts-day < a b))))))))
+(defun ot-ts-date= (a b)
+  (cond
+   ((and (null a)
+         (null b)))
+   ((and a b)
+    (and (ot-on ts-year  = a b)
+         (ot-on ts-month = a b)
+         (ot-on ts-day   = a b)))))
 
-  (defun ot-order< (a b)
-    (on (lambda (item)
-          (or (get-text-property 0 'order item) 1))
-        < a b))
+(defun ot-ts-date< (a b)
+  (cond
+   ;; nil is less than non-nil
+   ((null b) nil)
+   ((null a) t)
+   (t
+    (or (ot-on ts-year < a b)
+	(and
+	 (ot-on ts-year = a b)
+	 (or (ot-on ts-month < a b)
+	     (and (ot-on ts-month = a b)
+		  (ot-on ts-day < a b))))))))
 
-  (defun ot-sched-or-event< (a b)
-    (on (lambda (item)
-          (ot--parse-org-element-ts
-           (ot-get-sched-or-event item)))
-        ts< a b)))
+(defsubst ot-get-order (item) (or (get-text-property 0 'order item) 1))
+(defsubst ot-get-ts (item) (ot--parse-org-element-ts (ot-get-sched-or-event item)))
+
+(defun ot-order< (a b)
+  (ot-on ot-get-order < a b))
+
+(defun ot-sched-or-event< (a b)
+  (ot-on ot-get-ts ts< a b))
 
 (defun ot-select-block-for-current-entry ()
   "Select block for the entry at point in `org-timeblock-list-mode'."
