@@ -137,8 +137,8 @@ are tagged with a tag in car."
 
 (defvar ot-data nil)
 
-(defvar ot-svg-width)
-(defvar ot-svg-height)
+(defvar ot-svg-width 0)
+(defvar ot-svg-height 0)
 
 (defvar ot-list-entries-pos nil
   "Saved positions for entries in `org-timeblock-list-mode'.
@@ -1176,7 +1176,7 @@ Duration format:
   (interactive)
   (when (ot--daterangep (ot-get-sched-or-event nil (line-beginning-position)))
     (user-error "Can not reschedule entries with daterange timestamp"))
-  (let((eventp (ot-get-event nil (line-beginning-position))))
+  (let ((eventp (ot-get-event nil (line-beginning-position))))
     (when-let ((duration (ot-read-duration))
 	       (timestamp (ot--duration duration (get-text-property (line-beginning-position) 'marker) eventp)))
       (ot--update-prefix timestamp eventp)
@@ -1221,7 +1221,7 @@ SCHEDULED property."
   (interactive)
   (when (ot--daterangep (ot-get-sched nil (line-beginning-position)))
     (user-error "Can not reschedule entries with daterange timestamp"))
-  (let((eventp (ot-get-event nil (line-beginning-position))))
+  (let ((eventp (ot-get-event nil (line-beginning-position))))
     (when-let ((timestamp
 		(ot--schedule-time
 		 (get-text-property (line-beginning-position) 'marker)
