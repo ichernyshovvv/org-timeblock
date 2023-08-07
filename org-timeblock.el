@@ -308,10 +308,12 @@ id is constructed via `ot-construct-id'"
    (match-string-no-properties 1)))
 
 (defmacro ot-on (accessor op lhs rhs)
+  "Run OP on ACCESSOR's return values from LHS and RHS."
   `(,op (,accessor ,lhs)
         (,accessor ,rhs)))
 
 (defun ot-ts-date= (a b)
+  "Return t if dates of ts.el ts objects A and B are equal."
   (cond
    ((and (null a)
          (null b)))
@@ -321,6 +323,8 @@ id is constructed via `ot-construct-id'"
          (ot-on ts-day   = a b)))))
 
 (defun ot-ts-date< (a b)
+  "Return t, if A's date is earlier then B's date.
+A and B are ts.el ts objects."
   (cond
    ;; nil is less than non-nil
    ((null b) nil)
@@ -333,13 +337,21 @@ id is constructed via `ot-construct-id'"
 	     (and (ot-on ts-month = a b)
 		  (ot-on ts-day < a b))))))))
 
-(defsubst ot-get-order (item) (or (get-text-property 0 'order item) 1))
-(defsubst ot-get-ts (item) (ot--parse-org-element-ts (ot-get-sched-or-event item)))
+(defsubst ot-get-order (item)
+  "Return ITEM's \\='order text property or return 1."
+  (or (get-text-property 0 'order item) 1))
+
+(defsubst ot-get-ts (item)
+  "Return ITEM's \\='sched or \\='event text property as ts.el object."
+  (ot--parse-org-element-ts (ot-get-sched-or-event item)))
 
 (defun ot-order< (a b)
+  "Return t, if A's \\='order is less then B's \\='order."
   (ot-on ot-get-order < a b))
 
 (defun ot-sched-or-event< (a b)
+  "Return t, if A's \\='sched or \\='event is less then B's.
+\\='sched or \\='event are transformed to ts.el objects."
   (ot-on ot-get-ts ts< a b))
 
 (defun ot-select-block-for-current-entry ()
