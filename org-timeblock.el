@@ -777,11 +777,10 @@ PROMPT can overwrite the default prompt."
   "Construct identifier for the org entry at MARKER.
 If MARKER is nil, use entry at point.
 If EVENTP is non-nil, use entry's TIMESTAMP property."
-  (let* ((element (org-with-point-at marker (org-element-at-point)))
-	 (title (org-element-property :title element)))
+  (let ((element (org-with-point-at marker (org-element-at-point))))
     (md5
      (concat
-      (if (stringp title) title (car title)) ;; TODO
+      (org-element-property :raw-value element)
       (if eventp
 	  (org-entry-get marker "TIMESTAMP")
 	(concat
