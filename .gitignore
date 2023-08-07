@@ -1,4 +1,4 @@
 # Added automatically by ‘eldev init’.
 /.eldev
-/Eldev-local
+run-tests.sh
 *.elc

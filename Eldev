@@ -1,7 +1,0 @@
-; -*- mode: emacs-lisp; lexical-binding: t -*-
-
-;; Autodetermined by `eldev init'.
-(eldev-use-package-archive 'melpa)
-(eldev-use-package-archive 'gnu-elpa)
-(eldev-add-loading-roots 'test "test")
-(eldev-use-plugin 'autoloads)
