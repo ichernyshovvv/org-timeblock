@@ -690,8 +690,9 @@ Schedule or event date won't be changed.  The time might be a
 timerange which depends on user interactive choice.
 
 Time format is \"HHMM\""
-  (with-current-buffer (marker-buffer marker)
-    (goto-char (marker-position marker))
+  (unless (marker-buffer marker)
+    (user-error "Non-existent marker's buffer"))
+  (org-with-point-at marker
     (ot-show-context)
     (let* ((timerangep
 	    (eq
@@ -921,49 +922,29 @@ TS is a org-element timestamp object."
       (make-ts :year year-start :month month-start :day day-start
 	       :hour (or hour-start 0) :minute (or minute-start 0) :second 0))))
 
-(defun ot--schedule (start-ts &optional end-ts marker)
-  "Schedule the entry at MARKER to a timestamp.
-If MARKER is nil, schedule the entry at point.
-
+(defun ot--schedule (start-ts &optional end-ts)
+  "Schedule the entry at point.
 START-TS and END-TS are ts.el time objects."
-  (save-window-excursion
-    (save-excursion
-      (save-restriction
-	(let* ((marker-valid-p
-		(and marker (marker-buffer marker)
-		     (buffer-live-p (marker-buffer marker))))
-	       (point (or (when marker-valid-p marker) (point)))
-	       (buffer (or (when marker-valid-p (marker-buffer marker)) (current-buffer)))
-	       repeat-string warning-string
-	       timestamp)
-	  (with-current-buffer buffer
-	    (widen)
-	    (goto-char point)
-	    (setq
-	     timestamp (org-element-property :scheduled (org-element-at-point))
-	     repeat-string (org-get-repeat)
-	     warning-string
-	     (concat
-	      (pcase (org-element-property :warning-type timestamp)
-		(`first "--") (`all "-"))
-	      (let ((val (org-element-property :warning-value timestamp)))
-		(and val (number-to-string val)))
-	      (pcase (org-element-property :warning-unit timestamp)
-		(`hour "h") (`day "d") (`week "w") (`month "m") (`year "y"))))
-	    (org-schedule nil (ot-ts-to-org-timerange start-ts end-ts repeat-string warning-string))
-	    (cond
-	     ((or (not end-ts) (ot-ts-date= start-ts end-ts))
-	      (org-schedule nil (ot-ts-to-org-timerange start-ts end-ts repeat-string warning-string)))
-	     ((and end-ts (not (ot-ts-date= start-ts end-ts)))
-	      (org-back-to-heading t)
-	      (save-excursion
-		(forward-line)
-		(when (re-search-forward "^SCHEDULED:.+>\n" (1+ (line-end-position)) t)
-		  (replace-match "")))
-	      (org-schedule nil (ot-ts-to-org-timerange start-ts nil repeat-string warning-string))
-	      (forward-line)
-	      (when (re-search-forward "^SCHEDULED:.+>" (line-end-position) t)
-		(insert "--" (ot-ts-to-org-timerange end-ts nil repeat-string warning-string)))))))))))
+  (let* ((timestamp (org-element-property :scheduled (org-element-at-point)))
+	 (repeat-string (org-get-repeat))
+	 (warning-string
+	  (concat
+	   (pcase (org-element-property :warning-type timestamp)
+	     (`first "--") (`all "-"))
+	   (let ((val (org-element-property :warning-value timestamp)))
+	     (and val (number-to-string val)))
+	   (pcase (org-element-property :warning-unit timestamp)
+	     (`hour "h") (`day "d") (`week "w") (`month "m") (`year "y"))))
+	 (dates-equal-p (ot-ts-date= start-ts end-ts)))
+    (cond
+     ((or (not end-ts) dates-equal-p)
+      (org-schedule nil (ot-ts-to-org-timerange start-ts end-ts)))
+     ((and end-ts (not dates-equal-p))
+      (org-schedule nil (ot-ts-to-org-timerange start-ts))
+      (org-back-to-heading t)
+      (forward-line)
+      (when (re-search-forward org-scheduled-time-regexp (line-end-position) t)
+	(insert "--" (ot-ts-to-org-timerange end-ts nil repeat-string warning-string)))))))
 
 (defun ot-delete-event-timestamp ()
   "Delete event timestamp for the entry at point.
@@ -1065,8 +1046,9 @@ Duration format:
 Change SCHEDULED timestamp duration of the org entry at MARKER.
 Return the changed org-element timestamp object.
 If EVENTP is non-nil, use entry's timestamp."
-  (with-current-buffer (marker-buffer marker)
-    (goto-char (marker-position marker))
+  (unless (marker-buffer marker)
+    (user-error "Non-existent marker's buffer"))
+  (org-with-point-at marker
     (ot-show-context)
     (let* ((timestamp
 	    (if eventp
