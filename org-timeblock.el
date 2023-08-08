@@ -139,6 +139,7 @@ are tagged with a tag in car."
 
 (defvar ot-svg-width 0)
 (defvar ot-svg-height 0)
+(defvar ot-svg-obj nil)
 
 (defvar ot-list-entries-pos nil
   "Saved positions for entries in `org-timeblock-list-mode'.
@@ -300,7 +301,6 @@ Mouse position is of the form (X . Y)."
 
 (defun ot-selected-block-id ()
   "Return an id of the entry of selected timeblock.
-
 id is constructed via `ot-construct-id'"
   (goto-char (point-min))
   (and
@@ -309,14 +309,12 @@ id is constructed via `ot-construct-id'"
 
 (defmacro ot-on (accessor op lhs rhs)
   "Run OP on ACCESSOR's return values from LHS and RHS."
-  `(,op (,accessor ,lhs)
-        (,accessor ,rhs)))
+  `(,op (,accessor ,lhs) (,accessor ,rhs)))
 
 (defun ot-ts-date= (a b)
   "Return t if dates of ts.el ts objects A and B are equal."
   (cond
-   ((and (null a)
-         (null b)))
+   ((and (null a) (null b)))
    ((and a b)
     (and (ot-on ts-year  = a b)
          (ot-on ts-month = a b)
@@ -448,7 +446,6 @@ Default background color is used when BASE-COLOR is nil."
 		 (window-width (setq ot-svg-width (window-body-width window t)))
 		 (timeline-left-padding 25)
 		 (entry-max-width (- window-width timeline-left-padding))
-		 (svg-obj (svg-create window-width window-height))
 		 (min-hour
 		  (if-let ((ot-view-options)
 			   (hours
@@ -510,7 +507,7 @@ Default background color is used when BASE-COLOR is nil."
 				       (cl-incf k)
 				       (throw 'next-column t)))
 				(throw 'found-column k))))))))
-	    (svg-rectangle svg-obj 0 0 window-width window-height :fill (face-attribute 'default :background))
+	    (setq ot-svg-obj (svg-create window-width window-height))
 	    ;; Drawing all the entries inside the timeline
 	    (dolist (entry entries)
 	      (let* ((length (1+ (length (seq-uniq
@@ -573,7 +570,7 @@ Default background color is used when BASE-COLOR is nil."
 		     (y (round (* scale (- minutes (* min-hour 60))))))
 		(push (list (get-text-property 0 'id entry) (get-text-property 0 'marker entry) (ot-get-event entry)) ot-data)
 		;; Appending generated rectangle for current entry
-		(svg-rectangle svg-obj x y entry-width duration
+		(svg-rectangle ot-svg-obj x y entry-width duration
 			       :stroke (if (ot-get-event entry) "#5b0103" "#cdcdcd")
 			       :stroke-width (if (ot-get-event entry) 2 1)
 			       :opacity "0.95"
@@ -583,7 +580,7 @@ Default background color is used when BASE-COLOR is nil."
 		;; Setting the title of current entry
 		(let ((y (- y 5)))
 		  (dolist (heading-part heading-list)
-		    (svg-text svg-obj heading-part
+		    (svg-text ot-svg-obj heading-part
 			      :x x
 			      :y (cl-incf y (default-font-height))
 			      :fill (face-attribute 'default :foreground)
@@ -593,7 +590,7 @@ Default background color is used when BASE-COLOR is nil."
 	      (while (< (cl-incf iter) 24)
 		(setq y (round (* scale (- iter min-hour) 60)))
 		(svg-line
-		 svg-obj
+		 ot-svg-obj
 		 timeline-left-padding
 		 y
 		 window-width
@@ -601,7 +598,7 @@ Default background color is used when BASE-COLOR is nil."
 		 :stroke-dasharray "4"
 		 :stroke hour-lines-color)
 		(svg-text
-		 svg-obj (format "%d" iter)
+		 ot-svg-obj (format "%d" iter)
 		 :y (+ y 5)
 		 :x 5
 		 :fill (face-attribute 'default :foreground))))
@@ -609,24 +606,24 @@ Default background color is used when BASE-COLOR is nil."
 	    (when (and ot-current-time-indicator
 		       (ot-ts-date= ot-date (ts-now)))
 	      (svg-polygon
-	       svg-obj
+	       ot-svg-obj
 	       (list
 		(cons (- entry-max-width 5) cur-time-indicator)
 		(cons (+ entry-max-width 25) (- cur-time-indicator 5))
 		(cons (+ entry-max-width 25) (+ cur-time-indicator 5)))
 	       :fill-color "red"))
-	    (svg-print svg-obj))
+	    (svg-print ot-svg-obj))
 	(let* ((window (get-buffer-window ot-buffer))
 	       (window-height (window-body-height window t))
 	       (window-width (window-body-width window t))
-	       (message "No entries found for this date.")
-	       (svg-obj (svg-create window-width window-height)))
+	       (message "No entries found for this date."))
+	  (setq ot-svg-obj (svg-create window-width window-height))
 	  (svg-text
-	   svg-obj message
+	   ot-svg-obj message
 	   :y (/ window-height 2)
 	   :x (- (/ window-width 2) (/ (* (default-font-width) (length message)) 2))
 	   :fill (face-attribute 'default :foreground))
-	  (svg-print svg-obj)))
+	  (svg-print ot-svg-obj)))
       (org-timeblock-mode))))
 
 (defun ot-show-timeblocks ()
@@ -1228,27 +1225,27 @@ SCHEDULED property."
 (defun ot-select-block-under-mouse ()
   "Select timeblock under current position of mouse cursor."
   (interactive)
-  (cl-macrolet ((get-number (n) `(string-to-number (match-string-no-properties ,n))))
-    (when-let ((pos (ot-mouse-pixel-pos))
-	       (inhibit-read-only t))
-      (goto-char (point-min))
-      (when (re-search-forward (format " fill=\"\\(%s\\)\"" ot-sel-block-color) nil t)
-	(replace-match (or ot-prev-selected-block-color "#ffffff") nil nil nil 1)
-	(goto-char (point-min)))
-      (when (catch 'found
-	      (goto-char (point-min))
-	      (search-forward "</rect>" nil t)
-	      (while (re-search-forward "<rect width=\"\\([^\"]+\\)\" height=\"\\([^\"]+\\)\" x=\"\\([^\"]+\\)\" y=\"\\([^\"]+\\)\" id=\"\\([^\"]+\\)\"" nil t)
-		(and (> (car pos) (get-number 3))
-		     (<= (car pos) (+ (get-number 3) (get-number 1)))
-		     (<= (cdr pos) (+ (get-number 4) (get-number 2)))
-		     (> (cdr pos) (get-number 4))
-		     (throw 'found t))))
-	(re-search-forward " fill=\"\\([^\"]+\\)\"" nil t)
-	(setq ot-prev-selected-block-color (match-string-no-properties 1))
-	(replace-match ot-sel-block-color nil nil nil 1))
-      (org-timeblock-mode)
-      (ot-show-olp-maybe (ot-selected-block-marker)))))
+  (when-let ((pos (ot-mouse-pixel-pos))
+	     (inhibit-read-only t))
+    (goto-char (point-min))
+    (when (re-search-forward (format " fill=\"\\(%s\\)\"" ot-sel-block-color) nil t)
+      (replace-match (or ot-prev-selected-block-color "#ffffff") nil nil nil 1)
+      (goto-char (point-min)))
+    (when-let ((found (car (dom-search
+			    ot-svg-obj
+			    (lambda (node)
+			      (let ((x (dom-attr node 'x))
+				    (y (dom-attr node 'y)))
+				(and (eq (dom-tag node) 'rect)
+				     (> (car pos) x)
+				     (<= (car pos) (+ x (dom-attr node 'width)))
+				     (<= (cdr pos) (+ y (dom-attr node 'height)))
+				     (> (cdr pos) y))))))))
+      (re-search-forward (format "id=\"%s\" fill=\"\\([^\"]+\\)\"" (dom-attr found 'id)) nil t)
+      (setq ot-prev-selected-block-color (match-string-no-properties 1))
+      (replace-match ot-sel-block-color nil nil nil 1))
+    (org-timeblock-mode)
+    (ot-show-olp-maybe (ot-selected-block-marker))))
 
 (defun ot-list-next-line ()
   "Move cursor to the next line."
@@ -1271,11 +1268,8 @@ SCHEDULED property."
     (goto-char (point-min))
     (when (re-search-forward (format " fill=\"\\(%s\\)\"" ot-sel-block-color) nil t)
       (replace-match ot-prev-selected-block-color nil nil nil 1)
-      (unless (save-excursion
-		(search-forward "</rect>" nil t)
-		(re-search-forward " id=\"[^\"]+\"" nil t))
+      (unless (save-excursion (search-forward "<rect " nil t))
 	(goto-char (point-min))))
-    (search-forward "</rect>" nil t)
     (when (re-search-forward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t)
       (setq ot-prev-selected-block-color (match-string-no-properties 1))
       (replace-match ot-sel-block-color nil nil nil 1)
@@ -1297,11 +1291,8 @@ heading at MARKER in the echo area."
     (goto-char (point-max))
     (when (re-search-backward (format " fill=\"\\(%s\\)\"" ot-sel-block-color) nil t)
       (replace-match ot-prev-selected-block-color nil nil nil 1)
-      (unless (save-excursion
-		(search-backward "</rect>" nil t)
-		(re-search-backward " id=\"[^\"]+\"" nil t))
+      (unless (save-excursion (search-backward "</rect>" nil t))
 	(goto-char (point-max))))
-    (search-backward "</rect>" nil t)
     (when (re-search-backward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t)
       (setq ot-prev-selected-block-color (match-string-no-properties 1))
       (replace-match ot-sel-block-color nil nil nil 1)
@@ -1364,7 +1355,6 @@ When called from Lisp, DATE should be a date as returned by
   (unless (eq major-mode 'org-timeblock-mode)
     (user-error "Not in *org-timeblock* buffer"))
   (goto-char (point-min))
-  (search-forward "</rect>" nil t)
   (when (re-search-forward (format "<rect .*? id=\"\\([^\"]+\\)\" fill=\"%s\"" ot-sel-block-color) nil t)
     (when-let ((inhibit-read-only t)
 	       (id (match-string-no-properties 1))
