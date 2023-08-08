@@ -846,8 +846,8 @@ with time (timerange or just start time)."
 	(append
 	 (org-ql-select
 	   files
-	   `(and (active-timestamp
-		  :on ,(ts-format "%Y-%m-%d" ot-date)
+	   `(and (ot-active-ts
+		  :on ,ot-date
 		  :exclude-dateranges ,exclude-dateranges
 		  :with-time ,with-time))
 	   :action
@@ -867,8 +867,8 @@ with time (timerange or just start time)."
 	 (org-ql-select
 	   files
 	   `(and (not (done))
-		 (ot-org-ql-scheduled
-		  :on ,(ts-format "%Y-%m-%d" ot-date)
+		 (ot-scheduled
+		  :on ,ot-date
 		  :exclude-dateranges ,exclude-dateranges
 		  :with-time ,with-time))
 	   :action
@@ -1461,44 +1461,38 @@ Available view options:
 
 ;;;; Predicates
 
-(org-ql-defpred active-timestamp (&key on exclude-dateranges with-time)
+(org-ql-defpred ot-active-ts (&key on exclude-dateranges with-time)
   "Search for events that have a timestamp set to ON
-ON format: \"YYYY-MM-DD\"
+ON is a ts.el struct.
 
 When EXCLUDE-DATERANGES is non-nil, exclude events with daterange and no time.
 
 When WITH-TIME is non-nil, each event must contain a timestamp
 with time (timerange or just start time)."
   :preambles
-  ((`(active-timestamp . ,on)
+  ((`(ot-active-ts . ,on)
     (list
-     :query query ;; run :body on regexp-matched headings after :preambles
-     :regexp
-     (concat "<.+?>\\(--<.+?>\\)?"))))
+     :query query
+     :regexp org-ts-regexp)))
   :body
-  (when-let ((on-ts
-	      (when (stringp on)
-		(if (string-match-p "^[0-9]\\{4\\}-[01][0-9]-[0-3][0-9]$" on)
-		    (ts-apply :hour 0 :minute 0 :second 0 (ts-parse on))
-		  (user-error "Wrong date format = %s" on))))
-	     (timestamp (ot-get-event-timestamp))
+  (when-let ((timestamp (ot-get-event-timestamp))
 	     ((not (and exclude-dateranges (ot--daterangep timestamp))))
 	     ((or (not with-time) (org-element-property :hour-start timestamp)))
 	     (start-ts (ot--parse-org-element-ts timestamp)))
     (let ((end-ts (ot--parse-org-element-ts timestamp t)))
       (or
-       (ot-ts-date= start-ts on-ts)
-       (ot-ts-date= end-ts on-ts)
+       (ot-ts-date= start-ts on)
+       (ot-ts-date= end-ts on)
        (and
 	end-ts
-	(ot-ts-date< start-ts on-ts)
-	(ot-ts-date< on-ts end-ts))))))
+	(ot-ts-date< start-ts on)
+	(ot-ts-date< on end-ts))))))
 
 ;; See https://github.com/alphapapa/org-ql/pull/237
 ;; TODO delete `org-ql' prefix
-(org-ql-defpred ot-org-ql-scheduled (&key on exclude-dateranges with-time)
+(org-ql-defpred ot-scheduled (&key on exclude-dateranges with-time)
   "Search for entries that have `SCHEDULED' set to ON date
-ON format: \"YYYY-MM-DD\"
+ON is a ts.el struct.
 
 When EXCLUDE-DATERANGES is non-nil, exclude scheduled entries
 with a daterange with no times.
@@ -1506,29 +1500,23 @@ with a daterange with no times.
 When WITH-TIME is non-nil, each entry must be scheduled to a
 timestamp with time (timerange or just start time)."
   :preambles
-  ((`(ot-org-ql-scheduled . ,on)
+  ((`(ot-scheduled . ,on)
     (list
-     :query query ;; run :body on regexp-matched headings after :preambles
-     :regexp
-     "^SCHEDULED:[ \t]+<.+?>\\(?:--<.+?>\\)?")))
+     :query query
+     :regexp org-scheduled-time-regexp)))
   :body
-  (when-let ((on-ts
-	      (when (stringp on)
-		(if (string-match-p "^[0-9]\\{4\\}-[01][0-9]-[0-3][0-9]$" on)
-		    (ts-apply :hour 0 :minute 0 :second 0 (ts-parse on))
-		  (user-error "Wrong date format = %s" on))))
-	     (sched (org-element-property :scheduled (org-element-at-point)))
+  (when-let ((sched (org-element-property :scheduled (org-element-at-point)))
 	     ((not (and exclude-dateranges (ot--daterangep sched))))
 	     ((or (not with-time) (org-element-property :hour-start sched)))
 	     (start-ts (ot--parse-org-element-ts sched)))
     (let ((end-ts (ot--parse-org-element-ts sched t)))
       (or
-       (ot-ts-date= start-ts on-ts)
-       (ot-ts-date= end-ts on-ts)
+       (ot-ts-date= start-ts on)
+       (ot-ts-date= end-ts on)
        (and
 	end-ts
-	(ot-ts-date< start-ts on-ts)
-	(ot-ts-date< on-ts end-ts))))))
+	(ot-ts-date< start-ts on)
+	(ot-ts-date< on end-ts))))))
 
 ;;;; Footer
 
