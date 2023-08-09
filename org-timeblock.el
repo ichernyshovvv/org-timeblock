@@ -4,7 +4,7 @@
 
 ;; Author: Ilya Chernyshov <ichernyshovvv@gmail.com>
 ;; Version: 0.1
-;; Package-Requires: ((emacs "28.1") (compat "29.1") (org-ql "0.7") (org "9.0") svg)
+;; Package-Requires: ((emacs "28.1") (compat "29.1") (org-ql "0.7") (org "9.0") svg persist)
 ;; Keywords: org, calendar, timeblocking, agenda
 ;; URL: https://github.com/ichernyshovvv/org-timeblock
 
@@ -39,6 +39,7 @@
 (require 'seq)
 (require 'org-ql)
 (require 'text-property-search)
+(require 'persist)
 (require 'compat)
 (require 'compat-macs)
 
@@ -141,7 +142,7 @@ are tagged with a tag in car."
 (defvar ot-svg-height 0)
 (defvar ot-svg-obj nil)
 
-(defvar ot-list-entries-pos nil
+(persist-defvar ot-list-entries-pos nil
   "Saved positions for entries in `org-timeblock-list-mode'.
 Nested alist of saved positions of the entries for each date that
 a user have previously opened in `org-timeblock-list-mode'.")
@@ -158,14 +159,12 @@ a user have previously opened in `org-timeblock-list-mode'.")
 (defvar ot-list-buffer "*org-timeblock-list*"
   "The name of the buffer displaying the list of tasks and events.")
 
-(defvar ot-list-sort-line-position nil
+(persist-defvar ot-list-sortline-pos nil
   "Sort indicator line position.
 The line position of the sort line which is displayed in
 `org-timeblock-list-mode' when orgmode tasks are manually
 placed.  Used as a simple separator to distinguish manually sorted
 tasks and those tasks that have not been sorted yet.")
-
-(defvar ot-list-order-cache-file (expand-file-name ".cache/org-timeblock.el" user-emacs-directory))
 
 ;;;; Keymaps
 
@@ -665,12 +664,9 @@ commands"
 	  (setf (alist-get id (alist-get (ts-format "%Y-%m-%d" ot-date) ot-list-entries-pos nil nil #'equal) nil nil #'equal)
 		(cl-incf count)))
 	(when (get-text-property (point) 'sort-ind)
-	  (setf (alist-get (ts-format "%Y-%m-%d" ot-date) ot-list-sort-line-position nil nil 'equal)
+	  (setf (alist-get (ts-format "%Y-%m-%d" ot-date) ot-list-sortline-pos nil nil 'equal)
 		(cl-incf count)))
-	(forward-line))
-      (with-temp-file ot-list-order-cache-file
-	(insert (format "%S" `(setq org-timeblock-entries-positions-alist ',ot-list-entries-pos
-				    org-timeblock/sort-line-position ',ot-list-sort-line-position))))))
+	(forward-line))))
   (org-save-all-org-buffers))
 
 (defun ot-quit ()
@@ -1110,10 +1106,6 @@ When BACKWARD is non-nil, move backward."
   (interactive)
   (switch-to-buffer ot-list-buffer)
   (setq ot-date (ts-now))
-  (unless (file-exists-p ot-list-order-cache-file)
-    (make-directory (file-name-directory ot-list-order-cache-file) t)
-    (with-temp-file ot-list-order-cache-file))
-  (load (expand-file-name ot-list-order-cache-file) nil t t)
   (ot-redraw-buffers))
 
 ;;;###autoload
@@ -1122,10 +1114,6 @@ When BACKWARD is non-nil, move backward."
   (interactive)
   (switch-to-buffer ot-buffer)
   (setq ot-date (ts-now))
-  (unless (file-exists-p ot-list-order-cache-file)
-    (make-directory (file-name-directory ot-list-order-cache-file) t)
-    (with-temp-file ot-list-order-cache-file))
-  (load (expand-file-name ot-list-order-cache-file) nil t t)
   (ot-redraw-buffers))
 
 ;;;; Planning commands
@@ -1443,7 +1431,7 @@ Available view options:
       (goto-char (point-min))
       (when (eq ot-sort-function #'ot-order<)
 	(forward-line
-	 (alist-get (ts-format "%Y-%m-%d" ot-date) ot-list-sort-line-position nil nil #'equal))
+	 (alist-get (ts-format "%Y-%m-%d" ot-date) ot-list-sortline-pos nil nil #'equal))
 	(insert (propertize (format "% 37s" "^^^ SORTED ^^^\n") 'sort-ind t 'face '(:extend t :background "#8b0000" :foreground "#ffffff")))
 	(goto-char (point-min)))
       (when (get-buffer-window ot-buffer)
