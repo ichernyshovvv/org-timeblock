@@ -17,7 +17,7 @@
                        #:recursive? #t
                        #:select? (git-predicate %source-dir)))
    (build-system emacs-build-system)
-   (arguments (list #:emacs emacs-next))
+   (arguments (list #:emacs emacs))
    (propagated-inputs (list emacs-org-ql emacs-compat emacs-persist))
    (home-page "https://github.com/ichernyshovvv/org-timeblock")
    (synopsis "Schedule your day visually, using timeblocking technique inside Emacs")
