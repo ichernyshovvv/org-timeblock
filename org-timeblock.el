@@ -168,64 +168,57 @@ tasks and those tasks that have not been sorted yet.")
 
 ;;;; Keymaps
 
-(defvar org-timeblock-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "g") 'ot-redraw-buffers)
-    (define-key map (kbd "s") 'ot-schedule)
-    (define-key map (kbd "d") 'ot-set-duration)
-    (define-key map (kbd "v") 'ot-switch-view)
-    (define-key map (kbd "<down>") 'ot-forward-block)
-    (define-key map (kbd "<up>") 'ot-backward-block)
-    (define-key map (kbd "<tab>") 'ot-goto-other-window)
-    (define-key map (kbd "<RET>") 'ot-goto)
-    (define-key map [mouse-1] 'ot-select-block-under-mouse)
-    (define-key map (kbd "C-<up>") 'ot-day-earlier)
-    (define-key map (kbd "C-<down>") 'ot-day-later)
-    (define-key map (kbd "t") 'ot-toggle-timeblock-list)
-    (define-key map (kbd "j") 'ot-jump-to-day)
-    (define-key map (kbd "+") 'ot-new-task)
-    map))
+(defvar-keymap ot-mode-map
+  "+" #'ot-new-task
+  "<mouse-1>" #'ot-select-block-under-mouse
+  "<down>" #'ot-forward-block
+  "<up>" #'ot-backward-block
+  "C-<down>" #'ot-day-later
+  "C-<up>" #'ot-day-earlier
+  "RET" #'ot-goto
+  "TAB" #'ot-goto-other-window
+  "d" #'ot-set-duration
+  "g" #'ot-redraw-buffers
+  "j" #'ot-jump-to-day
+  "s" #'ot-schedule
+  "t" #'ot-toggle-timeblock-list
+  "v" #'ot-switch-view)
 
-(defvar org-timeblock-list-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "s") 'ot-list-schedule)
-    (define-key map (kbd "r") 'ot-list-bulk-reschedule)
-    (define-key map (kbd "<tab>") 'ot-list-goto-other-window)
-    (define-key map (kbd "<RET>") 'ot-list-goto)
-    (define-key map (kbd "q") 'ot-quit)
-    (define-key map (kbd "C-s") 'ot-list-save)
-    (define-key map (kbd "M-<down>") 'ot-list-drag-line-forward)
-    (define-key map (kbd "M-<up>") 'ot-list-drag-line-backward)
-    (define-key map (kbd "d") 'ot-list-set-duration)
-    (define-key map (kbd "g") 'ot-redraw-buffers)
-    (define-key map (kbd "t") 'ot-list-toggle-timeblock)
-    (define-key map (kbd "<down>") 'ot-list-next-line)
-    (define-key map (kbd "<up>") 'ot-list-previous-line)
-    (define-key map (kbd "S") 'ot-list-toggle-sort-function)
-    (define-key map (kbd "5") 'ot-list-done)
-    (define-key map (kbd "1") 'ot-list-todo)
-    (define-key map (kbd "+") 'ot-new-task)
-    (define-key map (kbd "v") 'ot-switch-view)
-    (define-key map (kbd "C-<up>") 'ot-day-earlier)
-    (define-key map (kbd "C-<down>") 'ot-day-later)
-    (define-key map (kbd "j") 'ot-jump-to-day)
-    map))
+(defvar-keymap ot-list-mode-map
+  "+" #'ot-new-task
+  "<down>" #'ot-list-next-line
+  "<up>" #'ot-list-previous-line
+  "C-<down>" #'ot-day-later
+  "C-<up>" #'ot-day-earlier
+  "C-s" #'ot-list-save
+  "M-<down>" #'ot-list-drag-line-forward
+  "M-<up>" #'ot-list-drag-line-backward
+  "RET" #'ot-list-goto
+  "TAB" #'ot-list-goto-other-window
+  "S" #'ot-list-toggle-sort-function
+  "d" #'ot-list-set-duration
+  "g" #'ot-redraw-buffers
+  "j" #'ot-jump-to-day
+  "q" #'ot-quit
+  "s" #'ot-list-schedule
+  "t" #'ot-list-toggle-timeblock
+  "v" #'ot-switch-view)
 
 ;; Generate todo commands and bind them to a corresponding key
 (dolist (elem ot-fast-todo-commands)
-  (let ((command-name (intern (concat "org-timeblock-" (downcase (car elem))))))
+  (let ((command-name (intern (format "%s%s" 'ot- (downcase (car elem))))))
     (defalias command-name
       (lambda ()
 	(interactive)
 	(when-let ((m (pcase major-mode
-			(`org-timeblock-list-mode
+			(`ot-list-mode
 			 (get-text-property (line-beginning-position) 'marker))
-			(`org-timeblock-mode
+			(`ot-mode
 			 (ot-selected-block-marker)))))
 	  (ot--set-todo m (car elem))
 	  (ot-redraw-buffers))))
-    (define-key org-timeblock-list-mode-map (kbd (cdr elem)) command-name)
-    (define-key org-timeblock-mode-map (kbd (cdr elem)) command-name)))
+    (define-key ot-list-mode-map (kbd (cdr elem)) command-name)
+    (define-key ot-mode-map (kbd (cdr elem)) command-name)))
 
 ;;;; Modes
 
