@@ -92,6 +92,22 @@ If you use Emacs 29, you can install the package via
 
 ~M-x package-vc-install RET https://github.com/ichernyshovvv/org-timeblock/ RET~
 
+** Guix
+
+If you use Guix, you can install the package from [[https://git.sr.ht/~sokolov/channel][this]] channel.
+
+1. To add the channel, add this to the list of channels in ~channels.scm~:
+
+#+begin_src scheme
+(channel
+ (name 'sklv)
+ (url "https://git.sr.ht/~sokolov/channel"))
+#+end_src
+
+2. Then, run ~guix pull~.
+
+3. Now you can install the package.
+
 ** Quelpa
 
 1. Install ~quelpa-use-package~ (which can be installed directly from MELPA).
