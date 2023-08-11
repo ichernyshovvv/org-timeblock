@@ -60,8 +60,15 @@
   "Non-nil means show outline path in echo area for the selected item."
   :group 'org-timeblock
   :type '(choice
-	  (const :tag "Don't show outline path with prepended file name.." nil)
+	  (const :tag "Don't show outline path with prepended file name." nil)
 	  (const :tag "Show outline path." t)))
+
+(defcustom ot-display-time t
+  "Non-nil means show end and start time of events or tasks inside timeblocks."
+  :group 'org-timeblock
+  :type '(choice
+	  (const :tag "Show time." t)
+	  (const :tag "Do not show time." nil)))
 
 (defcustom ot-inbox-file
   (expand-file-name "inbox.org" org-directory)
@@ -362,23 +369,24 @@ A and B are ts.el ts objects."
 	(replace-match ot-sel-block-color nil nil nil 1)
 	(ot-redisplay)))))
 
-(defun ot-tss-intersect-p (oe-ts1 oe-ts2)
-  "Check if two timestamps intersect each other.
-`OE-TS1',`OE-TS2' - org-element timestamp objects."
-  (when-let ((ts1-start (ot--parse-org-element-ts oe-ts1))
-	     (ts2-start (ot--parse-org-element-ts oe-ts2)))
-    (let ((ts1-end (ot--parse-org-element-ts oe-ts1 t))
-	  (ts2-end (ot--parse-org-element-ts oe-ts2 t)))
+(defun ot-intersect-p (entry1 entry2)
+  "Return t, if two entries intersect each other.
+Otherwise, return nil.
+`ENTRY1',`ENTRY2' - strings returned from `org-timeblock-get-entries'."
+  (when-let ((y1 (get-text-property 0 'y entry1))
+	     (y2 (get-text-property 0 'y entry2)))
+    (let ((y1-end (+ (get-text-property 0 'block-height entry1) y1))
+	  (y2-end (+ (get-text-property 0 'block-height entry2) y2)))
       (or
-       (ts= ts2-start ts1-start)
+       (= y2 y1)
        (and
-	ts2-end
-	(ts< ts2-start ts1-start)
-	(ts< ts1-start ts2-end))
+	y2-end
+	(< y2 y1)
+	(< y1 y2-end))
        (and
-	ts1-end
-	(ts< ts1-start ts2-start)
-	(ts< ts2-start ts1-end))))))
+	y1-end
+	(< y1 y2)
+	(< y2 y1-end))))))
 
 (defun ot--parse-hex-color (hex)
   "Convert a HEX color code to a RGB list of form (R G B)."
@@ -435,7 +443,7 @@ Default background color is used when BASE-COLOR is nil."
 		 (window-height (setq ot-svg-height (window-body-height window t)))
 		 (window-width (setq ot-svg-width (window-body-width window t)))
 		 (timeline-left-padding 25)
-		 (entry-max-width (- window-width timeline-left-padding))
+		 (block-max-width (- window-width timeline-left-padding))
 		 (min-hour
 		  (if-let ((ot-view-options)
 			   (hours
@@ -462,7 +470,7 @@ Default background color is used when BASE-COLOR is nil."
 		 (columns
 		  (mapcar
 		   (lambda (x)
-		     (cons (get-text-property 0 'marker x) 1))
+		     (cons (get-text-property 0 'id x) 1))
 		   entries))
 		 placed
 		 (bg-rgb-sum (apply #'+ (ot--parse-hex-color ot-background-color)))
@@ -475,106 +483,63 @@ Default background color is used when BASE-COLOR is nil."
 			      ot-sel-block-color-light
 			    ot-sel-block-color-dark))
 		    (lambda (title) (setf (alist-get title ot-colors nil nil #'equal) (ot--random-color)))))
-		 (hour-lines-color
-		  (if (> bg-rgb-sum 550) "#7b435c" "#cdcdcd")))
+		 (hour-lines-color (if (> bg-rgb-sum 550) "#7b435c" "#cdcdcd")))
 	    (dolist (entry entries)
-	      (let ((m (get-text-property 0 'marker entry))
-		    (id (get-text-property 0 'id entry)))
+	      (let* ((timestamp (ot-get-sched-or-event entry))
+		     (start-ts (ot--parse-org-element-ts timestamp))
+		     (end-ts (ot--parse-org-element-ts timestamp t))
+		     (start-date-earlier-p (ot-ts-date< start-ts ot-date))
+		     (end-date-later-p (ot-ts-date< ot-date end-ts)))
+		(add-text-properties 0 (length entry)
+				     `( time-string ,(and ot-display-time
+							  (not (or end-date-later-p start-date-earlier-p))
+							  (concat (ts-format " %H:%M" start-ts)
+								  (and end-ts (ts-format "-%H:%M" end-ts))))
+					block-height ,(if (and start-ts end-ts)
+							  (max
+							   (default-font-height)
+							   (* (/ (round (ts-diff
+									 (if end-date-later-p
+									     (ts-apply :hour 23 :minute 59 :second 0 ot-date)
+									   end-ts)
+									 (if start-date-earlier-p
+									     (ts-apply :hour 0 :minute 1 :second 0 ot-date)
+									   start-ts)))
+								 60)
+							      scale))
+							(default-font-height))
+					y ,(* (- (if start-date-earlier-p
+						     0
+						   (+ (* 60 (org-element-property :hour-start timestamp))
+						      (org-element-property :minute-start timestamp)))
+						 (* min-hour 60))
+					      scale)
+					title ,(concat
+						(get-text-property 0 'title entry)
+						(cond
+						 ((and end-date-later-p start-date-earlier-p) "↕️")
+						 (end-date-later-p "⬇️")
+						 (start-date-earlier-p "⬆️"))))
+				     entry)))
+	    ;; Timeblocks layout algorithm
+	    (dolist (entry entries)
+	      (let ((id (get-text-property 0 'id entry)))
 		(push entry placed)
-		(setcdr (assq m columns)
+		(setcdr (assoc id columns)
 			(catch 'found-column
 			  (let ((k 1))
 			    (while t
 			      (catch 'next-column
 				(dolist (el (seq-filter
 					     (lambda (x)
-					       (eq (cdr (assq (get-text-property 0 'marker x) columns)) k))
+					       (eq (cdr (assoc (get-text-property 0 'id x) columns)) k))
 					     placed))
 				  (and (not (string= (get-text-property 0 'id el) id))
-				       (ot-tss-intersect-p
-                                        (ot-get-sched-or-event entry)
-                                        (ot-get-sched-or-event el))
+				       (ot-intersect-p entry el)
 				       (cl-incf k)
 				       (throw 'next-column t)))
 				(throw 'found-column k))))))))
 	    (setq ot-svg-obj (svg-create window-width window-height))
-	    ;; Drawing all the entries inside the timeline
-	    (dolist (entry entries)
-	      (let* ((length (1+ (length (seq-uniq
-					  (mapcar
-					   ;; get columns for those entries
-					   (lambda (x)
-					     (cdr (assq (get-text-property 0 'marker x) columns)))
-					   ;; find those with which current entry is in intersection
-					   (seq-filter
-					    (lambda (x)
-					      (unless (equal (get-text-property 0 'id entry) (get-text-property 0 'id x))
-						(ot-tss-intersect-p
-                                                 (ot-get-sched-or-event entry)
-                                                 (ot-get-sched-or-event x))))
-					    entries))
-					  #'eq))))
-		     (x (+ timeline-left-padding (round (* (1- (cdr (assq (get-text-property 0 'marker entry) columns))) (/ entry-max-width length)))))
-		     (entry-width (round (/ entry-max-width length)))
-		     (timestamp (ot-get-sched-or-event entry))
-		     (start-ts (ot--parse-org-element-ts timestamp))
-		     (end-ts (ot--parse-org-element-ts timestamp t))
-		     (duration (if (and start-ts end-ts)
-				   (round
-				    (* (/ (round (ts-diff
-						  (if (ot-ts-date< ot-date end-ts)
-						      (ts-apply :hour 23 :minute 59 :second 0 ot-date)
-						    end-ts)
-						  (if (ot-ts-date< start-ts ot-date)
-						      (ts-apply :hour 0 :minute 1 :second 0 ot-date)
-						    start-ts)))
-					  60)
-				       scale))
-				 5))
-		     (title (get-text-property 0 'title entry))
-		     ;; Splitting the title of an entry
-		     (heading-list
-		      (append
-		       (if (> (* (length title) (default-font-width)) entry-width)
-			   (seq-take
-			    (seq-partition title (/ entry-width (default-font-width)))
-			    (let ((lines-count (round (/ duration (default-font-height)))))
-			      (if (= 0 lines-count) 1 lines-count)))
-			 `(,title))
-		       (cond
-			((and
-			  (ot-ts-date< ot-date end-ts)
-			  (ot-ts-date< start-ts ot-date))
-			 '("↕️"))
-			((ot-ts-date< ot-date end-ts)
-			 '("⬇️"))
-			((ot-ts-date< start-ts ot-date)
-			 '("⬆️"))
-			(t nil))))
-		     (hstart (if (ot-ts-date< start-ts ot-date)
-				 0
-			       (org-element-property :hour-start timestamp)))
-		     (minutes (+ (* hstart 60) (if (ot-ts-date< start-ts ot-date)
-						   0
-						 (org-element-property :minute-start timestamp))))
-		     (y (round (* scale (- minutes (* min-hour 60))))))
-		(push (list (get-text-property 0 'id entry) (get-text-property 0 'marker entry) (ot-get-event entry)) ot-data)
-		;; Appending generated rectangle for current entry
-		(svg-rectangle ot-svg-obj x y entry-width duration
-			       :stroke (if (ot-get-event entry) "#5b0103" "#cdcdcd")
-			       :stroke-width (if (ot-get-event entry) 2 1)
-			       :opacity "0.95"
-			       :fill (or (car (ot-get-colors (get-text-property 0 'tags entry)))
-					 (funcall get-color title))
-			       :id (get-text-property 0 'id entry))
-		;; Setting the title of current entry
-		(let ((y (- y 5)))
-		  (dolist (heading-part heading-list)
-		    (svg-text ot-svg-obj heading-part
-			      :x x
-			      :y (cl-incf y (default-font-height))
-			      :fill (face-attribute 'default :foreground)
-			      :font-size (aref (font-info (face-font 'default)) 2))))))
 	    ;; Drawing hour lines
 	    (let ((iter (if (> min-hour 0) (1- min-hour) 0)) y)
 	      (while (< (cl-incf iter) 24)
@@ -592,15 +557,83 @@ Default background color is used when BASE-COLOR is nil."
 		 :y (+ y 5)
 		 :x 5
 		 :fill (face-attribute 'default :foreground))))
+	    ;; Drawing all the entries inside the timeline
+	    (dolist (entry entries)
+	      (when-let ((length (1+ (length (seq-uniq
+					      (mapcar
+					       ;; get columns for those entries
+					       (lambda (x)
+						 (cdr (assoc (get-text-property 0 'id x) columns)))
+					       ;; find those with which current entry is in intersection
+					       (seq-filter
+						(lambda (x)
+						  (unless (equal (get-text-property 0 'id entry) (get-text-property 0 'id x))
+						    (ot-intersect-p entry x)))
+						entries))
+					      #'eq))))
+			 (y (get-text-property 0 'y entry))
+			 (block-height (get-text-property 0 'block-height entry))
+			 ((> (+ y block-height) 0))
+			 (x (+ timeline-left-padding (round (* (1- (cdr (assoc (get-text-property 0 'id entry) columns))) (/ block-max-width length)))))
+			 (block-width (round (/ block-max-width length)))
+			 (title (get-text-property 0 'title entry))
+			 ;; Splitting the title of an entry
+			 (heading-list
+			  (if (> (* (length title) (default-font-width)) block-width)
+			      (seq-take
+			       (seq-partition title (/ block-width (default-font-width)))
+			       (let ((lines-count (round (/ block-height (default-font-height)))))
+				 (if (= 0 lines-count) 1 lines-count)))
+			    `(,title))))
+		(let ((time-string (get-text-property 0 'time-string entry)))
+		  (when-let ((time-string)
+			     ((< (- block-height
+				    (* (length heading-list) (default-font-height)))
+				 (- (default-font-height) 6)))
+			     (diff (-
+				    (+ (length (car (last heading-list)))
+				       (length time-string))
+				    (/ block-width (default-font-width))))
+			     ((> diff 0)))
+		    (cl-callf
+			(lambda (x)
+			  (if (> (- (length x) diff) 10)
+			      (substring x 0 (- diff))
+			    (setq time-string nil)
+			    x))
+			(car (last heading-list))))
+		  (push (list (get-text-property 0 'id entry) (get-text-property 0 'marker entry) (ot-get-event entry)) ot-data)
+		  ;; Appending generated rectangle for current entry
+		  (svg-rectangle ot-svg-obj x y block-width block-height
+				 :stroke (if (ot-get-event entry) "#5b0103" "#cdcdcd")
+				 :stroke-width (if (ot-get-event entry) 2 1)
+				 :opacity "0.7"
+				 :fill (or (car (ot-get-colors (get-text-property 0 'tags entry)))
+					   (funcall get-color title))
+				 :id (get-text-property 0 'id entry))
+		  ;; Setting the title of current entry
+		  (let ((y (- y 5)))
+		    (dolist (heading-part heading-list)
+		      (svg-text ot-svg-obj heading-part
+				:x x
+				:y (cl-incf y (default-font-height))
+				:fill (face-attribute 'default :foreground)
+				:font-size (aref (font-info (face-font 'default)) 2))))
+		  (when time-string
+		    (svg-text ot-svg-obj time-string
+			      :x (- (+ x block-width) (* (length time-string) (default-font-width)))
+			      :y (- (+ y block-height) 2)
+			      :fill hour-lines-color
+			      :font-size (aref (font-info (face-font 'default)) 2))))))
 	    ;; Drawing current time indicator
 	    (when (and ot-current-time-indicator
 		       (ot-ts-date= ot-date (ts-now)))
 	      (svg-polygon
 	       ot-svg-obj
 	       (list
-		(cons (- entry-max-width 5) cur-time-indicator)
-		(cons (+ entry-max-width 25) (- cur-time-indicator 5))
-		(cons (+ entry-max-width 25) (+ cur-time-indicator 5)))
+		(cons (- block-max-width 5) cur-time-indicator)
+		(cons (+ block-max-width 25) (- cur-time-indicator 5))
+		(cons (+ block-max-width 25) (+ cur-time-indicator 5)))
 	       :fill-color "red"))
 	    (svg-print ot-svg-obj))
 	(let* ((window (get-buffer-window ot-buffer))
@@ -617,6 +650,7 @@ Default background color is used when BASE-COLOR is nil."
       (ot-redisplay))))
 
 (defun ot-redisplay ()
+  "Redisplay *org-timeblock* buffer."
   (let((inhibit-message t))
     (ot-mode)))
 
@@ -830,50 +864,29 @@ with time (timerange or just start time)."
 		 nil nil #'equal)
 	 entry)
 	entry)
-      (when files
-	(append
-	 (org-ql-select
-	   files
-	   `(and (ot-active-ts
-		  :on ,ot-date
-		  :exclude-dateranges ,exclude-dateranges
-		  :with-time ,with-time))
-	   :action
-	   (lambda ()
-	     (let ((id (ot-construct-id nil t))
-		   (event (ot-get-event-timestamp))
-		   (title (org-get-heading t nil t t)))
-	       (propertize
-		(concat
-		 (ot--construct-entry-prefix event t)
-		 title)
-		'tags (mapcar 'substring-no-properties (org-element-property :tags (org-element-at-point)))
-		'marker (copy-marker (point) t)
-		'title title
-		'id id
-		'event event))))
-	 (org-ql-select
-	   files
-	   `(and (not (done))
-		 (ot-scheduled
-		  :on ,ot-date
-		  :exclude-dateranges ,exclude-dateranges
-		  :with-time ,with-time))
-	   :action
-	   (lambda ()
-	     (let* ((elem (org-element-at-point))
-		    (sched (org-element-property :scheduled elem))
-		    (id (ot-construct-id))
-		    (title (org-get-heading t nil t t)))
-	       (propertize
-		(concat
-		 (ot--construct-entry-prefix sched)
-		 title)
-		'tags (mapcar 'substring-no-properties (org-element-property :tags (org-element-at-point)))
-		'marker (copy-marker (point) t)
-		'title title
-		'id id
-		'sched sched)))))))
+      (let ((markers
+	     (org-ql-select
+	       files
+	       `(and (not (done))
+		     (ot-active-ts
+		      :on ,ot-date
+		      :exclude-dateranges ,exclude-dateranges
+		      :with-time ,with-time))
+	       :action (lambda () (copy-marker (point) t))))
+	    propertized-entries)
+	(cl-macrolet ((get-propertized-entry (timestamp &optional eventp)
+			`(when-let ((,timestamp)
+				    (title (org-get-heading t nil t t)))
+			   (propertize (concat (ot--construct-entry-prefix ,timestamp ,eventp) title)
+				       (if ,eventp 'event 'sched) ,timestamp
+				       'marker marker
+				       'tags (mapcar 'substring-no-properties (org-element-property :tags (org-element-at-point)))
+				       'id (ot-construct-id nil ,eventp)
+				       'title title))))
+	  (dolist (marker markers (remove nil propertized-entries))
+	    (org-with-point-at marker
+	      (push (get-propertized-entry (ot-get-event-timestamp) t) propertized-entries)
+	      (push (get-propertized-entry (org-element-property :scheduled (org-element-at-point))) propertized-entries))))))
      (or sort-func ot-sort-function))))
 
 (defun ot-get-colors (tags)
@@ -1432,12 +1445,12 @@ Available view options:
 ;;;; Predicates
 
 (org-ql-defpred ot-active-ts (&key on exclude-dateranges with-time)
-  "Search for events that have a timestamp set to ON
+  "Search for org entries that have TIMESTAMP or SCHEDULED property set to ON.
 ON is a ts.el struct.
 
-When EXCLUDE-DATERANGES is non-nil, exclude events with daterange and no time.
+When EXCLUDE-DATERANGES is non-nil, exclude entries with daterange and no time.
 
-When WITH-TIME is non-nil, each event must contain a timestamp
+When WITH-TIME is non-nil, each entry must contain a timestamp
 with time (timerange or just start time)."
   :preambles
   ((`(ot-active-ts . ,on)
@@ -1445,41 +1458,12 @@ with time (timerange or just start time)."
      :query query
      :regexp org-ts-regexp)))
   :body
-  (when-let ((timestamp (ot-get-event-timestamp))
+  (when-let ((timestamp (or (org-element-property :scheduled (org-element-at-point))
+			    (ot-get-event-timestamp)))
 	     ((not (and exclude-dateranges (ot--daterangep timestamp))))
 	     ((or (not with-time) (org-element-property :hour-start timestamp)))
 	     (start-ts (ot--parse-org-element-ts timestamp)))
     (let ((end-ts (ot--parse-org-element-ts timestamp t)))
-      (or
-       (ot-ts-date= start-ts on)
-       (ot-ts-date= end-ts on)
-       (and
-	end-ts
-	(ot-ts-date< start-ts on)
-	(ot-ts-date< on end-ts))))))
-
-;; See https://github.com/alphapapa/org-ql/pull/237
-;; TODO delete `org-ql' prefix
-(org-ql-defpred ot-scheduled (&key on exclude-dateranges with-time)
-  "Search for entries that have `SCHEDULED' set to ON date
-ON is a ts.el struct.
-
-When EXCLUDE-DATERANGES is non-nil, exclude scheduled entries
-with a daterange with no times.
-
-When WITH-TIME is non-nil, each entry must be scheduled to a
-timestamp with time (timerange or just start time)."
-  :preambles
-  ((`(ot-scheduled . ,on)
-    (list
-     :query query
-     :regexp org-scheduled-time-regexp)))
-  :body
-  (when-let ((sched (org-element-property :scheduled (org-element-at-point)))
-	     ((not (and exclude-dateranges (ot--daterangep sched))))
-	     ((or (not with-time) (org-element-property :hour-start sched)))
-	     (start-ts (ot--parse-org-element-ts sched)))
-    (let ((end-ts (ot--parse-org-element-ts sched t)))
       (or
        (ot-ts-date= start-ts on)
        (ot-ts-date= end-ts on)
