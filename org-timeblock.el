@@ -360,7 +360,7 @@ A and B are ts.el ts objects."
       (when (re-search-forward (format " id=\"%s\" fill=\"\\([^\"]+\\)\"" id) nil t)
 	(setq ot-prev-selected-block-color (match-string 1))
 	(replace-match ot-sel-block-color nil nil nil 1)
-	(org-timeblock-mode)))))
+	(ot-redisplay)))))
 
 (defun ot-tss-intersect-p (oe-ts1 oe-ts2)
   "Check if two timestamps intersect each other.
@@ -614,7 +614,11 @@ Default background color is used when BASE-COLOR is nil."
 	   :x (- (/ window-width 2) (/ (* (default-font-width) (length message)) 2))
 	   :fill (face-attribute 'default :foreground))
 	  (svg-print ot-svg-obj)))
-      (org-timeblock-mode))))
+      (ot-redisplay))))
+
+(defun ot-redisplay ()
+  (let((inhibit-message t))
+    (ot-mode)))
 
 (defun ot-show-timeblocks ()
   "Switch to *org-timeblock* buffer in another window."
@@ -1158,7 +1162,7 @@ SCHEDULED property."
 	     (marker (ot-selected-block-marker)))
     (ot--schedule-time marker (ot-block-eventp id))
     (ot-redraw-buffers)
-    (org-timeblock-mode)))
+    (ot-redisplay)))
 
 (defun ot-set-duration ()
   "Interactively change SCHEDULED duration of the selected block.
@@ -1177,7 +1181,7 @@ Duration format:
 	     (duration (ot-read-duration)))
     (ot--duration duration marker (ot-block-eventp id))
     (ot-redraw-buffers)
-    (org-timeblock-mode)))
+    (ot-redisplay)))
 
 (defun ot-list-schedule ()
   "Reschedule the entry at point in *org-timeblock-list* buffer.
@@ -1220,7 +1224,7 @@ SCHEDULED property."
       (re-search-forward (format "id=\"%s\" fill=\"\\([^\"]+\\)\"" (dom-attr found 'id)) nil t)
       (setq ot-prev-selected-block-color (match-string-no-properties 1))
       (replace-match ot-sel-block-color nil nil nil 1))
-    (org-timeblock-mode)
+    (ot-redisplay)
     (ot-show-olp-maybe (ot-selected-block-marker))))
 
 (defun ot-list-next-line ()
@@ -1249,7 +1253,7 @@ SCHEDULED property."
     (when (re-search-forward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t)
       (setq ot-prev-selected-block-color (match-string-no-properties 1))
       (replace-match ot-sel-block-color nil nil nil 1)
-      (org-timeblock-mode)
+      (ot-redisplay)
       (ot-show-olp-maybe (ot-selected-block-marker)))))
 
 (defun ot-show-olp-maybe (marker)
@@ -1272,7 +1276,7 @@ heading at MARKER in the echo area."
     (when (re-search-backward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t)
       (setq ot-prev-selected-block-color (match-string-no-properties 1))
       (replace-match ot-sel-block-color nil nil nil 1)
-      (org-timeblock-mode)
+      (ot-redisplay)
       (ot-show-olp-maybe (ot-selected-block-marker)))))
 
 (defun ot-day-later ()
@@ -1393,7 +1397,7 @@ Available view options:
     (let ((inhibit-read-only t)
 	  (entries (ot-get-entries)))
       (erase-buffer)
-      (org-timeblock-list-mode)
+      (ot-list-mode)
       (setq
        header-line-format
        (substitute-command-keys
