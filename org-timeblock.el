@@ -788,26 +788,39 @@ insert \"EVENT\" in the prefix."
 		      mend)))))
      'prefix t)))
 
-(cl-defun ot-read-ts (ts &optional (prompt "TIME:"))
-  "Read a time in \"HHMM\" format and set it to ts.el object TS.
+(cl-defun org-timeblock-read-ts (ts &optional (prompt "TIME:"))
+  "Read a time in \"HHMM\" format and apply it to ts.el struct TS.
 
-Return the changed time object.
+Return the changed time struct.
 
 PROMPT can overwrite the default prompt."
-  (cl-loop
-   as
-   res = (let (time)
-	   (while (< (length time) 4)
-	     (setq time (concat time (char-to-string (read-char-exclusive (concat prompt time))))))
-	   (when (string-match-p "[[:digit:]]\\{4\\}" time)
-	     (ts-apply
-	      :hour
-	      (string-to-number (substring time 0 2))
-	      :minute
-	      (string-to-number (substring time 2 4))
-	      ts)))
-   until res
-   finally return res))
+  (let (time)
+    (catch 'exit
+      (while t
+	(let ((len (length time))
+	      (ch (read-char-exclusive (concat prompt (reverse time)))))
+	  (cond
+	   ((and (= len 0) (<= ?0 ch ?2))
+	    (push ch time))
+	   ((and (= len 1) (if (< (car time) ?2) (<= ?0 ch ?9) (<= ?0 ch ?3)))
+	    (push ch time))
+	   ((and (= len 2) (<= ?0 ch ?5))
+	    (push ch time))
+	   ((and (= len 3) (<= ?0 ch ?9))
+	    (push ch time)
+	    (throw 'exit t))
+	   ((and (/= len 0) (eq ch ?\C-?))
+	    (pop time))
+	   (t (ding))))))
+    (setq time (let (res)
+		 (dolist (ch time res)
+		   (push (cl-digit-char-p ch) res))))
+    (ts-apply
+     :hour
+     (+ (* 10 (pop time)) (pop time)) 
+     :minute
+     (+ (* 10 (pop time)) (pop time))
+     ts)))
 
 (defun ot-construct-id (&optional marker eventp)
   "Construct identifier for the org entry at MARKER.
