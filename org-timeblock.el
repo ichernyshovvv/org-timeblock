@@ -585,7 +585,8 @@ Default background color is used when BASE-COLOR is nil."
 			       (let ((lines-count (round (/ block-height (default-font-height)))))
 				 (if (= 0 lines-count) 1 lines-count)))
 			    `(,title))))
-		(let ((time-string (get-text-property 0 'time-string entry)))
+		(let ((time-string (get-text-property 0 'time-string entry))
+		      (colors (ot-get-colors (get-text-property 0 'tags entry))))
 		  (when-let ((time-string)
 			     ((< (- block-height
 				    (* (length heading-list) (default-font-height)))
@@ -608,8 +609,7 @@ Default background color is used when BASE-COLOR is nil."
 				 :stroke (if (ot-get-event entry) "#5b0103" "#cdcdcd")
 				 :stroke-width (if (ot-get-event entry) 2 1)
 				 :opacity "0.7"
-				 :fill (or (car (ot-get-colors (get-text-property 0 'tags entry)))
-					   (funcall get-color title))
+				 :fill (or (car colors) (funcall get-color title))
 				 :id (get-text-property 0 'id entry))
 		  ;; Setting the title of current entry
 		  (let ((y (- y 5)))
@@ -617,13 +617,13 @@ Default background color is used when BASE-COLOR is nil."
 		      (svg-text ot-svg-obj heading-part
 				:x x
 				:y (cl-incf y (default-font-height))
-				:fill (face-attribute 'default :foreground)
+				:fill (or (cadr colors) (face-attribute 'default :foreground))
 				:font-size (aref (font-info (face-font 'default)) 2))))
 		  (when time-string
 		    (svg-text ot-svg-obj time-string
 			      :x (- (+ x block-width) (* (length time-string) (default-font-width)))
 			      :y (- (+ y block-height) 2)
-			      :fill hour-lines-color
+			      :fill (or (cadr colors) hour-lines-color)
 			      :font-size (aref (font-info (face-font 'default)) 2))))))
 	    ;; Drawing current time indicator
 	    (when (and ot-current-time-indicator
@@ -890,7 +890,8 @@ with time (timerange or just start time)."
      (or sort-func ot-sort-function))))
 
 (defun ot-get-colors (tags)
-  "Return the colors for TAGS."
+  "Return the colors for TAGS.
+Return value is of the form (\"background color\" \"foreground color\")."
   (catch 'found
     (dolist (tag tags)
       (when-let ((colors (cdr (seq-find (lambda (x) (string= (car x) tag)) ot-tag-colors))))
@@ -1197,7 +1198,7 @@ SCHEDULED property."
 (defun ot-list-update-entry (eventp)
   "Update text and text properties for the entry at point in *org-timeblock-list*.
 If EVENTP is non-nil the entry is considered as an event."
-  (let ((marker (get-text-property (line-beginning-position) 'marker)))
+  (let ((marker (get-text-property (line-beginning-position) 'marker)) colors)
     (unless (marker-buffer marker)
       (user-error "Non-existent marker's buffer"))
     (let ((inhibit-read-only t)
@@ -1206,17 +1207,22 @@ If EVENTP is non-nil the entry is considered as an event."
 	     (let ((timestamp (if eventp
 				  (ot-get-event-timestamp)
 				(org-element-property :scheduled (org-element-at-point))))
-		   (title (org-get-heading t nil t t)))
+		   (title (org-get-heading t nil t t))
+		   (tags (mapcar 'substring-no-properties (org-element-property :tags (org-element-at-point)))))
+	       (setq colors (ot-get-colors tags))
 	       (propertize
 		(concat (ot--construct-entry-prefix timestamp eventp) title)
 		(if eventp 'event 'sched) timestamp
 		'marker marker
-		'tags (mapcar 'substring-no-properties (org-element-property :tags (org-element-at-point)))
+		'tags tags
 		'id (ot-construct-id nil eventp)
 		'title title)))))
       (delete-region (line-beginning-position) (1+ (line-end-position)))
-      (insert new-entry "\n"))))
-
+      (insert (propertize
+	       (concat new-entry "\n")
+	       'face
+	       `(:extend t ,@(and (car colors) (list :background (car colors))) ,@(and (cadr colors) (list :foreground (cadr colors)))))))))
+	  
 ;;;; Navigation commands
 
 (defun ot-select-block-under-mouse ()
@@ -1432,11 +1438,10 @@ Available view options:
       (insert "\n")
       (dolist (entry entries)
 	(let ((colors (ot-get-colors (get-text-property 0 'tags entry))))
-	  (insert
-	   (propertize
-	    (concat entry "\n")
-	    'face
-	    `(:background ,(car colors) :foreground ,(cadr colors))))))
+	  (insert (propertize
+		   (concat entry "\n")
+		   'face
+		   `(:extend t ,@(and (car colors) (list :background (car colors))) ,@(and (cadr colors) (list :foreground (cadr colors))))))))
       (goto-char (point-min))
       (when (eq ot-sort-function #'ot-order<)
 	(forward-line
