@@ -994,20 +994,6 @@ WARNING-STRING is a warning string of the form \"-[0-9]+[hdwmy]\""
 	   (and end-time (concat " " end-time)))))
        timestamp-end))))
 
-(defun ot--update-prefix (timestamp &optional eventp)
-  "Update the prefix for the entry at point.
-TIMESTAMP is an org-element timestamp object used to construct a new prefix.
-If EVENTP is non-nil the entry is considered as an event."
-  (let ((inhibit-read-only t))
-    (save-excursion
-      (beginning-of-line)
-      (text-property-search-forward 'prefix nil)
-      (delete-region (line-beginning-position) (point))
-      (insert (apply
-	       'propertize
-	       (ot--construct-entry-prefix timestamp eventp)
-	       (text-properties-at (point)))))))
-
 (defun ot-read-duration ()
   "Read duration and return an integer in minutes.
 
@@ -1161,8 +1147,7 @@ Duration format:
   (let ((eventp (ot-get-event nil (line-beginning-position))))
     (when-let ((duration (ot-read-duration))
 	       (timestamp (ot--duration duration (get-text-property (line-beginning-position) 'marker) eventp)))
-      (ot--update-prefix timestamp eventp)
-      (forward-line)
+      (ot-list-update-entry eventp)
       (when (get-buffer-window ot-buffer)
 	(ot-redraw-timeblocks)))))
 
@@ -1204,14 +1189,33 @@ SCHEDULED property."
   (when (ot--daterangep (ot-get-sched nil (line-beginning-position)))
     (user-error "Can not reschedule entries with daterange timestamp"))
   (let ((eventp (ot-get-event nil (line-beginning-position))))
-    (when-let ((timestamp
-		(ot--schedule-time
-		 (get-text-property (line-beginning-position) 'marker)
-		 eventp)))
-      (ot--update-prefix timestamp eventp)
-      (forward-line)
+    (when-let ((timestamp (ot--schedule-time (get-text-property (line-beginning-position) 'marker) eventp)))
+      (ot-list-update-entry eventp)
       (when (get-buffer-window ot-buffer)
 	(ot-redraw-timeblocks)))))
+
+(defun ot-list-update-entry (eventp)
+  "Update text and text properties for the entry at point in *org-timeblock-list*.
+If EVENTP is non-nil the entry is considered as an event."
+  (let ((marker (get-text-property (line-beginning-position) 'marker)))
+    (unless (marker-buffer marker)
+      (user-error "Non-existent marker's buffer"))
+    (let ((inhibit-read-only t)
+	  (new-entry
+	   (org-with-point-at marker
+	     (let ((timestamp (if eventp
+				  (ot-get-event-timestamp)
+				(org-element-property :scheduled (org-element-at-point))))
+		   (title (org-get-heading t nil t t)))
+	       (propertize
+		(concat (ot--construct-entry-prefix timestamp eventp) title)
+		(if eventp 'event 'sched) timestamp
+		'marker marker
+		'tags (mapcar 'substring-no-properties (org-element-property :tags (org-element-at-point)))
+		'id (ot-construct-id nil eventp)
+		'title title)))))
+      (delete-region (line-beginning-position) (1+ (line-end-position)))
+      (insert new-entry "\n"))))
 
 ;;;; Navigation commands
 
@@ -1416,8 +1420,8 @@ Available view options:
        (substitute-command-keys
 	(format "\\<org-timeblock-list-mode-map>Sorted by %s property. Toggle sorting: `\\[org-timeblock-list-toggle-sort-function]'"
 		(pcase ot-sort-function
-		  ('ot-order< "SORTING-ORDER") ;; TODO replace with backticks?
-		  ('ot-sched-or-event< "SCHEDULED")
+		  (`ot-order< "SORTING-ORDER")
+		  (`ot-sched-or-event< "SCHEDULED")
 		  ((pred symbolp) (symbol-name ot-sort-function))))))
       (insert
        (propertize
