@@ -468,10 +468,7 @@ Default background color is used when BASE-COLOR is nil."
 		      (+ (* (ts-hour cur-time) 60) (ts-minute cur-time)) ;; minutes
 		      (* min-hour 60))))
 		 (columns
-		  (mapcar
-		   (lambda (x)
-		     (cons (get-text-property 0 'id x) 1))
-		   entries))
+		  (mapcar (lambda (x) (cons (get-text-property 0 'id x) 1)) entries))
 		 placed
 		 (bg-rgb-sum (apply #'+ (ot--parse-hex-color ot-background-color)))
 		 (get-color
@@ -788,7 +785,7 @@ insert \"EVENT\" in the prefix."
 		      mend)))))
      'prefix t)))
 
-(cl-defun org-timeblock-read-ts (ts &optional (prompt "TIME:"))
+(cl-defun ot-read-ts (ts &optional (prompt "TIME:"))
   "Read a time in \"HHMM\" format and apply it to ts.el struct TS.
 
 Return the changed time struct.
@@ -817,7 +814,7 @@ PROMPT can overwrite the default prompt."
 		   (push (cl-digit-char-p ch) res))))
     (ts-apply
      :hour
-     (+ (* 10 (pop time)) (pop time)) 
+     (+ (* 10 (pop time)) (pop time))
      :minute
      (+ (* 10 (pop time)) (pop time))
      ts)))
