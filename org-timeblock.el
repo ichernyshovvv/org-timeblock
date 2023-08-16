@@ -161,6 +161,13 @@ a user have previously opened in `org-timeblock-list-mode'.")
 (defvar ot-date nil
   "The date that is used to get and display schedule data.")
 
+(defvar ot-duration-multipliers
+  '((?w . 10080)
+    (?d . 1440)
+    (?h . 60)
+    (?m . 1))
+  "Duration multipliers used in `ot-read-duration'.")
+
 (defvar ot-buffer "*org-timeblock*" "The name of the buffer displaying visual schedule.")
 
 (defvar ot-list-buffer "*org-timeblock-list*"
@@ -1002,38 +1009,56 @@ WARNING-STRING is a warning string of the form \"-[0-9]+[hdwmy]\""
        timestamp-end))))
 
 (defun ot-read-duration ()
-  "Read duration and return an integer in minutes.
+  "Read time duration and return minutes as an integer.
 
-Duration format:
+Beep or flash the screen when an invalid character is typed.  The
+prompt shows currently valid characters for the next input
+character.
+
+Valid duration formats:
 2h
 2h30m
 2h30
-45"
-  (let (dur)
+45
+1d
+1w3h30m"
+  (let* ((dur "")
+	 (all-multipliers (mapcar #'car ot-duration-multipliers))
+	 (valid-multipliers all-multipliers)
+	 typed-multipliers)
     (catch 'dur
-      (while t
-	(let ((char (read-char-exclusive (concat "DURATION:" dur))))
-	  (pcase char
-	    ((guard (and (< char 58) (> char 47)))
-	     (setq dur (concat dur (char-to-string char))))
-	    (?q (throw 'dur nil))
-	    (?
-	     (when (and (> (length dur) 0) (string-match "^\\(?:\\([0-9]+\\)h\\)?\\([0-9]+\\)?" dur))
-	       (let ((hours (and (match-string 1 dur) (string-to-number (match-string 1 dur))))
-		     (minutes (and (match-string 2 dur) (string-to-number (match-string 2 dur)))))
-		 (throw 'dur (+ (or minutes 0) (if hours (* hours 60) 0))))))
-	    (?m
-	     (if (string-match "^\\(?:\\([0-9]+\\)h\\)?\\([0-9]+\\)m" (concat dur "m"))
-		 (let ((hours (and (match-string 1 dur) (string-to-number (match-string 1 dur))))
-		       (minutes (string-to-number (match-string 2 dur))))
-		   (throw 'dur (+ minutes (if hours (* hours 60) 0))))
-	       (setq dur nil)))
-	    (?h
-	     (unless (= 0 (length dur))
-	       (setq dur (concat dur (char-to-string char)))))
-	    (?\C-?
-	     (unless (= 0 (length dur))
-	       (setq dur (substring dur 0 -1))))))))))
+      (while-let ((multipliers (apply #'propertize
+				      (concat "[" valid-multipliers "]")
+				      (and (or (length= dur 0) (member (string-to-char (substring dur -1)) all-multipliers))
+					   '(face org-agenda-dimmed-todo-face))))
+		  (ch (read-char-exclusive (concat "DURATION ([0-9]+" multipliers "):" dur))))
+	(cond
+	 ((<= ?0 ch ?9)
+	  (setq dur (format "%s%c" dur ch)))
+	 ((or (and (eq ch ?\C-m) (length> dur 0))
+	      (and (member ch valid-multipliers) (string-match-p "[0-9]+$" dur)))
+	  (when-let (((member ch '(?m ?\C-m)))
+		     (minutes 0)
+		     (start 0))
+	    (setq dur (concat dur "m"))
+	    (while (string-match (concat "\\([0-9]+\\)\\([" typed-multipliers "m]\\)") dur start)
+	      (cl-incf minutes (* (cdr (assq (string-to-char (match-string 2 dur)) ot-duration-multipliers))
+				  (string-to-number (match-string 1 dur))))
+	      (setq start (match-end 0)))
+	    (throw 'dur minutes))
+	  (setq dur (format "%s%c" dur ch)
+		valid-multipliers (cdr (member ch valid-multipliers)))
+	  (push ch typed-multipliers))
+	 ((and (eq ?\C-? ch) (not (length= dur 0)))
+	  (when (eq (string-to-char (substring dur -1)) (car typed-multipliers))
+	    (pop typed-multipliers)
+	    (setq valid-multipliers
+		  (let ((ms all-multipliers))
+		    (when typed-multipliers
+		      (while (not (eq (pop ms) (car typed-multipliers)))))
+		    ms)))
+	  (setq dur (substring dur 0 -1)))
+	 (t (ding)))))))
 
 (defun ot--duration (duration marker &optional eventp)
   "Set SCHEDULED duration to DURATION for the org entry at MARKER.
