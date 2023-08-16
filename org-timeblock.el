@@ -787,7 +787,6 @@ insert \"EVENT\" in the prefix."
 
 (cl-defun ot-read-ts (ts &optional (prompt "TIME:"))
   "Read a time in \"HHMM\" format and apply it to ts.el struct TS.
-
 Return the changed time struct.
 
 PROMPT can overwrite the default prompt."
@@ -797,11 +796,9 @@ PROMPT can overwrite the default prompt."
 	(let ((len (length time))
 	      (ch (read-char-exclusive (concat prompt (reverse time)))))
 	  (cond
-	   ((and (= len 0) (<= ?0 ch ?2))
-	    (push ch time))
-	   ((and (= len 1) (if (< (car time) ?2) (<= ?0 ch ?9) (<= ?0 ch ?3)))
-	    (push ch time))
-	   ((and (= len 2) (<= ?0 ch ?5))
+	   ((or (and (= len 0) (<= ?0 ch ?2))
+		(and (= len 1) (if (< (car time) ?2) (<= ?0 ch ?9) (<= ?0 ch ?3)))
+		(and (= len 2) (<= ?0 ch ?5)))
 	    (push ch time))
 	   ((and (= len 3) (<= ?0 ch ?9))
 	    (push ch time)
@@ -809,15 +806,13 @@ PROMPT can overwrite the default prompt."
 	   ((and (/= len 0) (eq ch ?\C-?))
 	    (pop time))
 	   (t (ding))))))
-    (setq time (let (res)
-		 (dolist (ch time res)
-		   (push (cl-digit-char-p ch) res))))
-    (ts-apply
-     :hour
-     (+ (* 10 (pop time)) (pop time))
-     :minute
-     (+ (* 10 (pop time)) (pop time))
-     ts)))
+    (cl-macrolet ((pop-digit () '(- (pop time) 48)))
+      (ts-apply
+       :minute
+       (+ (pop-digit) (* 10 (pop-digit)))
+       :hour
+       (+ (pop-digit) (* 10 (pop-digit)))
+       ts))))
 
 (defun ot-construct-id (&optional marker eventp)
   "Construct identifier for the org entry at MARKER.
