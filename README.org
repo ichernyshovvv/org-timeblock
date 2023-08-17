@@ -32,7 +32,7 @@ customizable variable ~org-timeblock-tag-colors~:
 :CUSTOM_ID: screencast
 :END:
 
-[[https://youtu.be/tuMcPotV71I]]
+[[https://youtu.be/lVV9gVp5nxU]]
 
 * Description
 :PROPERTIES:
