@@ -20,7 +20,10 @@ org-timeblock-mode buffer:
 
 [[file:screenshots/org-timeblock.png]]
 
-You can press ~[t]~ to toggle the display of org-timeblock-list-mode buffer:
+You can press ~[t]~ to toggle the display of org-timeblock-list-mode
+buffer.  Foreground colors for timeblocks are generated randomly, but
+you can assign specific background and foreground colors in
+customizable variable ~org-timeblock-tag-colors~: 
 
 [[file:screenshots/org-timeblock-with-list.png]]
 
