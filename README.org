@@ -18,14 +18,14 @@ Schedule your day visually, using [[https://en.wikipedia.org/wiki/Timeblocking][
 
 org-timeblock-mode buffer:
 
-[[file:screenshots/org-timeblock.png]]
+[[file:screenshots/org-timeblock-mode.png]]
 
 You can press ~[t]~ to toggle the display of org-timeblock-list-mode
 buffer.  Foreground colors for timeblocks are generated randomly, but
 you can assign specific background and foreground colors in
 customizable variable ~org-timeblock-tag-colors~: 
 
-[[file:screenshots/org-timeblock-with-list.png]]
+[[file:screenshots/org-timeblock-with-list-mode.png]]
 
 * Screencast
 :PROPERTIES:
