@@ -499,26 +499,28 @@ Default background color is used when BASE-COLOR is nil."
 							  (not (or end-date-later-p start-date-earlier-p))
 							  (concat (ts-format " %H:%M" start-ts)
 								  (and end-ts (ts-format "-%H:%M" end-ts))))
-					block-height ,(if (and start-ts end-ts)
-							  (max
-							   (default-font-height)
-							   (round
-							    (* (/ (ts-diff
-								   (if end-date-later-p
-								       (ts-apply :hour 23 :minute 59 :second 0 ot-date)
-								     end-ts)
-								   (if start-date-earlier-p
-								       (ts-apply :hour 0 :minute 1 :second 0 ot-date)
-								     start-ts))
-								  60)
-							       scale)))
-							(default-font-height))
-					y ,(round (* (- (if start-date-earlier-p
-							    0
-							  (+ (* 60 (org-element-property :hour-start timestamp))
-							     (org-element-property :minute-start timestamp)))
-							(* min-hour 60))
-						     scale))
+					block-height ,(- (if (and start-ts end-ts)
+							     (max
+							      (default-font-height)
+							      (round
+							       (* (/ (ts-diff
+								      (if end-date-later-p
+									  (ts-apply :hour 23 :minute 59 :second 0 ot-date)
+									end-ts)
+								      (if start-date-earlier-p
+									  (ts-apply :hour 0 :minute 1 :second 0 ot-date)
+									start-ts))
+								     60)
+								  scale)))
+							   (default-font-height))
+							 (if (ot-get-event entry) 2 1))
+					y ,(+ (round (* (- (if start-date-earlier-p
+							       0
+							     (+ (* 60 (org-element-property :hour-start timestamp))
+								(org-element-property :minute-start timestamp)))
+							   (* min-hour 60))
+							scale))
+					      (if (ot-get-event entry) 2 1))
 					title ,(concat
 						(get-text-property 0 'title entry)
 						(cond
@@ -579,8 +581,9 @@ Default background color is used when BASE-COLOR is nil."
 			 (y (get-text-property 0 'y entry))
 			 (block-height (get-text-property 0 'block-height entry))
 			 ((> (+ y block-height) 0))
-			 (x (+ timeline-left-padding (round (* (1- (cdr (assoc (get-text-property 0 'id entry) columns))) (/ block-max-width length)))))
-			 (block-width (round (/ block-max-width length)))
+			 (x (+ (+ timeline-left-padding (round (* (1- (cdr (assoc (get-text-property 0 'id entry) columns))) (/ block-max-width length))))
+			       (if (ot-get-event entry) 2 1)))
+			 (block-width (- (round (/ block-max-width length)) (if (ot-get-event entry) 2 1)))
 			 (title (get-text-property 0 'title entry))
 			 ;; Splitting the title of an entry
 			 (heading-list
