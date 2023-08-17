@@ -804,7 +804,7 @@ PROMPT can overwrite the default prompt."
     (catch 'exit
       (while t
 	(let ((len (length time))
-	      (ch (read-char-exclusive (concat prompt (reverse time)))))
+	      (ch (read-char-exclusive (concat "[format: HHMM] " prompt (reverse time)))))
 	  (cond
 	   ((or (and (= len 0) (<= ?0 ch ?2))
 		(and (= len 1) (if (< (car time) ?2) (<= ?0 ch ?9) (<= ?0 ch ?3)))
