@@ -77,13 +77,13 @@
   :type 'file)
 
 (defcustom ot-new-task-time
-  "12:00"
-  "Time to which new tasks are scheduled via `org-timeblock-new-task'.
-Time is of the format \"HH:MM\"."
+  'pick
+  "Time to which new tasks are scheduled via `org-timeblock-new-task'."
   :group 'org-timeblock
   :type '(choice
 	  (const :tag "Unspecified.  The new task will be scheduled to a date with no time" nil)
-	  (string :tag "Time")))
+	  (const :tag "The new task will be scheduled to a time picked by user." pick)
+	  (string :tag "Time of the format \"HH:MM\".  The new task will be scheduled to a time.")))
 
 (defcustom ot-view-options t
   "Options that are used to decide which part of visual schedule must be hidden."
@@ -1160,7 +1160,13 @@ The new task is created in `org-timeblock-inbox-file'"
       (insert "\n")
       (org-insert-heading nil t t)
       (insert "TODO " title " ")
-      (org-schedule nil (concat (ts-format "%Y-%m-%d " ot-date) ot-new-task-time))
+      (pcase ot-new-task-time
+	(`pick (ot--schedule-time))
+	((pred stringp) (unless (string-match-p "\\([01][0-9]\\|2[0-3]\\):[0-5][0-9]" ot-new-task-time)
+			  (user-error "Wrong time format specified in `org-timeblock-new-task-time'"))
+	 (org-schedule nil (concat (ts-format "%Y-%m-%d " ot-date) ot-new-task-time)))
+	(`nil (org-schedule nil (ts-format "%Y-%m-%d" ot-date)))
+	(_ (user-error "Invalid custom variable value")))
       (save-buffer)))
   (ot-redraw-buffers))
 
@@ -1255,7 +1261,7 @@ If EVENTP is non-nil the entry is considered as an event."
 	       (concat new-entry "\n")
 	       'face
 	       `(:extend t ,@(and (car colors) (list :background (car colors))) ,@(and (cadr colors) (list :foreground (cadr colors)))))))))
-	  
+
 ;;;; Navigation commands
 
 (defun ot-select-block-under-mouse ()
