@@ -711,18 +711,19 @@ commands"
   (interactive)
   (quit-window t))
 
-(defun ot--schedule-time (marker eventp)
+(defun ot--schedule-time (&optional marker eventp)
   "Interactively change time for Org entry timestamp at MARKER.
-
+If MARKER is nil, use entry at point.
 If EVENTP is non-nil, change timestamp of the event.
 
 Schedule or event date won't be changed.  The time might be a
 timerange which depends on user interactive choice.
 
 Time format is \"HHMM\""
-  (unless (marker-buffer marker)
-    (user-error "Non-existent marker's buffer"))
-  (org-with-point-at marker
+  (when marker
+    (unless (marker-buffer marker)
+      (user-error "Non-existent marker's buffer")))
+  (org-with-point-at (or marker (point))
     (ot-show-context)
     (let* ((timerangep
 	    (eq
@@ -741,8 +742,6 @@ Time format is \"HHMM\""
 	    (if timerangep
 		(ot-read-ts ot-date "END-TIME: ")
 	      (when duration (ts-inc 'minute duration new-start-ts)))))
-      (unless timestamp
-	(user-error "Scheduled property not found"))
       (if eventp
 	  (progn
 	    (save-excursion
