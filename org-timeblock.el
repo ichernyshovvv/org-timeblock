@@ -711,10 +711,11 @@ commands"
   (interactive)
   (quit-window t))
 
-(defun ot--schedule-time (&optional marker eventp)
-  "Interactively change time for Org entry timestamp at MARKER.
+(cl-defun ot--schedule-time (&optional marker eventp (date ot-date))
+  "Interactively change time in DATE for Org entry timestamp at MARKER.
 If MARKER is nil, use entry at point.
 If EVENTP is non-nil, change timestamp of the event.
+If DATE is not specified, use `org-timeblock-date'.
 
 Schedule or event date won't be changed.  The time might be a
 timerange which depends on user interactive choice.
@@ -725,32 +726,38 @@ Time format is \"HHMM\""
       (user-error "Non-existent marker's buffer")))
   (org-with-point-at (or marker (point))
     (ot-show-context)
-    (let* ((timerangep
-	    (eq
-	     (read-char-from-minibuffer
-	      "Schedule: time[s]tamp, time[r]ange"
-	      '(?s ?r))
-	     ?r))
-	   (timestamp (if eventp
-			  (ot-get-event-timestamp)
-			(org-element-property :scheduled (org-element-at-point))))
-	   (start-ts (ot--parse-org-element-ts timestamp))
-	   (end-ts (ot--parse-org-element-ts timestamp t))
-	   (duration (when (and start-ts end-ts) (/ (round (ts-diff end-ts start-ts)) 60)))
-	   (new-start-ts (ot-read-ts ot-date "START-TIME: "))
-	   (new-end-ts
-	    (if timerangep
-		(ot-read-ts ot-date "END-TIME: ")
-	      (when duration (ts-inc 'minute duration new-start-ts)))))
-      (if eventp
-	  (progn
-	    (save-excursion
-	      (ot-delete-event-timestamp)
-	      (insert
-	       (ot-ts-to-org-timerange new-start-ts new-end-ts)))
-	    (ot-get-event-timestamp))
-	(ot--schedule new-start-ts new-end-ts)
-	(org-element-property :scheduled (org-element-at-point))))))
+    (let (ts-type prev-date)
+      (while (null ts-type)
+	(pcase (read-char-from-minibuffer
+		(format "Schedule (%s): time[s]tamp, time[r]ange, other [d]ay" (ts-format "%Y-%m-%d" date))
+		'(?s ?r ?d))
+	  (?r (setq ts-type 'timerange))
+	  (?s (setq ts-type 'timestamp))
+	  (?d (setq prev-date date
+		    date (ts-parse (org-read-date nil nil nil nil (ts-internal date))))
+	      (ot-jump-to-day date))))
+      (let* ((timestamp (if eventp
+			    (ot-get-event-timestamp)
+			  (org-element-property :scheduled (org-element-at-point))))
+	     (start-ts (ot--parse-org-element-ts timestamp))
+	     (end-ts (ot--parse-org-element-ts timestamp t))
+	     (duration (when (and start-ts end-ts) (/ (round (ts-diff end-ts start-ts)) 60)))
+	     (new-start-ts (ot-read-ts date "START-TIME: "))
+	     (new-end-ts
+	      (if (eq ts-type 'timerange)
+		  (ot-read-ts date "END-TIME: ")
+		(when duration (ts-inc 'minute duration new-start-ts)))))
+	(when prev-date
+	  (ot-jump-to-day prev-date))
+	(if eventp
+	    (progn
+	      (save-excursion
+		(ot-delete-event-timestamp)
+		(insert
+		 (ot-ts-to-org-timerange new-start-ts new-end-ts)))
+	      (ot-get-event-timestamp))
+	  (ot--schedule new-start-ts new-end-ts)
+	  (org-element-property :scheduled (org-element-at-point)))))))
 
 (defun ot--daterangep (timestamp)
   "Return t if org timestamp object TIMESTAMP is a daterange with no time."
@@ -1353,7 +1360,7 @@ heading at MARKER in the echo area."
 When called interactively, prompt for the date.
 When called from Lisp, DATE should be a date as returned by
 `org-read-date'"
-  (interactive (list (ts-parse (org-read-date nil))))
+  (interactive (list (ts-parse (org-read-date))))
   (when date
     (setq ot-date date)
     (ot-redraw-buffers)))
