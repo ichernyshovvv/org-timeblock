@@ -86,8 +86,6 @@ Requirements:
 
 - Emacs 28.1 (or higher)
 - SVG support in your Emacs build
-- org 9.0 (or higher)
-- org-ql 0.7 (or higher)
 
 ** package-vc-install (Emacs 29)
 
@@ -120,13 +118,6 @@ If you use Guix, you can install the package from [[https://git.sr.ht/~sokolov/c
 (use-package org-timeblock
   :quelpa (org-timeblock :fetcher github :repo "ichernyshovvv/org-timeblock"))
 #+end_src
-
-** Manual
-
-1.  Run ~M-x package-install org-ql~
-2.  ~git clone https://github.com/ichernyshovvv/org-timeblock~
-3.  Add the path of the downloaded folder to ~load-path~ somewhere in your Emacs
-    config:
 
 #+begin_src elisp
 (add-to-list 'load-path "path/to/org-timeblock/")
