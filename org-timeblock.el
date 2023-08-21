@@ -158,8 +158,8 @@ a user have previously opened in `org-timeblock-list-mode'.")
 
 (defvar ot-sort-function #'ot-order<)
 
-(defvar ot-date nil
-  "The date that is used to get and display schedule data.")
+(defvar ot-daterange nil
+  "The date range that is used to get and display schedule data.")
 
 (defvar ot-duration-multipliers
   '((?w . 10080)
@@ -243,7 +243,8 @@ tasks and those tasks that have not been sorted yet.")
 		(< (window-body-width window t) ot-svg-width))))
       (ot-redraw-timeblocks)
     (setq image-transform-resize nil
-	  header-line-format (ts-format "[%Y-%m-%d %a]" ot-date)
+	  header-line-format (concat (ts-format "[%Y-%m-%d %a]" (car ot-daterange))
+				     (when (cdr ot-daterange) (ts-format "-[%Y-%m-%d %a]" (cdr ot-daterange))))
 	  buffer-read-only t)))
 
 (define-derived-mode org-timeblock-list-mode special-mode "Org-Timeblock-List" :interactive nil
@@ -461,7 +462,7 @@ Default background color is used when BASE-COLOR is nil."
 			      (mapcar
                                (lambda (entry)
 				 (let ((s-or-e (ot-get-sched-or-event entry)))
-                                   (if (ot-ts-date< (ot--parse-org-element-ts s-or-e) ot-date)
+                                   (if (ot-ts-date< (ot--parse-org-element-ts s-or-e) ot-daterange)
 				       0
 				     (org-element-property :hour-start s-or-e))))
 			       entries)))))
@@ -492,8 +493,8 @@ Default background color is used when BASE-COLOR is nil."
 	      (let* ((timestamp (ot-get-sched-or-event entry))
 		     (start-ts (ot--parse-org-element-ts timestamp))
 		     (end-ts (ot--parse-org-element-ts timestamp t))
-		     (start-date-earlier-p (ot-ts-date< start-ts ot-date))
-		     (end-date-later-p (ot-ts-date< ot-date end-ts)))
+		     (start-date-earlier-p (ot-ts-date< start-ts ot-daterange))
+		     (end-date-later-p (ot-ts-date< ot-daterange end-ts)))
 		(add-text-properties 0 (length entry)
 				     `( time-string ,(and ot-display-time
 							  (not (or end-date-later-p start-date-earlier-p))
@@ -505,10 +506,10 @@ Default background color is used when BASE-COLOR is nil."
 							      (round
 							       (* (/ (ts-diff
 								      (if end-date-later-p
-									  (ts-apply :hour 23 :minute 59 :second 0 ot-date)
+									  (ts-apply :hour 23 :minute 59 :second 0 ot-daterange)
 									end-ts)
 								      (if start-date-earlier-p
-									  (ts-apply :hour 0 :minute 1 :second 0 ot-date)
+									  (ts-apply :hour 0 :minute 1 :second 0 ot-daterange)
 									start-ts))
 								     60)
 								  scale)))
@@ -635,7 +636,7 @@ Default background color is used when BASE-COLOR is nil."
 			      :font-size (aref (font-info (face-font 'default)) 2))))))
 	    ;; Drawing current time indicator
 	    (when (and ot-current-time-indicator
-		       (ot-ts-date= ot-date (ts-now)))
+		       (ot-ts-date= ot-daterange (ts-now)))
 	      (svg-polygon
 	       ot-svg-obj
 	       (list
@@ -698,10 +699,10 @@ commands"
       (while (not (eobp))
 	(when-let ((m (get-text-property (point) 'marker))
 		   (id (ot-construct-id m (ot-get-event nil (line-beginning-position)))))
-	  (setf (alist-get id (alist-get (ts-format "%Y-%m-%d" ot-date) ot-list-entries-pos nil nil #'equal) nil nil #'equal)
+	  (setf (alist-get id (alist-get (ts-format "%Y-%m-%d" ot-daterange) ot-list-entries-pos nil nil #'equal) nil nil #'equal)
 		(cl-incf count)))
 	(when (get-text-property (point) 'sort-ind)
-	  (setf (alist-get (ts-format "%Y-%m-%d" ot-date) ot-list-sortline-pos nil nil 'equal)
+	  (setf (alist-get (ts-format "%Y-%m-%d" ot-daterange) ot-list-sortline-pos nil nil 'equal)
 		(cl-incf count)))
 	(forward-line))))
   (org-save-all-org-buffers))
@@ -711,7 +712,7 @@ commands"
   (interactive)
   (quit-window t))
 
-(cl-defun ot--schedule-time (&optional marker eventp (date ot-date))
+(cl-defun ot--schedule-time (&optional marker eventp (date ot-daterange))
   "Interactively change time in DATE for Org entry timestamp at MARKER.
 If MARKER is nil, use entry at point.
 If EVENTP is non-nil, change timestamp of the event.
@@ -880,7 +881,7 @@ with time (timerange or just start time)."
 	 'order (alist-get
 		 (get-text-property 0 'id entry)
 		 (alist-get
-		  (ts-format "%Y-%m-%d" ot-date)
+		  (ts-format "%Y-%m-%d" ot-daterange)
 		  ot-list-entries-pos
 		  nil nil #'equal)
 		 nil nil #'equal)
@@ -891,7 +892,7 @@ with time (timerange or just start time)."
 	       files
 	       `(and (not (done))
 		     (ot-active-ts
-		      :on ,ot-date
+		      :on ,ot-daterange
 		      :exclude-dateranges ,exclude-dateranges
 		      :with-time ,with-time))
 	       :action (lambda () (copy-marker (point) t))))
@@ -1140,7 +1141,7 @@ When BACKWARD is non-nil, move backward."
   "Enter `org-timeblock-list-mode'."
   (interactive)
   (switch-to-buffer ot-list-buffer)
-  (setq ot-date (ts-now))
+  (setq ot-daterange (ts-now))
   (ot-redraw-buffers))
 
 ;;;###autoload
@@ -1148,7 +1149,7 @@ When BACKWARD is non-nil, move backward."
   "Enter `org-timeblock-mode'."
   (interactive)
   (switch-to-buffer ot-buffer)
-  (setq ot-date (ts-now))
+  (setq ot-daterange (ts-now))
   (ot-redraw-buffers))
 
 ;;;; Planning commands
@@ -1171,8 +1172,8 @@ The new task is created in `org-timeblock-inbox-file'"
 	(`pick (ot--schedule-time))
 	((pred stringp) (unless (string-match-p "\\([01][0-9]\\|2[0-3]\\):[0-5][0-9]" ot-new-task-time)
 			  (user-error "Wrong time format specified in `org-timeblock-new-task-time'"))
-	 (org-schedule nil (concat (ts-format "%Y-%m-%d " ot-date) ot-new-task-time)))
-	(`nil (org-schedule nil (ts-format "%Y-%m-%d" ot-date)))
+	 (org-schedule nil (concat (ts-format "%Y-%m-%d " ot-daterange) ot-new-task-time)))
+	(`nil (org-schedule nil (ts-format "%Y-%m-%d" ot-daterange)))
 	(_ (user-error "Invalid custom variable value")))
       (save-buffer)))
   (ot-redraw-buffers))
@@ -1351,7 +1352,7 @@ heading at MARKER in the echo area."
 (defun ot-day-later ()
   "Go forward in time by one day in `org-timeblock-mode'."
   (interactive)
-  (setq ot-date (ts-inc 'day 1 ot-date))
+  (setq ot-daterange (ts-inc 'day 1 ot-daterange))
   (ot-redraw-buffers))
 
 (defun ot-jump-to-day (date)
@@ -1362,13 +1363,13 @@ When called from Lisp, DATE should be a date as returned by
 `org-read-date'"
   (interactive (list (ts-parse (org-read-date))))
   (when date
-    (setq ot-date date)
+    (setq ot-daterange date)
     (ot-redraw-buffers)))
 
 (defun ot-day-earlier ()
   "Go backward in time by one day in `org-timeblock-mode'."
   (interactive)
-  (setq ot-date (ts-dec 'day 1 ot-date))
+  (setq ot-daterange (ts-dec 'day 1 ot-daterange))
   (ot-redraw-buffers))
 
 ;;;; View commands
@@ -1478,8 +1479,8 @@ Available view options:
       (insert
        (propertize
 	(concat
-	 (ts-format "[%Y-%m-%d %a]" ot-date)
-	 (and (ot-ts-date= ot-date (ts-now)) " Today"))
+	 (ts-format "[%Y-%m-%d %a]" ot-daterange)
+	 (and (ot-ts-date= ot-daterange (ts-now)) " Today"))
 	'face 'ot-list-header))
       (insert "\n")
       (dolist (entry entries)
@@ -1491,7 +1492,7 @@ Available view options:
       (goto-char (point-min))
       (when (eq ot-sort-function #'ot-order<)
 	(forward-line
-	 (alist-get (ts-format "%Y-%m-%d" ot-date) ot-list-sortline-pos nil nil #'equal))
+	 (alist-get (ts-format "%Y-%m-%d" ot-daterange) ot-list-sortline-pos nil nil #'equal))
 	(insert (propertize (format "% 37s" "^^^ SORTED ^^^\n") 'sort-ind t 'face '(:extend t :background "#8b0000" :foreground "#ffffff")))
 	(goto-char (point-min)))
       (when (get-buffer-window ot-buffer)
@@ -1520,12 +1521,18 @@ with time (timerange or just start time)."
 	     (start-ts (ot--parse-org-element-ts timestamp)))
     (let ((end-ts (ot--parse-org-element-ts timestamp t)))
       (or
-       (ot-ts-date= start-ts on)
-       (ot-ts-date= end-ts on)
+       (ot-ts-date= start-ts (car on))
+       (ot-ts-date= end-ts (car on))
+       (ot-ts-date= start-ts (cdr on))
+       (and end-ts (cdr on)
+	    (ot-ts-date= end-ts (cdr on)))
        (and
-	end-ts
-	(ot-ts-date< start-ts on)
-	(ot-ts-date< on end-ts))))))
+	(ot-ts-date< (car on) start-ts)
+	(ot-ts-date< start-ts (cdr on)))
+       (and
+	(ot-ts-date< (car on) end-ts)
+	end-ts (cdr on)
+	(ot-ts-date< end-ts (cdr on)))))))
 
 ;;;; Footer
 
