@@ -1417,6 +1417,8 @@ heading at MARKER in the echo area."
   (setq ot-daterange
 	(cons (ts-inc 'day 1 (car ot-daterange))
 	      (ts-inc 'day 1 (cdr ot-daterange))))
+  (unless (= ot-current-column 1)
+    (ot-backward-column))
   (ot-redraw-buffers))
 
 (defun ot-jump-to-day (date)
@@ -1436,6 +1438,8 @@ When called from Lisp, DATE should be a date as returned by
   (setq ot-daterange
 	(cons (ts-dec 'day 1 (car ot-daterange))
 	      (ts-dec 'day 1 (cdr ot-daterange))))
+  (unless (= ot-current-column ot-n-days-view)
+    (ot-forward-column))
   (ot-redraw-buffers))
 
 ;;;; View commands
