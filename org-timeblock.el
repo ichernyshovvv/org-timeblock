@@ -204,7 +204,8 @@ tasks and those tasks that have not been sorted yet.")
   "j" #'ot-jump-to-day
   "s" #'ot-schedule
   "t" #'ot-toggle-timeblock-list
-  "v" #'ot-switch-scaling)
+  "v" #'ot-switch-scaling
+  "V" #'ot-switch-view)
 
 (defvar-keymap ot-list-mode-map
   "+" #'ot-new-task
@@ -224,7 +225,8 @@ tasks and those tasks that have not been sorted yet.")
   "q" #'ot-quit
   "s" #'ot-list-schedule
   "t" #'ot-list-toggle-timeblock
-  "v" #'ot-switch-scaling)
+  "v" #'ot-switch-scaling
+  "V" #'ot-switch-view)
 
 ;; Generate todo commands and bind them to a corresponding key
 (dolist (elem ot-fast-todo-commands)
@@ -1504,6 +1506,18 @@ Available view options:
 	  (`hide-all 't)
 	  (`t 'nil)))
   (ot-redraw-timeblocks))
+
+(defun ot-switch-view ()
+  ""
+  (interactive)
+  (pcase (string-to-number (completing-read "Number of days in the view: " '("1" "2" "3" "4" "5" "6" "7") nil t))
+    (`1
+     (setq ot-n-days-view 1
+	   ot-daterange (list (car ot-daterange))))
+    ((and days _)
+     (setq ot-n-days-view days
+	   ot-daterange (cons (car ot-daterange) (ts-inc 'day days (car ot-daterange))))))
+  (ot-redraw-buffers))
 
 (defun ot-list-toggle-timeblock ()
   "Toggle the display of the window with `org-timeblock-mode'."
