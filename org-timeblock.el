@@ -1330,7 +1330,9 @@ If EVENTP is non-nil the entry is considered as an event."
   "Select timeblock under current position of mouse cursor."
   (interactive)
   (when-let ((pos (ot-mouse-pixel-pos))
-	     (inhibit-read-only t))
+	     (inhibit-read-only t)
+	     (window (get-buffer-window ot-buffer))
+	     (window-width (window-body-width window t)))
     (goto-char (point-min))
     (when (re-search-forward (format " fill=\"\\(%s\\)\"" ot-sel-block-color) nil t)
       (replace-match (or ot-prev-selected-block-color "#ffffff") nil nil nil 1)
@@ -1348,6 +1350,7 @@ If EVENTP is non-nil the entry is considered as an event."
       (re-search-forward (format "id=\"%s\" fill=\"\\([^\"]+\\)\"" (dom-attr found 'id)) nil t)
       (setq ot-prev-selected-block-color (match-string-no-properties 1))
       (replace-match ot-sel-block-color nil nil nil 1))
+    (setq ot-current-column (1+ (/ (car pos) (/ window-width ot-n-days-view))))
     (ot-redisplay)
     (ot-show-olp-maybe (ot-selected-block-marker))))
 
