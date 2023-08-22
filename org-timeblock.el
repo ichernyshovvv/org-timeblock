@@ -756,7 +756,7 @@ commands"
   (interactive)
   (quit-window t))
 
-(cl-defun ot--schedule-time (&optional marker eventp (date (car ot-daterange)))
+(cl-defun ot--schedule-time (&optional marker eventp (date (nth (1- ot-current-column) (ot-get-dates))))
   "Interactively change time in DATE for Org entry timestamp at MARKER.
 If MARKER is nil, use entry at point.
 If EVENTP is non-nil, change timestamp of the event.
