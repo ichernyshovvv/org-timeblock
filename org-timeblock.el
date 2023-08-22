@@ -63,6 +63,11 @@
 	  (const :tag "Don't show outline path with prepended file name." nil)
 	  (const :tag "Show outline path." t)))
 
+(defcustom ot-n-days-view 3
+  "Number of days displayed in org-timeblock"
+  :group 'org-timeblock
+  :type 'integer)
+
 (defcustom ot-display-time t
   "Non-nil means show end and start time of events or tasks inside timeblocks."
   :group 'org-timeblock
@@ -1385,7 +1390,7 @@ When called from Lisp, DATE should be a date as returned by
 `org-read-date'"
   (interactive (list (ts-parse (org-read-date))))
   (when date
-    (setq ot-daterange date)
+    (setq ot-daterange (cons date (ts-inc 'day ot-n-days-view date)))
     (ot-redraw-buffers)))
 
 (defun ot-day-earlier ()
