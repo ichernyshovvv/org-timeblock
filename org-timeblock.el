@@ -259,9 +259,10 @@ tasks and those tasks that have not been sorted yet.")
 		 (dates (ot-get-dates))
 		 (right-margin (format "%% -%ds" (/ window-width (default-font-width) (length dates))))
 		 result)
-	    (dolist (date dates result)
+	    (dotimes (iter (length dates) result)
 	      (cl-callf concat result
-		(format right-margin (ts-format "[%Y-%m-%d %a]" date)))))
+		(propertize (format right-margin (ts-format "[%Y-%m-%d %a]" (nth iter dates))) 'face
+			    (when (= ot-current-column (1+ iter)) (list :background ot-sel-block-color))))))
 	  buffer-read-only t)))
 
 (define-derived-mode org-timeblock-list-mode special-mode "Org-Timeblock-List" :interactive nil
@@ -1366,8 +1367,8 @@ If EVENTP is non-nil the entry is considered as an event."
 	       (re-search-backward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t))
       (setq ot-prev-selected-block-color (match-string-no-properties 1))
       (replace-match ot-sel-block-color nil nil nil 1)
-      (ot-redisplay)
-      (ot-show-olp-maybe (ot-selected-block-marker)))))
+      (ot-show-olp-maybe (ot-selected-block-marker)))
+    (ot-redisplay)))
 
 (defun ot-forward-column ()
   "Select the next column in *org-timeblock* buffer."
