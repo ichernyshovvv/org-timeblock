@@ -327,9 +327,10 @@ Mouse position is of the form (X . Y)."
 (defun ot-get-dates ()
   "Return a list of ts.el struct dates between org-timeblock-daterange."
   (let (dates (start-date (car ot-daterange)))
-    (while (ot-ts-date< start-date (cdr ot-daterange))
-      (push start-date dates)
-      (setq start-date (ts-inc 'day 1 start-date)))
+    (while (and
+	    (push start-date dates)
+	    (setq start-date (ts-inc 'day 1 start-date))
+	    (ot-ts-date< start-date (cdr ot-daterange))))
     (nreverse dates)))
 
 (defun ot-selected-block-id ()
