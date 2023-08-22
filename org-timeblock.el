@@ -258,7 +258,7 @@ tasks and those tasks that have not been sorted yet.")
 		 (window-width (window-body-width window t))
 		 (dates (ot-get-dates))
 		 (right-margin (format "%% -%ds" (/ window-width (default-font-width) (length dates))))
-		 result)
+		 (result (make-string (/ (car (window-edges window t nil t)) (default-font-width)) ? )))
 	    (dotimes (iter (length dates) result)
 	      (cl-callf concat result
 		(propertize (format right-margin (ts-format "[%Y-%m-%d %a]" (nth iter dates))) 'face
