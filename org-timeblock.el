@@ -781,7 +781,12 @@ Time format is \"HHMM\""
 	  (?s (setq ts-type 'timestamp))
 	  (?d (setq prev-date date
 		    date (ts-parse (org-read-date nil nil nil nil (ts-internal date))))
-	      (ot-jump-to-day date))))
+	      (unless (or
+		       (ot-ts-date= date (car ot-daterange))
+		       (ot-ts-date= date (cdr ot-daterange))
+		       (ot-ts-date< date (cdr ot-daterange))
+		       (ot-ts-date< (car ot-daterange) date))
+		(ot-jump-to-day date)))))
       (let* ((timestamp (if eventp
 			    (ot-get-event-timestamp)
 			  (org-element-property :scheduled (org-element-at-point))))
@@ -793,7 +798,12 @@ Time format is \"HHMM\""
 	      (if (eq ts-type 'timerange)
 		  (ot-read-ts date "END-TIME: ")
 		(when duration (ts-inc 'minute duration new-start-ts)))))
-	(when prev-date
+	(when (and prev-date
+		   (not (or
+			 (ot-ts-date= date (car ot-daterange))
+			 (ot-ts-date= date (cdr ot-daterange))
+			 (ot-ts-date< date (cdr ot-daterange))
+			 (ot-ts-date< (car ot-daterange) date))))
 	  (ot-jump-to-day prev-date))
 	(if eventp
 	    (progn
