@@ -675,9 +675,9 @@ Default background color is used when BASE-COLOR is nil."
 		      (svg-polygon
 		       ot-svg-obj
 		       (list
-			(cons (- block-max-width 5) cur-time-indicator)
-			(cons (+ block-max-width 25) (- cur-time-indicator 5))
-			(cons (+ block-max-width 25) (+ cur-time-indicator 5)))
+			(cons (+ (* window-width iter) (- block-max-width 5)) cur-time-indicator)
+			(cons (+ (* window-width iter) block-max-width 25) (- cur-time-indicator 5))
+			(cons (+ (* window-width iter) block-max-width 25) (+ cur-time-indicator 5)))
 		       :fill-color "red")))
 		(let* ((window (get-buffer-window ot-buffer))
 		       (window-height (window-body-height window t))
