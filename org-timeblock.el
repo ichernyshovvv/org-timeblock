@@ -64,7 +64,7 @@
 	  (const :tag "Show outline path." t)))
 
 (defcustom ot-n-days-view 3
-  "Number of days displayed in org-timeblock"
+  "Number of days displayed in org-timeblock."
   :group 'org-timeblock
   :type 'integer)
 
@@ -251,11 +251,7 @@ tasks and those tasks that have not been sorted yet.")
 	  header-line-format
 	  (let* ((window (get-buffer-window ot-buffer))
 		 (window-width (window-body-width window t))
-		 (dates (let (dates (start-date (car ot-daterange)))
-			  (while (ot-ts-date< start-date (cdr ot-daterange))
-			    (push start-date dates)
-			    (setq start-date (ts-inc 'day 1 start-date)))
-			  (nreverse (append (list (cdr ot-daterange)) dates))))
+		 (dates (ot-get-dates))
 		 (right-margin (format "%% -%ds" (/ window-width (default-font-width) (length dates))))
 		 result)
 	    (dolist (date dates result)
@@ -321,6 +317,14 @@ Mouse position is of the form (X . Y)."
 (defun ot-block-eventp (id)
   "Return t if block with ID is an event."
   (caddr (seq-find (lambda (x) (string= (car x) id)) ot-data)))
+
+(defun ot-get-dates ()
+  "Return a list of ts.el struct dates between org-timeblock-daterange."
+  (let (dates (start-date (car ot-daterange)))
+    (while (ot-ts-date< start-date (cdr ot-daterange))
+      (push start-date dates)
+      (setq start-date (ts-inc 'day 1 start-date)))
+    (nreverse dates)))
 
 (defun ot-selected-block-id ()
   "Return an id of the entry of selected timeblock.
@@ -463,11 +467,7 @@ Default background color is used when BASE-COLOR is nil."
     (let ((inhibit-read-only t))
       (erase-buffer)
       (if-let ((entries (ot-get-entries :sort-func #'ot-sched-or-event< :exclude-dateranges t :with-time t))
-	       (dates (let (dates (start-date (car ot-daterange)))
-			(while (ot-ts-date< start-date (cdr ot-daterange))
-			  (push start-date dates)
-			  (setq start-date (ts-inc 'day 1 start-date)))
-			(nreverse (append (list (cdr ot-daterange)) dates))))
+	       (dates (ot-get-dates))
 	       (window (get-buffer-window ot-buffer))
 	       (overall-window-height (setq ot-svg-height (window-body-height window t)))
 	       (overall-window-width (setq ot-svg-width (window-body-width window t))))
@@ -1177,7 +1177,7 @@ When BACKWARD is non-nil, move backward."
   "Enter `org-timeblock-list-mode'."
   (interactive)
   (switch-to-buffer ot-list-buffer)
-  (setq ot-daterange (cons (ts-now) (ts-inc 'day 3 (ts-now))))
+  (setq ot-daterange (cons (ts-now) (ts-inc 'day ot-n-days-view (ts-now))))
   (ot-redraw-buffers))
 
 ;;;###autoload
@@ -1185,7 +1185,7 @@ When BACKWARD is non-nil, move backward."
   "Enter `org-timeblock-mode'."
   (interactive)
   (switch-to-buffer ot-buffer)
-  (setq ot-daterange (cons (ts-now) (ts-inc 'day 3 (ts-now))))
+  (setq ot-daterange (cons (ts-now) (ts-inc 'day ot-n-days-view (ts-now))))
   (ot-redraw-buffers))
 
 ;;;; Planning commands
