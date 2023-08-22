@@ -248,8 +248,19 @@ tasks and those tasks that have not been sorted yet.")
 		(< (window-body-width window t) ot-svg-width))))
       (ot-redraw-timeblocks)
     (setq image-transform-resize nil
-	  header-line-format (concat (ts-format "[%Y-%m-%d %a]" (car ot-daterange))
-				     (when (cdr ot-daterange) (ts-format "-[%Y-%m-%d %a]" (cdr ot-daterange))))
+	  header-line-format
+	  (let* ((window (get-buffer-window ot-buffer))
+		 (window-width (window-body-width window t))
+		 (dates (let (dates (start-date (car ot-daterange)))
+			  (while (ot-ts-date< start-date (cdr ot-daterange))
+			    (push start-date dates)
+			    (setq start-date (ts-inc 'day 1 start-date)))
+			  (nreverse (append (list (cdr ot-daterange)) dates))))
+		 (right-margin (format "%% -%ds" (/ window-width (default-font-width) (length dates))))
+		 result)
+	    (dolist (date dates result)
+	      (cl-callf concat result
+		(format right-margin (ts-format "[%Y-%m-%d %a]" date)))))
 	  buffer-read-only t)))
 
 (define-derived-mode org-timeblock-list-mode special-mode "Org-Timeblock-List" :interactive nil
