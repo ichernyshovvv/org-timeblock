@@ -204,7 +204,7 @@ tasks and those tasks that have not been sorted yet.")
   "j" #'ot-jump-to-day
   "s" #'ot-schedule
   "t" #'ot-toggle-timeblock-list
-  "v" #'ot-switch-view)
+  "v" #'ot-switch-scaling)
 
 (defvar-keymap ot-list-mode-map
   "+" #'ot-new-task
@@ -224,7 +224,7 @@ tasks and those tasks that have not been sorted yet.")
   "q" #'ot-quit
   "s" #'ot-list-schedule
   "t" #'ot-list-toggle-timeblock
-  "v" #'ot-switch-view)
+  "v" #'ot-switch-scaling)
 
 ;; Generate todo commands and bind them to a corresponding key
 (dolist (elem ot-fast-todo-commands)
@@ -1490,8 +1490,8 @@ When called from Lisp, DATE should be a date as returned by
     (goto-char pos)
     (ot-show-context)))
 
-(defun ot-switch-view ()
-  "Switch between different views in `org-timeblock-mode'.
+(defun ot-switch-scaling ()
+  "Switch between different scaling modes in `org-timeblock-mode'.
 
 Available view options:
 1. Do not hide anything.  All 24 hours will be displayed.
