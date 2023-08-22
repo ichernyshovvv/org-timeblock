@@ -149,6 +149,7 @@ are tagged with a tag in car."
 (defvar ot-colors nil)
 
 (defvar ot-data nil)
+(defvar ot-current-column 1)
 
 (defvar ot-svg-width 0)
 (defvar ot-svg-height 0)
@@ -191,6 +192,8 @@ tasks and those tasks that have not been sorted yet.")
   "+" #'ot-new-task
   "<mouse-1>" #'ot-select-block-under-mouse
   "<down>" #'ot-forward-block
+  "<right>" #'ot-forward-column
+  "<left>" #'ot-backward-column
   "<up>" #'ot-backward-block
   "C-<down>" #'ot-day-later
   "C-<up>" #'ot-day-earlier
@@ -642,6 +645,7 @@ Default background color is used when BASE-COLOR is nil."
 			  (push (list (get-text-property 0 'id entry) (get-text-property 0 'marker entry) (ot-get-event entry)) ot-data)
 			  ;; Appending generated rectangle for current entry
 			  (svg-rectangle ot-svg-obj x y block-width block-height
+					 :column (1+ iter)
 					 :stroke (if (ot-get-event entry) "#5b0103" "#cdcdcd")
 					 :stroke-width (if (ot-get-event entry) 2 1)
 					 :opacity "0.7"
@@ -1354,13 +1358,30 @@ If EVENTP is non-nil the entry is considered as an event."
     (goto-char (point-min))
     (when (re-search-forward (format " fill=\"\\(%s\\)\"" ot-sel-block-color) nil t)
       (replace-match ot-prev-selected-block-color nil nil nil 1)
-      (unless (save-excursion (search-forward "<rect " nil t))
+      (unless (save-excursion (re-search-forward (format "<rect .+? column=\"%d\"" ot-current-column) nil t))
 	(goto-char (point-min))))
-    (when (re-search-forward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t)
+    (when (and (re-search-forward (format "<rect .*? column=\"%d\"" ot-current-column) nil t)
+	       (re-search-backward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t))
       (setq ot-prev-selected-block-color (match-string-no-properties 1))
       (replace-match ot-sel-block-color nil nil nil 1)
       (ot-redisplay)
       (ot-show-olp-maybe (ot-selected-block-marker)))))
+
+(defun ot-forward-column ()
+  "Select the next column in *org-timeblock* buffer."
+  (interactive)
+  (if (= ot-current-column ot-n-days-view)
+      (setq ot-current-column 1)
+    (cl-incf ot-current-column))
+  (ot-forward-block))
+
+(defun ot-backward-column ()
+  "Select the next column in *org-timeblock* buffer."
+  (interactive)
+  (if (= ot-current-column 1)
+      (setq ot-current-column ot-n-days-view)
+    (cl-decf ot-current-column))
+  (ot-forward-block))
 
 (defun ot-show-olp-maybe (marker)
   "Show outline path in echo area for the selected item.
@@ -1377,9 +1398,10 @@ heading at MARKER in the echo area."
     (goto-char (point-max))
     (when (re-search-backward (format " fill=\"\\(%s\\)\"" ot-sel-block-color) nil t)
       (replace-match ot-prev-selected-block-color nil nil nil 1)
-      (unless (save-excursion (search-backward "</rect>" nil t))
+      (unless (save-excursion (re-search-backward (format "<rect .+? column=\"%d\"" ot-current-column) nil t))
 	(goto-char (point-max))))
-    (when (re-search-backward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t)
+    (when (and (re-search-backward (format "<rect .*? column=\"%d\"" ot-current-column) nil t)
+	       (re-search-forward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t))
       (setq ot-prev-selected-block-color (match-string-no-properties 1))
       (replace-match ot-sel-block-color nil nil nil 1)
       (ot-redisplay)
