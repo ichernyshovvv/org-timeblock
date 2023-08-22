@@ -106,7 +106,6 @@ If you use Guix, you can install the package from [[https://git.sr.ht/~sokolov/c
 #+end_src
 
 2. Then, run ~guix pull~.
-
 3. Now you can install the package.
 
 ** Quelpa
@@ -117,10 +116,6 @@ If you use Guix, you can install the package from [[https://git.sr.ht/~sokolov/c
 #+begin_src elisp
 (use-package org-timeblock
   :quelpa (org-timeblock :fetcher github :repo "ichernyshovvv/org-timeblock"))
-#+end_src
-
-#+begin_src elisp
-(add-to-list 'load-path "path/to/org-timeblock/")
 #+end_src
 
 * Usage
