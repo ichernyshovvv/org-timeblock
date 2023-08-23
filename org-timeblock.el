@@ -68,6 +68,11 @@
   :group 'org-timeblock
   :type 'integer)
 
+(defcustom ot-list-sortline-face 'org-agenda-dimmed-todo-face
+  "Number of days displayed in org-timeblock."
+  :group 'org-timeblock
+  :type 'face)
+
 (defcustom ot-display-time t
   "Non-nil means show end and start time of events or tasks inside timeblocks."
   :group 'org-timeblock
@@ -738,17 +743,23 @@ commands"
   (unless (eq major-mode 'org-timeblock-list-mode)
     (user-error "Not in org-timeblock buffer"))
   (let ((count 0)
-	(inhibit-read-only t))
+	(inhibit-read-only t)
+	date
+	(dates (ot-get-dates)))
     (save-excursion
       (goto-char (point-min))
       (while (not (eobp))
-	(when-let ((m (get-text-property (point) 'marker))
-		   (id (ot-construct-id m (ot-get-event nil (line-beginning-position)))))
-	  (setf (alist-get id (alist-get (ts-format "%Y-%m-%d" (car ot-daterange)) ot-list-entries-pos nil nil #'equal) nil nil #'equal)
-		(cl-incf count)))
-	(when (get-text-property (point) 'sort-ind)
-	  (setf (alist-get (ts-format "%Y-%m-%d" (car ot-daterange)) ot-list-sortline-pos nil nil 'equal)
-		(cl-incf count)))
+	(cond ((eq (get-text-property (line-beginning-position) 'face) 'ot-list-header)
+	       (setq count 0
+		     date (pop dates)))
+	      ((get-text-property (line-beginning-position) 'marker)
+	       (when-let ((m (get-text-property (line-beginning-position) 'marker))
+			  (id (ot-construct-id m (ot-get-event nil (line-beginning-position)))))
+		 (setf (alist-get id (alist-get (ts-format "%Y-%m-%d" date) ot-list-entries-pos nil nil #'equal) nil nil #'equal)
+		       (cl-incf count))))
+	      ((get-text-property (line-beginning-position) 'sort-ind)
+	       (setf (alist-get (ts-format "%Y-%m-%d" date) ot-list-sortline-pos nil nil 'equal)
+		     (cl-incf count))))
 	(forward-line))))
   (org-save-all-org-buffers))
 
@@ -931,16 +942,18 @@ with time (timerange or just start time)."
 	;; because when buffers have not been changed, org-ql uses
 	;; cached results and therefore does not update 'order property,
 	;; which is the only property that's not stored in org buffers
-	(put-text-property
-	 0 (length entry)
-	 'order (alist-get
-		 (get-text-property 0 'id entry)
-		 (alist-get
-		  (ts-format "%Y-%m-%d" (car ot-daterange))
-		  ot-list-entries-pos
-		  nil nil #'equal)
-		 nil nil #'equal)
-	 entry)
+	(dolist (date (ot-get-dates))
+	  (when (ot-ts-date= date (ot--parse-org-element-ts (ot-get-sched-or-event entry)))
+	    (put-text-property
+	     0 (length entry)
+	     'order (alist-get
+		     (get-text-property 0 'id entry)
+		     (alist-get
+		      (ts-format "%Y-%m-%d" date)
+		      ot-list-entries-pos
+		      nil nil #'equal)
+		     nil nil #'equal)
+	     entry)))
 	entry)
       (let ((markers
 	     (org-ql-select
@@ -1176,7 +1189,10 @@ When BACKWARD is non-nil, move backward."
     (user-error "Can not move this line"))
   (when (or (and backward (= (line-number-at-pos) 2))
 	    (and (not backward) (= (count-lines (point-min) (point-max))
-				   (line-number-at-pos))))
+				   (line-number-at-pos)))
+	    (save-excursion
+	      (if backward (forward-line -1) (forward-line))
+	      (eq (get-text-property (line-beginning-position) 'face) 'ot-list-header)))
     (user-error "Can not move further"))
   (let ((inhibit-read-only t)
 	(end (save-excursion (move-beginning-of-line 2) (point)))
@@ -1560,7 +1576,8 @@ Available view options:
   (interactive)
   (with-current-buffer (get-buffer-create ot-list-buffer)
     (let ((inhibit-read-only t)
-	  (entries (ot-get-entries)))
+	  (entries (ot-get-entries))
+	  (dates (ot-get-dates)))
       (erase-buffer)
       (ot-list-mode)
       (setq
@@ -1571,25 +1588,29 @@ Available view options:
 		  (`ot-order< "SORTING-ORDER")
 		  (`ot-sched-or-event< "SCHEDULED")
 		  ((pred symbolp) (symbol-name ot-sort-function))))))
-      (insert
-       (propertize
-	(concat
-	 (ts-format "[%Y-%m-%d %a]" (car ot-daterange))
-	 (and (ot-ts-date= (car ot-daterange) (ts-now)) " Today"))
-	'face 'ot-list-header))
-      (insert "\n")
-      (dolist (entry entries)
-	(let ((colors (ot-get-colors (get-text-property 0 'tags entry))))
-	  (insert (propertize
-		   (concat entry "\n")
-		   'face
-		   `(:extend t ,@(and (car colors) (list :background (car colors))) ,@(and (cadr colors) (list :foreground (cadr colors))))))))
+      (dolist (date dates)
+	(let ((entries (seq-filter (lambda (x) (ot-ts-date= (ot--parse-org-element-ts (ot-get-sched-or-event x)) date)) entries))
+	      (date-beg (point)))
+	  (insert
+	   (propertize
+	    (concat
+	     (ts-format "[%Y-%m-%d %a]" date)
+	     (and (ot-ts-date= date (ts-now)) " Today"))
+	    'face 'ot-list-header))
+	  (insert "\n")
+	  (dolist (entry entries)
+	    (let ((colors (ot-get-colors (get-text-property 0 'tags entry))))
+	      (insert (propertize
+		       (concat entry "\n")
+		       'face
+		       `(:extend t ,@(and (car colors) (list :background (car colors))) ,@(and (cadr colors) (list :foreground (cadr colors))))))))
+	  (when (eq ot-sort-function #'ot-order<)
+	    (goto-char date-beg)
+	    (forward-line
+	     (alist-get (ts-format "%Y-%m-%d" date) ot-list-sortline-pos nil nil #'equal))
+	    (insert (propertize (format "% 37s" "^^^ SORTED ^^^\n") 'sort-ind t 'face ot-list-sortline-face)))
+	  (goto-char (point-max))))
       (goto-char (point-min))
-      (when (eq ot-sort-function #'ot-order<)
-	(forward-line
-	 (alist-get (ts-format "%Y-%m-%d" (car ot-daterange)) ot-list-sortline-pos nil nil #'equal))
-	(insert (propertize (format "% 37s" "^^^ SORTED ^^^\n") 'sort-ind t 'face '(:extend t :background "#8b0000" :foreground "#ffffff")))
-	(goto-char (point-min)))
       (when (get-buffer-window ot-buffer)
 	(ot-redraw-timeblocks)))))
 
