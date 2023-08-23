@@ -262,11 +262,18 @@ tasks and those tasks that have not been sorted yet.")
 	  (let* ((window (get-buffer-window ot-buffer))
 		 (window-width (window-body-width window t))
 		 (dates (ot-get-dates))
-		 (right-margin (format "%% -%ds" (/ window-width (default-font-width) (length dates))))
+		 (max-length (/ window-width (default-font-width) (length dates)))
+		 (date-format
+		  (pcase max-length
+		    ((pred (< 15)) "[%Y-%m-%d %a]")
+		    ((pred (< 11)) "[%Y-%m-%d]")
+		    ((pred (< 6)) "[%m-%d]")
+		    ((pred (< 3)) "[%d]")))
+		 (right-margin (format "%% -%ds" max-length))
 		 (result (make-string (/ (car (window-edges window t nil t)) (default-font-width)) ? )))
 	    (dotimes (iter (length dates) result)
 	      (cl-callf concat result
-		(propertize (format right-margin (ts-format "[%Y-%m-%d %a]" (nth iter dates))) 'face
+		(propertize (format right-margin (ts-format date-format (nth iter dates))) 'face
 			    (when (= ot-current-column (1+ iter)) (list :background ot-sel-block-color))))))
 	  buffer-read-only t)))
 
@@ -1558,13 +1565,14 @@ Available view options:
 (defun ot-switch-view ()
   ""
   (interactive)
-  (pcase (string-to-number (completing-read "Number of days in the view: " '("1" "2" "3" "4" "5" "6" "7") nil t))
-    (`1
-     (setq ot-n-days-view 1
-	   ot-daterange (list (nth (1- ot-current-column) (ot-get-dates)))))
-    ((and days _)
-     (setq ot-n-days-view days
-	   ot-daterange (cons (nth (1- ot-current-column) (ot-get-dates)) (ts-inc 'day days (nth (1- ot-current-column) (ot-get-dates)))))))
+  (let ((cur-date (nth (1- ot-current-column) (ot-get-dates))))
+    (pcase (string-to-number (completing-read "Number of days in the view: " '("1" "2" "3" "4" "5" "6" "7") nil t))
+      (`1
+       (setq ot-n-days-view 1
+	     ot-daterange (list cur-date)))
+      ((and days _)
+       (setq ot-n-days-view days
+	     ot-daterange (cons cur-date (ts-inc 'day days cur-date))))))
   (ot-redraw-buffers))
 
 (defun ot-list-toggle-timeblock ()
