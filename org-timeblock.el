@@ -407,6 +407,8 @@ A and B are ts.el ts objects."
       (when (re-search-forward (format " id=\"%s\" fill=\"\\([^\"]+\\)\"" id) nil t)
 	(setq ot-prev-selected-block-color (match-string 1))
 	(replace-match ot-sel-block-color nil nil nil 1)
+	(re-search-forward " column=\"\\([^\"]+\\)\"" nil t)
+	(setq ot-current-column (string-to-number (match-string 1)))
 	(ot-redisplay)))))
 
 (defun ot-intersect-p (entry1 entry2)
@@ -768,7 +770,7 @@ commands"
   (interactive)
   (quit-window t))
 
-(cl-defun ot--schedule-time (&optional marker eventp (date (nth (1- ot-current-column) (ot-get-dates))))
+(cl-defun ot--schedule-time (date &optional marker eventp)
   "Interactively change time in DATE for Org entry timestamp at MARKER.
 If MARKER is nil, use entry at point.
 If EVENTP is non-nil, change timestamp of the event.
@@ -1224,7 +1226,16 @@ When BACKWARD is non-nil, move backward."
 
 ;;;; Planning commands
 
-(defun ot-new-task ()
+(defun ot-list-get-current-date ()
+  "Get date at point."
+  (save-excursion
+    (while (not (eq (get-text-property (point) 'face) 'ot-list-header))
+      (forward-line -1))
+    (ts-parse (buffer-substring (line-beginning-position) (line-end-position)))))
+
+(cl-defun ot-new-task (&optional (date (pcase major-mode
+					 (`ot-mode (nth (1- ot-current-column) (ot-get-dates)))
+					 (`ot-list-mode (ot-list-get-current-date)))))
   "Create a task scheduled to the date in the current view.
 The new task is created in `org-timeblock-inbox-file'"
   (interactive)
@@ -1239,11 +1250,11 @@ The new task is created in `org-timeblock-inbox-file'"
       (org-insert-heading nil t t)
       (insert "TODO " title " ")
       (pcase ot-new-task-time
-	(`pick (ot--schedule-time))
+	(`pick (ot--schedule-time date))
 	((pred stringp) (unless (string-match-p "\\([01][0-9]\\|2[0-3]\\):[0-5][0-9]" ot-new-task-time)
 			  (user-error "Wrong time format specified in `org-timeblock-new-task-time'"))
-	 (org-schedule nil (concat (ts-format "%Y-%m-%d " (car ot-daterange)) ot-new-task-time)))
-	(`nil (org-schedule nil (ts-format "%Y-%m-%d" (car ot-daterange))))
+	 (org-schedule nil (concat (ts-format "%Y-%m-%d " date) ot-new-task-time)))
+	(`nil (org-schedule nil (ts-format "%Y-%m-%d" date)))
 	(_ (user-error "Invalid custom variable value")))
       (save-buffer)))
   (ot-redraw-buffers))
@@ -1275,8 +1286,9 @@ The org-element timestamp object may be from an event or from a
 SCHEDULED property."
   (interactive)
   (when-let ((id (ot-selected-block-id))
-	     (marker (ot-selected-block-marker)))
-    (ot--schedule-time marker (ot-block-eventp id))
+	     (marker (ot-selected-block-marker))
+	     (date (nth (1- ot-current-column) (ot-get-dates))))
+    (ot--schedule-time date marker (ot-block-eventp id))
     (ot-redraw-buffers)
     (ot-redisplay)))
 
@@ -1307,7 +1319,8 @@ SCHEDULED property."
   (when (ot--daterangep (ot-get-sched nil (line-beginning-position)))
     (user-error "Can not reschedule entries with daterange timestamp"))
   (let ((eventp (ot-get-event nil (line-beginning-position))))
-    (when-let ((timestamp (ot--schedule-time (get-text-property (line-beginning-position) 'marker) eventp)))
+    (when-let ((date (ot-list-get-current-date))
+	       (timestamp (ot--schedule-time date (get-text-property (line-beginning-position) 'marker) eventp)))
       (ot-list-update-entry eventp)
       (when (get-buffer-window ot-buffer)
 	(ot-redraw-timeblocks)))))
@@ -1548,10 +1561,10 @@ Available view options:
   (pcase (string-to-number (completing-read "Number of days in the view: " '("1" "2" "3" "4" "5" "6" "7") nil t))
     (`1
      (setq ot-n-days-view 1
-	   ot-daterange (list (car ot-daterange))))
+	   ot-daterange (list (nth (1- ot-current-column) (ot-get-dates)))))
     ((and days _)
      (setq ot-n-days-view days
-	   ot-daterange (cons (car ot-daterange) (ts-inc 'day days (car ot-daterange))))))
+	   ot-daterange (cons (nth (1- ot-current-column) (ot-get-dates)) (ts-inc 'day days (nth (1- ot-current-column) (ot-get-dates)))))))
   (ot-redraw-buffers))
 
 (defun ot-list-toggle-timeblock ()
