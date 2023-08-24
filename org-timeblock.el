@@ -259,10 +259,9 @@ tasks and those tasks that have not been sorted yet.")
       (ot-redraw-timeblocks)
     (setq image-transform-resize nil
 	  header-line-format
-	  (let* ((window (get-buffer-window ot-buffer))
-		 (window-width (window-body-width window t))
-		 (dates (ot-get-dates))
-		 (max-length (/ window-width (default-font-width) (length dates)))
+	  (let* ((dates (ot-get-dates))
+		 (left-fringe (/ (car (window-fringes window)) (default-font-width)))
+		 (max-length (/ (+ (/ (window-body-width window t) (default-font-width)) left-fringe) (length dates)))
 		 (date-format
 		  (pcase max-length
 		    ((pred (< 15)) "[%Y-%m-%d %a]")
@@ -270,11 +269,11 @@ tasks and those tasks that have not been sorted yet.")
 		    ((pred (< 6)) "[%m-%d]")
 		    ((pred (< 3)) "[%d]")))
 		 (right-margin (format "%% -%ds" max-length))
-		 (result (make-string (/ (car (window-edges window t nil t)) (default-font-width)) ? )))
+		 (result (make-string left-fringe ? )))
 	    (dotimes (iter (length dates))
 	      (cl-callf concat result
 		(propertize (format right-margin (ts-format date-format (nth iter dates))) 'face
-			    (when (= ot-current-column (1+ iter)) (list :background ot-sel-block-color)))))
+			    (and (= ot-current-column (1+ iter)) `(:background ,ot-sel-block-color)))))
 	    result)
 	  buffer-read-only t)))
 
