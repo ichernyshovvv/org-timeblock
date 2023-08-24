@@ -381,6 +381,21 @@ A and B are ts.el ts objects."
 	     (and (ot-on ts-month = a b)
 		  (ot-on ts-day < a b))))))))
 
+(defun ot-ts-date<= (a b)
+  "Return t, if A's date is earlier then B's date.
+A and B are ts.el ts objects."
+  (cond
+   ;; nil is less than non-nil
+   ((null b) nil)
+   ((null a) t)
+   (t
+    (or (ot-on ts-year < a b)
+	(and
+	 (ot-on ts-year = a b)
+	 (or (ot-on ts-month < a b)
+	     (and (ot-on ts-month = a b)
+		  (ot-on ts-day <= a b))))))))
+
 (defsubst ot-get-order (item)
   "Return ITEM's \\='order text property or return 1."
   (or (get-text-property 0 'order item) 1))
@@ -495,7 +510,12 @@ Default background color is used when BASE-COLOR is nil."
 	  (progn
 	    (setq ot-svg-obj (svg-create overall-window-width overall-window-height))
 	    (dotimes (iter (length dates))
-	      (if-let ((entries (seq-filter (lambda (x) (ot-ts-date= (ot--parse-org-element-ts (ot-get-sched-or-event x)) (nth iter dates))) entries)))
+	      (if-let ((entries (seq-filter (lambda (x)
+					      (let ((timestamp (ot-get-sched-or-event x))
+						    (date (nth iter dates)))
+						(and (ot-ts-date<= (ot--parse-org-element-ts timestamp) date)
+						     (ot-ts-date<= date (ot--parse-org-element-ts timestamp t)))))
+					    entries)))
 		  (let* ((window-height (window-body-height window t))
 			 (window-width (/ (window-body-width window t) (length dates)))
 			 (timeline-left-padding 25)
@@ -802,10 +822,8 @@ Time format is \"HHMM\""
 	  (?d (setq prev-date date
 		    date (ts-parse (org-read-date nil nil nil nil (ts-internal date))))
 	      (unless (or
-		       (ot-ts-date= date (car ot-daterange))
-		       (ot-ts-date= date (cdr ot-daterange))
-		       (ot-ts-date< date (cdr ot-daterange))
-		       (ot-ts-date< (car ot-daterange) date))
+		       (ot-ts-date<= date (cdr ot-daterange))
+		       (ot-ts-date<= (car ot-daterange) date))
 		(ot-jump-to-day date)))))
       (let* ((timestamp (if eventp
 			    (ot-get-event-timestamp)
@@ -820,10 +838,8 @@ Time format is \"HHMM\""
 		(when duration (ts-inc 'minute duration new-start-ts)))))
 	(when (and prev-date
 		   (not (or
-			 (ot-ts-date= date (car ot-daterange))
-			 (ot-ts-date= date (cdr ot-daterange))
-			 (ot-ts-date< date (cdr ot-daterange))
-			 (ot-ts-date< (car ot-daterange) date))))
+			 (ot-ts-date<= date (cdr ot-daterange))
+			 (ot-ts-date<= (car ot-daterange) date))))
 	  (ot-jump-to-day prev-date))
 	(if eventp
 	    (progn
@@ -1611,7 +1627,11 @@ Available view options:
 		  (`ot-sched-or-event< "SCHEDULED")
 		  ((pred symbolp) (symbol-name ot-sort-function))))))
       (dolist (date dates)
-	(let ((entries (seq-filter (lambda (x) (ot-ts-date= (ot--parse-org-element-ts (ot-get-sched-or-event x)) date)) entries))
+	(let ((entries (seq-filter (lambda (x)
+				     (let ((timestamp (ot-get-sched-or-event x)))
+				       (and (ot-ts-date<= (ot--parse-org-element-ts timestamp) date)
+					    (ot-ts-date<= date (ot--parse-org-element-ts timestamp t)))))
+				   entries))
 	      (date-beg (point)))
 	  (insert
 	   (propertize
@@ -1659,18 +1679,15 @@ with time (timerange or just start time)."
 	     (start-ts (ot--parse-org-element-ts timestamp)))
     (let ((end-ts (ot--parse-org-element-ts timestamp t)))
       (or
-       (ot-ts-date= start-ts (car ot-daterange))
-       (ot-ts-date= end-ts (car ot-daterange))
-       (ot-ts-date= start-ts (cdr ot-daterange))
-       (and end-ts (cdr ot-daterange)
-	    (ot-ts-date= end-ts (cdr ot-daterange)))
+       ;; car  start  cdr
        (and
-	(ot-ts-date< (car ot-daterange) start-ts)
-	(ot-ts-date< start-ts (cdr ot-daterange)))
+	(ot-ts-date<= (car ot-daterange) start-ts)
+	(ot-ts-date<= start-ts (cdr ot-daterange)))
+       ;; car  end  cdr
        (and
-	(ot-ts-date< (car ot-daterange) end-ts)
-	end-ts (cdr ot-daterange)
-	(ot-ts-date< end-ts (cdr ot-daterange)))))))
+	(ot-ts-date<= (car ot-daterange) end-ts)
+	end-ts
+	(ot-ts-date<= end-ts (cdr ot-daterange)))))))
 
 ;;;; Footer
 
