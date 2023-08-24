@@ -271,10 +271,11 @@ tasks and those tasks that have not been sorted yet.")
 		    ((pred (< 3)) "[%d]")))
 		 (right-margin (format "%% -%ds" max-length))
 		 (result (make-string (/ (car (window-edges window t nil t)) (default-font-width)) ? )))
-	    (dotimes (iter (length dates) result)
+	    (dotimes (iter (length dates))
 	      (cl-callf concat result
 		(propertize (format right-margin (ts-format date-format (nth iter dates))) 'face
-			    (when (= ot-current-column (1+ iter)) (list :background ot-sel-block-color))))))
+			    (when (= ot-current-column (1+ iter)) (list :background ot-sel-block-color)))))
+	    result)
 	  buffer-read-only t)))
 
 (define-derived-mode org-timeblock-list-mode special-mode "Org-Timeblock-List" :interactive nil
@@ -1573,6 +1574,7 @@ Available view options:
       ((and days _)
        (setq ot-n-days-view days
 	     ot-daterange (cons cur-date (ts-inc 'day days cur-date))))))
+  (setq ot-current-column 1)
   (ot-redraw-buffers))
 
 (defun ot-list-toggle-timeblock ()
