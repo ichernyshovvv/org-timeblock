@@ -967,18 +967,20 @@ with time (timerange or just start time)."
 	;; because when buffers have not been changed, org-ql uses
 	;; cached results and therefore does not update 'order property,
 	;; which is the only property that's not stored in org buffers
-	(dolist (date (ot-get-dates))
-	  (when (ot-ts-date= date (ot--parse-org-element-ts (ot-get-sched-or-event entry)))
-	    (put-text-property
-	     0 (length entry)
-	     'order (alist-get
-		     (get-text-property 0 'id entry)
-		     (alist-get
-		      (ts-format "%Y-%m-%d" date)
-		      ot-list-entries-pos
-		      nil nil #'equal)
-		     nil nil #'equal)
-	     entry)))
+	(let ((timestamp (ot-get-sched-or-event entry)))
+	  (dolist (date (ot-get-dates))
+	    (when (and (ot-ts-date<= (ot--parse-org-element-ts timestamp) date)
+		       (ot-ts-date<= date (ot--parse-org-element-ts timestamp t)))
+	      (put-text-property
+	       0 (length entry)
+	       'order (alist-get
+		       (get-text-property 0 'id entry)
+		       (alist-get
+			(ts-format "%Y-%m-%d" date)
+			ot-list-entries-pos
+			nil nil #'equal)
+		       nil nil #'equal)
+	       entry))))
 	entry)
       (let ((markers
 	     (org-ql-select
