@@ -985,6 +985,8 @@ with time (timerange or just start time)."
 	       files
 	       `(and (not (done))
 		     (ot-active-ts
+		      :from ,(car ot-daterange)
+		      :to ,(cdr ot-daterange)
 		      :exclude-dateranges ,exclude-dateranges
 		      :with-time ,with-time))
 	       :action (lambda () (copy-marker (point) t))))
@@ -1259,7 +1261,9 @@ When BACKWARD is non-nil, move backward."
 (cl-defun ot-new-task (&optional (date (pcase major-mode
 					 (`ot-mode (nth (1- ot-current-column) (ot-get-dates)))
 					 (`ot-list-mode (ot-list-get-current-date)))))
-  "Create a task scheduled to the date in the current view.
+  "Create a task scheduled to DATE.
+If DATE is nil, use the date in the current view.
+
 The new task is created in `org-timeblock-inbox-file'"
   (interactive)
   (unless (member ot-inbox-file (org-agenda-files))
@@ -1481,7 +1485,7 @@ heading at MARKER in the echo area."
   (interactive)
   (setq ot-daterange
 	(cons (ts-inc 'day 1 (car ot-daterange))
-	      (ts-inc 'day 1 (cdr ot-daterange))))
+	      (and (cdr ot-daterange) (ts-inc 'day 1 (cdr ot-daterange)))))
   (unless (= ot-current-column 1)
     (ot-backward-column))
   (ot-redraw-buffers))
@@ -1502,7 +1506,7 @@ When called from Lisp, DATE should be a date as returned by
   (interactive)
   (setq ot-daterange
 	(cons (ts-dec 'day 1 (car ot-daterange))
-	      (ts-dec 'day 1 (cdr ot-daterange))))
+	      (and (cdr ot-daterange) (ts-dec 'day 1 (cdr ot-daterange)))))
   (unless (= ot-current-column ot-n-days-view)
     (ot-forward-column))
   (ot-redraw-buffers))
@@ -1579,7 +1583,7 @@ Available view options:
   (ot-redraw-timeblocks))
 
 (defun ot-switch-view ()
-  ""
+  "Switch current view to 1-7-days view."
   (interactive)
   (let ((cur-date (nth (1- ot-current-column) (ot-get-dates))))
     (pcase (string-to-number (completing-read "Number of days in the view: " '("1" "2" "3" "4" "5" "6" "7") nil t))
@@ -1658,16 +1662,15 @@ Available view options:
 
 ;;;; Predicates
 
-(org-ql-defpred ot-active-ts (&key exclude-dateranges with-time)
-  "Search for org entries that have TIMESTAMP or SCHEDULED property set to ON.
-OT-DATERANGE is a ts.el struct.
+(org-ql-defpred ot-active-ts (&key from to exclude-dateranges with-time)
+  "Search for entries that have TIMESTAMP/SCHEDULED property in [FROM;TO] daterange.
 
 When EXCLUDE-DATERANGES is non-nil, exclude entries with daterange and no time.
 
 When WITH-TIME is non-nil, each entry must contain a timestamp
 with time (timerange or just start time)."
   :preambles
-  ((`(ot-active-ts)
+  ((`(ot-active-ts . ,rest)
     (list
      :query query
      :regexp org-ts-regexp)))
@@ -1681,13 +1684,13 @@ with time (timerange or just start time)."
       (or
        ;; car  start  cdr
        (and
-	(ot-ts-date<= (car ot-daterange) start-ts)
-	(ot-ts-date<= start-ts (cdr ot-daterange)))
+	(ot-ts-date<= from start-ts)
+	(ot-ts-date<= start-ts to))
        ;; car  end  cdr
        (and
-	(ot-ts-date<= (car ot-daterange) end-ts)
+	(ot-ts-date<= from end-ts)
 	end-ts
-	(ot-ts-date<= end-ts (cdr ot-daterange)))))))
+	(ot-ts-date<= end-ts to))))))
 
 ;;;; Footer
 
