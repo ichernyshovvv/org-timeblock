@@ -1413,6 +1413,30 @@ When called from Lisp, DATE should be a date as returned by
       (ot-show-context)
       (recenter))))
 
+(defun ot-clock-in ()
+  "Jump to the org heading of selected timeblock."
+  (interactive)
+  (unless (eq major-mode 'org-timeblock-mode)
+    (user-error "Not in *org-timeblock* buffer"))
+  (goto-char (point-min))
+  (search-forward "</rect>" nil t)
+  (when (re-search-forward (format "<rect .*? id=\"\\([^\"]+\\)\" fill=\"%s\"" ot-sel-block-color) nil t)
+    (when-let ((inhibit-read-only t)
+	             (id (match-string-no-properties 1))
+	             (m (cadr (seq-find (lambda (x) (string= (car x) id)) ot-data))))
+      (switch-to-buffer-other-window (marker-buffer m))
+      (goto-char (marker-position m))
+      (org-clock-in)
+      (ot-show-context)
+      (recenter))))
+
+(defun ot-clock-out ()
+  "Jump to the org heading of the entry at point in the same window and clock out."
+  (interactive)
+  (org-clock-out)
+  (ot-show-context)
+  (recenter))
+
 (defun ot-goto ()
   "Go to the heading of the selected block in the same window."
   (interactive)
