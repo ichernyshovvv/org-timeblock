@@ -193,7 +193,9 @@ tasks and those tasks that have not been sorted yet.")
   "TAB" #'ot-goto-other-window
   "d" #'ot-set-duration
   "g" #'ot-redraw-buffers
+  "i" #'ot-clock-in
   "j" #'ot-jump-to-day
+  "o" #'ot-clock-out
   "s" #'ot-schedule
   "t" #'ot-toggle-timeblock-list
   "v" #'ot-switch-view)
