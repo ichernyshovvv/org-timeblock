@@ -118,6 +118,17 @@ If you use Guix, you can install the package from [[https://git.sr.ht/~sokolov/c
   :quelpa (org-timeblock :fetcher github :repo "ichernyshovvv/org-timeblock"))
 #+end_src
 
+** Straight
+
+Add this form to your init file:
+
+#+begin_src elisp
+(use-package org-timeblock
+  :straight (org-timeblock :type git
+              :host github
+              :repo "ichernyshovvv/org-timeblock"))
+#+end_src
+
 * Usage
 :PROPERTIES:
 :CUSTOM_ID: usage
