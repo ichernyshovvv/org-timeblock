@@ -511,10 +511,16 @@ Default background color is used when BASE-COLOR is nil."
 	    (setq ot-svg-obj (svg-create overall-window-width overall-window-height))
 	    (dotimes (iter (length dates))
 	      (if-let ((entries (seq-filter (lambda (x)
-					      (let ((timestamp (ot-get-sched-or-event x))
-						    (date (nth iter dates)))
-						(and (ot-ts-date<= (ot--parse-org-element-ts timestamp) date)
-						     (ot-ts-date<= date (ot--parse-org-element-ts timestamp t)))))
+					      (let* ((timestamp (ot-get-sched-or-event x))
+						     (date (nth iter dates))
+						     (start-ts (ot--parse-org-element-ts timestamp))
+						     (end-ts (ot--parse-org-element-ts timestamp t)))
+						(or
+						 (ot-ts-date= start-ts date)
+						 (and
+						  end-ts
+						  (ot-ts-date< start-ts date)
+						  (ot-ts-date<= date end-ts)))))
 					    entries)))
 		  (let* ((window-height (window-body-height window t))
 			 (window-width (/ (window-body-width window t) (length dates)))
@@ -982,30 +988,47 @@ with time (timerange or just start time)."
 		       nil nil #'equal)
 	       entry))))
 	entry)
-      (let ((markers
+      (let ((result
 	     (org-ql-select
 	       files
-	       `(and (not (done))
-		     (ot-active-ts
-		      :from ,(car ot-daterange)
-		      :to ,(cdr ot-daterange)
-		      :exclude-dateranges ,exclude-dateranges
-		      :with-time ,with-time))
-	       :action (lambda () (copy-marker (point) t))))
-	    propertized-entries)
-	(cl-macrolet ((get-propertized-entry (timestamp &optional eventp)
-			`(when-let ((,timestamp)
-				    (title (org-get-heading t nil t t)))
-			   (propertize (concat (ot--construct-entry-prefix ,timestamp ,eventp) title)
-				       (if ,eventp 'event 'sched) ,timestamp
-				       'marker marker
-				       'tags (mapcar 'substring-no-properties (org-element-property :tags (org-element-at-point)))
-				       'id (ot-construct-id nil ,eventp)
-				       'title title))))
-	  (dolist (marker markers (remove nil propertized-entries))
-	    (org-with-point-at marker
-	      (push (get-propertized-entry (ot-get-event-timestamp) t) propertized-entries)
-	      (push (get-propertized-entry (org-element-property :scheduled (org-element-at-point))) propertized-entries))))))
+	       (if (cdr ot-daterange)
+		   `(and (not (done))
+			 (ot-active-ts
+			  ,(car ot-daterange)
+			  ,(cdr ot-daterange)
+			  :exclude-dateranges ,exclude-dateranges
+			  :with-time ,with-time))
+		 `(and (not (done))
+		       (ot-active-ts-on
+			,(car ot-daterange)
+			:exclude-dateranges ,exclude-dateranges
+			:with-time ,with-time)))
+	       :action
+	       (lambda ()
+		 (let ((title (org-get-heading t nil t t))
+		       (sched (org-element-property :scheduled (org-element-at-point)))
+		       (event (ot-get-event-timestamp))
+		       (marker (copy-marker (point) t))
+		       (tags (mapcar 'substring-no-properties (org-element-property :tags (org-element-at-point)))))
+		   (cons
+		    (when event
+		      (propertize (concat (ot--construct-entry-prefix event t) title)
+				  'event event
+				  'marker marker
+				  'tags tags
+				  'id (ot-construct-id nil t)
+				  'title title))
+		    (when sched
+		      (propertize (concat (ot--construct-entry-prefix sched) title)
+				  'sched sched
+				  'marker marker
+				  'tags tags
+				  'id (ot-construct-id)
+				  'title title)))))))
+	    flattened)
+	(dolist (el result flattened)
+	  (and (car el) (push (car el) flattened))
+	  (and (cdr el) (push (cdr el) flattened)))))
      (or sort-func ot-sort-function))))
 
 (defun ot-get-colors (tags)
@@ -1664,7 +1687,7 @@ Available view options:
 
 ;;;; Predicates
 
-(org-ql-defpred ot-active-ts (&key from to exclude-dateranges with-time)
+(org-ql-defpred ot-active-ts (from to &key exclude-dateranges with-time)
   "Search for entries that have TIMESTAMP/SCHEDULED property in [FROM;TO] daterange.
 
 When EXCLUDE-DATERANGES is non-nil, exclude entries with daterange and no time.
@@ -1673,9 +1696,7 @@ When WITH-TIME is non-nil, each entry must contain a timestamp
 with time (timerange or just start time)."
   :preambles
   ((`(ot-active-ts . ,rest)
-    (list
-     :query query
-     :regexp org-ts-regexp)))
+    (list :query query :regexp org-ts-regexp)))
   :body
   (when-let ((timestamp (or (org-element-property :scheduled (org-element-at-point))
 			    (ot-get-event-timestamp)))
@@ -1684,15 +1705,37 @@ with time (timerange or just start time)."
 	     (start-ts (ot--parse-org-element-ts timestamp)))
     (let ((end-ts (ot--parse-org-element-ts timestamp t)))
       (or
-       ;; car  start  cdr
        (and
 	(ot-ts-date<= from start-ts)
 	(ot-ts-date<= start-ts to))
-       ;; car  end  cdr
+       (or (null end-ts)
+	   (and
+	    (ot-ts-date<= from end-ts)
+	    (ot-ts-date<= end-ts to)))))))
+
+(org-ql-defpred ot-active-ts-on (on &key exclude-dateranges with-time)
+  "Search for entries that have TIMESTAMP/SCHEDULED property set to ON.
+
+When EXCLUDE-DATERANGES is non-nil, exclude entries with daterange and no time.
+
+When WITH-TIME is non-nil, each entry must contain a timestamp
+with time (timerange or just start time)."
+  :preambles
+  ((`(ot-active-ts-on . ,rest)
+    (list :query query :regexp org-ts-regexp)))
+  :body
+  (when-let ((timestamp (or (org-element-property :scheduled (org-element-at-point))
+			    (ot-get-event-timestamp)))
+	     ((not (and exclude-dateranges (ot--daterangep timestamp))))
+	     ((or (not with-time) (org-element-property :hour-start timestamp)))
+	     (start-ts (ot--parse-org-element-ts timestamp)))
+    (let ((end-ts (ot--parse-org-element-ts timestamp t)))
+      (or
+       (ot-ts-date= start-ts on)
        (and
-	(ot-ts-date<= from end-ts)
 	end-ts
-	(ot-ts-date<= end-ts to))))))
+	(ot-ts-date< start-ts on)
+	(ot-ts-date<= on end-ts))))))
 
 ;;;; Footer
 
