@@ -1446,7 +1446,8 @@ If EVENTP is non-nil the entry is considered as an event."
   (ot-show-olp-maybe (get-text-property (line-beginning-position) 'marker)))
 
 (defun ot-forward-block ()
-  "Select the next timeblock in *org-timeblock* buffer."
+  "Select the next timeblock in *org-timeblock* buffer.
+Return t on success, otherwise - nil."
   (interactive)
   (let ((inhibit-read-only t))
     (goto-char (point-min))
@@ -1458,8 +1459,9 @@ If EVENTP is non-nil the entry is considered as an event."
 	       (re-search-backward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t))
       (setq ot-prev-selected-block-color (match-string-no-properties 1))
       (replace-match ot-sel-block-color nil nil nil 1)
-      (ot-show-olp-maybe (ot-selected-block-marker)))
-    (ot-redisplay)))
+      (ot-redisplay)
+      (ot-show-olp-maybe (ot-selected-block-marker))
+      t)))
 
 (defun ot-forward-column ()
   "Select the next column in *org-timeblock* buffer."
@@ -1467,7 +1469,8 @@ If EVENTP is non-nil the entry is considered as an event."
   (if (= ot-current-column ot-n-days-view)
       (setq ot-current-column 1)
     (cl-incf ot-current-column))
-  (ot-forward-block))
+  (unless (ot-forward-block)
+    (ot-redisplay)))
 
 (defun ot-backward-column ()
   "Select the next column in *org-timeblock* buffer."
@@ -1475,7 +1478,8 @@ If EVENTP is non-nil the entry is considered as an event."
   (if (= ot-current-column 1)
       (setq ot-current-column ot-n-days-view)
     (cl-decf ot-current-column))
-  (ot-forward-block))
+  (unless (ot-forward-block)
+    (ot-redisplay)))
 
 (defun ot-show-olp-maybe (marker)
   "Show outline path in echo area for the selected item.
@@ -1483,10 +1487,11 @@ If `ot-show-outline-path' is non-nil, display the path of the
 heading at MARKER in the echo area."
   (when (and ot-show-outline-path marker (marker-buffer marker)
 	     (buffer-live-p (marker-buffer marker)))
-    (org-with-point-at marker (org-display-outline-path t))))
+    (org-with-point-at marker (org-display-outline-path t t))))
 
 (defun ot-backward-block ()
-  "Select the previous timeblock in *org-timeblock* buffer."
+  "Select the previous timeblock in *org-timeblock* buffer.
+Return t on success, otherwise - nil."
   (interactive)
   (let ((inhibit-read-only t))
     (goto-char (point-max))
@@ -1499,7 +1504,8 @@ heading at MARKER in the echo area."
       (setq ot-prev-selected-block-color (match-string-no-properties 1))
       (replace-match ot-sel-block-color nil nil nil 1)
       (ot-redisplay)
-      (ot-show-olp-maybe (ot-selected-block-marker)))))
+      (ot-show-olp-maybe (ot-selected-block-marker))
+      t)))
 
 (defun ot-day-later ()
   "Go forward in time by one day in `org-timeblock-mode'."
