@@ -412,18 +412,27 @@ A and B are ts.el ts objects."
 
 (defun ot-select-block-for-current-entry ()
   "Select block for the entry at point in `org-timeblock-list-mode'."
-  (when-let (((not
+  (when-let (((get-buffer-window ot-buffer))
+	     ((not
 	       (ot--daterangep
                 (ot-get-sched-or-event nil (line-beginning-position)))))
 	     (id (get-text-property (line-beginning-position) 'id))
-	     (inhibit-read-only t)
-             ((get-buffer-window ot-buffer)))
+	     (column-number
+	      (save-excursion
+		(let ((count 0))
+		  (while (not (bobp))
+		    (while (not (eq (get-text-property (point) 'face) 'ot-list-header))
+		      (forward-line -1))
+		    (cl-incf count)
+		    (forward-line -1))
+		  count)))
+	     (inhibit-read-only t))
     (with-current-buffer ot-buffer
       (goto-char (point-min))
       (when (re-search-forward (format " fill=\"\\(%s\\)\"" ot-sel-block-color) nil t)
 	(replace-match ot-prev-selected-block-color nil nil nil 1)
 	(goto-char (point-min)))
-      (when (re-search-forward (format " id=\"%s\" fill=\"\\([^\"]+\\)\"" id) nil t)
+      (when (re-search-forward (format " id=\"%s\" fill=\"\\([^\"]+\\)\"" (format "%s_%d" id column-number)) nil t)
 	(setq ot-prev-selected-block-color (match-string 1))
 	(replace-match ot-sel-block-color nil nil nil 1)
 	(re-search-forward " column=\"\\([^\"]+\\)\"" nil t)
