@@ -10,6 +10,7 @@ Schedule your days visually, using [[https://en.wikipedia.org/wiki/Timeblocking]
 - [[#installation][Installation]]
 - [[#usage][Usage]]
 - [[#customization][Customization]]
+- [[#todos][TODOs]]
 
 * Screenshots
 :PROPERTIES:
@@ -180,3 +181,10 @@ commands:
 :END:
 
 ~M-x customize-group org-timeblock~ to see available customizable variables.
+
+* TODOs
+:PROPERTIES:
+:CUSTOM_ID: todos
+:END:
+- [ ] Implement caching mechanism for SVG data
+- [ ] Improve timeblocks layout algorithm
