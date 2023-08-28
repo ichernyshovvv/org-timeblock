@@ -519,14 +519,12 @@ Default background color is used when BASE-COLOR is nil."
 	      (if-let ((entries (seq-filter (lambda (x)
 					      (let* ((timestamp (ot-get-sched-or-event x))
 						     (date (nth iter dates))
-						     (start-ts (ot--parse-org-element-ts timestamp))
-						     (end-ts (ot--parse-org-element-ts timestamp t)))
+						     (start-ts (ot--parse-org-element-ts timestamp)))
 						(or
 						 (ot-ts-date= start-ts date)
-						 (and
-						  end-ts
-						  (ot-ts-date< start-ts date)
-						  (ot-ts-date<= date end-ts)))))
+						 (when-let ((end-ts (ot--parse-org-element-ts timestamp t)))
+						   (and (ot-ts-date< start-ts date)
+							(ot-ts-date<= date end-ts))))))
 					    entries)))
 		  (let* ((window-height (window-body-height window t))
 			 (window-width (/ (window-body-width window t) (length dates)))
@@ -1668,9 +1666,13 @@ Available view options:
 		  ((pred symbolp) (symbol-name ot-sort-function))))))
       (dolist (date dates)
 	(let ((entries (seq-filter (lambda (x)
-				     (let ((timestamp (ot-get-sched-or-event x)))
-				       (and (ot-ts-date<= (ot--parse-org-element-ts timestamp) date)
-					    (ot-ts-date<= date (ot--parse-org-element-ts timestamp t)))))
+				     (let* ((timestamp (ot-get-sched-or-event x))
+					    (start-ts (ot--parse-org-element-ts timestamp)))
+				       (or
+					(ot-ts-date= start-ts date)
+					(when-let ((end-ts (ot--parse-org-element-ts timestamp t)))
+					  (and (ot-ts-date< start-ts date)
+					       (ot-ts-date<= date end-ts))))))
 				   entries))
 	      (date-beg (point)))
 	  (insert
@@ -1714,15 +1716,13 @@ with time (timerange or just start time)."
 	     ((not (and exclude-dateranges (ot--daterangep timestamp))))
 	     ((or (not with-time) (org-element-property :hour-start timestamp)))
 	     (start-ts (ot--parse-org-element-ts timestamp)))
-    (let ((end-ts (ot--parse-org-element-ts timestamp t)))
-      (or
-       (and
-	(ot-ts-date<= from start-ts)
-	(ot-ts-date<= start-ts to))
-       (or (null end-ts)
-	   (and
-	    (ot-ts-date<= from end-ts)
-	    (ot-ts-date<= end-ts to)))))))
+    (or
+     (and
+      (ot-ts-date<= from start-ts)
+      (ot-ts-date<= start-ts to))
+     (when-let ((end-ts (ot--parse-org-element-ts timestamp t)))
+       (and (ot-ts-date<= from end-ts)
+	    (ot-ts-date<= end-ts to))))))
 
 (org-ql-defpred ot-active-ts-on (on &key exclude-dateranges with-time)
   "Search for entries that have TIMESTAMP/SCHEDULED property set to ON.
@@ -1740,13 +1740,11 @@ with time (timerange or just start time)."
 	     ((not (and exclude-dateranges (ot--daterangep timestamp))))
 	     ((or (not with-time) (org-element-property :hour-start timestamp)))
 	     (start-ts (ot--parse-org-element-ts timestamp)))
-    (let ((end-ts (ot--parse-org-element-ts timestamp t)))
-      (or
-       (ot-ts-date= start-ts on)
-       (and
-	end-ts
-	(ot-ts-date< start-ts on)
-	(ot-ts-date<= on end-ts))))))
+    (or
+     (ot-ts-date= start-ts on)
+     (when-let ((end-ts (ot--parse-org-element-ts timestamp t)))
+       (and (ot-ts-date< start-ts on)
+	    (ot-ts-date<= on end-ts))))))
 
 ;;;; Footer
 
