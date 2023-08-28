@@ -1,6 +1,6 @@
 #+TITLE: org-timeblock
 
-Schedule your day visually, using [[https://en.wikipedia.org/wiki/Timeblocking][timeblocking technique]] inside Emacs.
+Schedule your days visually, using [[https://en.wikipedia.org/wiki/Timeblocking][timeblocking technique]] inside Emacs.
 
 * Contents
 
@@ -26,6 +26,10 @@ you can assign specific background and foreground colors in
 customizable variable ~org-timeblock-tag-colors~: 
 
 [[file:screenshots/org-timeblock-with-list-mode.png]]
+
+You can switch to a multi-day view using ~ot-switch-view [V]~:
+
+[[file:screenshots/multi-day-view.png]]
 
 * Screencast
 :PROPERTIES:
@@ -58,7 +62,8 @@ There are two major modes provided by the package:
   - org-timeblock-toggle-timeblock-list ~[t]~
   - org-timeblock-todo ~[1]~
   - org-timeblock-done ~[5]~
-  - org-timeblock-switch-view ~[v]~
+  - org-timeblock-switch-scaling ~[v]~
+  - org-timeblock-switch-view ~[V]~
   - org-timeblock-jump-to-day ~[j]~
 
 - ~org-timeblock-list-mode~.  Displays a list of org tasks that are
@@ -75,6 +80,8 @@ There are two major modes provided by the package:
   - org-timeblock-done ~[5]~
   - org-timeblock-list-drag-line-forward/backward ~[M-<down>/<up>]~
   - org-timeblock-list-toggle-sort-function ~[S]~
+  - org-timeblock-switch-scaling ~[v]~
+  - org-timeblock-switch-view ~[V]~
   - org-timeblock-list-toggle-timeblock ~[t]~
 
 * Installation

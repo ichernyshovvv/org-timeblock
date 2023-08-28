@@ -1,4 +1,4 @@
-;;; org-timeblock.el --- Schedule your day visually, using timeblocking technique inside Emacs. -*- lexical-binding: t; -*-
+;;; org-timeblock.el --- Schedule your days visually, using timeblocking technique inside Emacs. -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2023  Ilya Chernyshov
 
