@@ -666,6 +666,8 @@ Default background color is used when BASE-COLOR is nil."
 				    `(,title))))
 			(let ((time-string (get-text-property 0 'time-string entry))
 			      (colors (ot-get-colors (get-text-property 0 'tags entry))))
+			  (when (< (/ block-width (default-font-width)) (length time-string))
+			    (setq time-string nil))
 			  (when-let ((time-string)
 				     ((< (- block-height
 					    (* (length heading-list) (default-font-height)))
