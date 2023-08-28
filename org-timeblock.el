@@ -593,12 +593,10 @@ Default background color is used when BASE-COLOR is nil."
 								   (* min-hour 60))
 								scale))
 						      (if (ot-get-event entry) 2 1))
-						title ,(concat
-							(get-text-property 0 'title entry)
-							(cond
-							 ((and end-date-later-p start-date-earlier-p) "↕️")
-							 (end-date-later-p "⬇️")
-							 (start-date-earlier-p "⬆️"))))
+						n-day-indicator ,(cond
+								  ((and end-date-later-p start-date-earlier-p) "↕️")
+								  (end-date-later-p "⬇️")
+								  (start-date-earlier-p "⬆️")))
 					     entry)))
 		    ;; Timeblocks layout algorithm
 		    (dolist (entry entries)
@@ -656,7 +654,8 @@ Default background color is used when BASE-COLOR is nil."
 				       (* window-width iter)
 				       (if (ot-get-event entry) 2 1)))
 				 (block-width (- (round (/ block-max-width length)) (if (ot-get-event entry) 2 1)))
-				 (title (get-text-property 0 'title entry))
+				 (title (concat (get-text-property 0 'title entry)
+						(get-text-property 0 'n-day-indicator entry)))
 				 ;; Splitting the title of an entry
 				 (heading-list
 				  (if (> (* (length title) (default-font-width)) block-width)
@@ -691,7 +690,7 @@ Default background color is used when BASE-COLOR is nil."
 					 :stroke-width (if (ot-get-event entry) 2 1)
 					 :opacity "0.7"
 					 :fill (or (car colors) (funcall get-color title))
-					 :id (get-text-property 0 'id entry))
+					 :id (format "%s_%d" (get-text-property 0 'id entry) (1+ iter)))
 			  ;; Setting the title of current entry
 			  (let ((y (- y 5)))
 			    (dolist (heading-part heading-list)
@@ -1683,7 +1682,7 @@ Available view options:
 ;;;; Predicates
 
 (org-ql-defpred ot-active-ts (from to &key exclude-dateranges with-time)
-  "Search for entries that have TIMESTAMP/SCHEDULED property in [FROM;TO] daterange.
+  "Search for entries with TIMESTAMP/SCHEDULED property in [FROM;TO] daterange.
 
 When EXCLUDE-DATERANGES is non-nil, exclude entries with daterange and no time.
 
