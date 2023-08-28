@@ -326,11 +326,8 @@ Mouse position is of the form (X . Y)."
 
 (defun ot-selected-block-marker ()
   "Return a marker pointing to the org entry of selected timeblock."
-  (goto-char (point-min))
-  (and
-   (re-search-forward (format "<rect .*? id=\"\\([^\"]+\\)\" fill=\"%s\"" ot-sel-block-color) nil t)
-   (let ((id (match-string-no-properties 1)))
-     (cadr (seq-find (lambda (x) (string= (car x) id)) ot-data)))))
+  (when-let ((id (ot-selected-block-id)))
+    (cadr (seq-find (lambda (x) (string= (car x) id)) ot-data))))
 
 (defun ot-block-eventp (id)
   "Return t if block with ID is an event."
@@ -351,7 +348,7 @@ id is constructed via `ot-construct-id'"
   (goto-char (point-min))
   (and
    (re-search-forward (format "<rect .*? id=\"\\([^\"]+\\)\" fill=\"%s\"" ot-sel-block-color) nil t)
-   (match-string-no-properties 1)))
+   (car (split-string (match-string-no-properties 1) "_"))))
 
 (defmacro ot-on (accessor op lhs rhs)
   "Run OP on ACCESSOR's return values from LHS and RHS."
@@ -1569,14 +1566,12 @@ When called from Lisp, DATE should be a date as returned by
   (unless (eq major-mode 'org-timeblock-mode)
     (user-error "Not in *org-timeblock* buffer"))
   (goto-char (point-min))
-  (when (re-search-forward (format "<rect .*? id=\"\\([^\"]+\\)\" fill=\"%s\"" ot-sel-block-color) nil t)
-    (when-let ((inhibit-read-only t)
-	       (id (match-string-no-properties 1))
-	       (m (cadr (seq-find (lambda (x) (string= (car x) id)) ot-data))))
-      (switch-to-buffer-other-window (marker-buffer m))
-      (goto-char (marker-position m))
-      (ot-show-context)
-      (recenter))))
+  (when-let ((m (ot-selected-block-marker))
+	     (inhibit-read-only t))
+    (switch-to-buffer-other-window (marker-buffer m))
+    (goto-char (marker-position m))
+    (ot-show-context)
+    (recenter)))
 
 (defun ot-goto ()
   "Go to the heading of the selected block in the same window."
