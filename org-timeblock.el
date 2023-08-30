@@ -210,7 +210,8 @@ tasks and those tasks that have not been sorted yet.")
   "s" #'ot-schedule
   "t" #'ot-toggle-timeblock-list
   "v" #'ot-switch-scaling
-  "V" #'ot-switch-view)
+  "V" #'ot-switch-view
+  "w" #'ot-write)
 
 (defvar-keymap ot-list-mode-map
   "+" #'ot-new-task
@@ -1697,6 +1698,45 @@ Available view options:
       (goto-char (point-min))
       (when (get-buffer-window ot-buffer)
 	(ot-redraw-timeblocks)))))
+
+(defun ot-write (file)
+  "Write the current *org-timeblock* buffer to FILE.
+
+Depending on the extension of the file name, PNG image (.png),
+SVG image (.svg), PDF (.pdf) is produced."
+  (interactive "FWrite timeblocks to [PDF|SVG|PNG] file : \n")
+  (unless (eq major-mode 'org-timeblock-mode)
+    (user-error "Not in org-timeblock buffer"))
+  (if (or (not (file-writable-p file))
+	  (and (file-exists-p file)
+	       (if (called-interactively-p 'any)
+		   (not (y-or-n-p (format "Overwrite existing file %s? " file))))))
+      (user-error "Cannot write agenda to file %s" file))
+  (let ((file (expand-file-name file)))
+    (with-temp-buffer
+      (let* ((svg-obj ot-svg-obj)
+	     (dates (ot-get-dates))
+	     (max-length (/ (+ (/ ot-svg-width (default-font-width))) (length dates)))
+	     (date-format
+	      (pcase max-length
+		((pred (< 15)) "[%Y-%m-%d %a]")
+		((pred (< 11)) "[%Y-%m-%d]")
+		((pred (< 6)) "[%m-%d]")
+		((pred (< 3)) "[%d]"))))
+	(dotimes (iter (length dates))
+	  (svg-text
+	   svg-obj (ts-format date-format (nth iter dates))
+	   :y ot-svg-height
+	   :x (+ 5 (* (/ ot-svg-width (length dates)) iter))
+	   :fill (face-attribute 'default :foreground)))
+	(svg-print svg-obj))
+      (pcase (file-name-extension file)
+	((or "pdf" "png")
+	 (unless (executable-find "inkscape")
+	   (user-error "Inkscape executable not found"))
+	 (call-process-region (point-min) (point-max) "inkscape" nil nil nil "--pipe"
+			      (concat "--export-filename=" file)))
+	((or "svg" `nil) (write-region nil nil file))))))
 
 ;;;; Predicates
 

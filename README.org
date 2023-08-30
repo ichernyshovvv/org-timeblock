@@ -65,6 +65,7 @@ There are two major modes provided by the package:
   - org-timeblock-done ~[5]~
   - org-timeblock-switch-scaling ~[v]~
   - org-timeblock-switch-view ~[V]~
+  - org-timeblock-write ~[w]~
   - org-timeblock-jump-to-day ~[j]~
 
 - ~org-timeblock-list-mode~.  Displays a list of org tasks that are
