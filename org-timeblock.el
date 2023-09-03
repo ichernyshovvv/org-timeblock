@@ -379,6 +379,19 @@ A and B are ts.el ts objects."
 	     (and (ot-on ts-month = a b)
 		  (ot-on ts-day < a b))))))))
 
+(defun ot-ts-time< (a b)
+  "Return t, if A's date is earlier then B's date.
+A and B are ts.el ts objects."
+  (cond
+   ;; nil is less than non-nil
+   ((null b) nil)
+   ((null a) t)
+   (t
+    (or (ot-on ts-hour < a b)
+	(and
+	 (ot-on ts-hour = a b)
+	 (ot-on ts-minute < a b))))))
+
 (defun ot-ts-date<= (a b)
   "Return t, if A's date is earlier then B's date.
 A and B are ts.el ts objects."
@@ -409,7 +422,7 @@ A and B are ts.el ts objects."
 (defun ot-sched-or-event< (a b)
   "Return t, if A's \\='sched or \\='event is less then B's.
 \\='sched or \\='event are transformed to ts.el objects."
-  (ot-on ot-get-ts ts< a b))
+  (ot-on ot-get-ts ot-ts-time< a b))
 
 (defun ot-select-block-for-current-entry ()
   "Select block for the entry at point in `org-timeblock-list-mode'."
