@@ -427,9 +427,9 @@ A and B are ts.el ts objects."
 (defun ot-select-block-for-current-entry ()
   "Select block for the entry at point in `org-timeblock-list-mode'."
   (when-let (((get-buffer-window ot-buffer))
-	     ((not
-	       (ot--daterangep
-                (ot-get-sched-or-event nil (line-beginning-position)))))
+	     (timestamp (ot-get-sched-or-event nil (line-beginning-position)))
+	     ((org-element-property :hour-start timestamp))
+	     ((not (ot--daterangep timestamp)))
 	     (id (get-text-property (line-beginning-position) 'id))
 	     (column-number
 	      (save-excursion
