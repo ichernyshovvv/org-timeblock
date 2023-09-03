@@ -1806,6 +1806,9 @@ with time (timerange or just start time)."
 	     (start-ts (ot--parse-org-element-ts timestamp)))
     (or
      (and
+      (org-element-property :repeater-type timestamp)
+      (ot-ts-date<= start-ts from))
+     (and
       (ot-ts-date<= from start-ts)
       (ot-ts-date<= start-ts to))
      (when-let ((end-ts (ot--parse-org-element-ts timestamp t)))
@@ -1830,6 +1833,9 @@ with time (timerange or just start time)."
 	     (start-ts (ot--parse-org-element-ts timestamp)))
     (or
      (ot-ts-date= start-ts on)
+     (and
+      (org-element-property :repeater-type timestamp)
+      (ot-ts-date<= start-ts on))
      (when-let ((end-ts (ot--parse-org-element-ts timestamp t)))
        (and (ot-ts-date< start-ts on)
 	    (ot-ts-date<= on end-ts))))))
