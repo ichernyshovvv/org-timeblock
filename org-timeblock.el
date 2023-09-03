@@ -535,6 +535,21 @@ Default background color is used when BASE-COLOR is nil."
 						     (date (nth iter dates))
 						     (start-ts (ot--parse-org-element-ts timestamp)))
 						(or
+						 (and
+						  (member (org-element-property :repeater-type timestamp) '(restart catch-up))
+						  (ot-ts-date<= start-ts date))
+						 (and (eq (org-element-property :repeater-type timestamp) 'cumulate)
+						      (when-let ((start start-ts)
+								 (value (org-element-property :repeater-value timestamp))
+								 (unit (pcase (org-element-property :repeater-unit timestamp)
+									 (`week
+									  (setq value (* value 7))
+									  'day)
+									 ((and _ u) u))))
+							;; TODO rewrite
+							(while (ot-ts-date< start date)
+							  (setq start (ts-inc unit value start)))
+							(ot-ts-date= start date)))
 						 (ot-ts-date= start-ts date)
 						 (when-let ((end-ts (ot--parse-org-element-ts timestamp t)))
 						   (and (ot-ts-date< start-ts date)
@@ -583,41 +598,53 @@ Default background color is used when BASE-COLOR is nil."
 			 (hour-lines-color (if (> bg-rgb-sum 550) "#7b435c" "#cdcdcd")))
 		    (dolist (entry entries)
 		      (let* ((timestamp (ot-get-sched-or-event entry))
+			     (repeated (org-element-property :repeater-type timestamp))
 			     (start-ts (ot--parse-org-element-ts timestamp))
 			     (end-ts (ot--parse-org-element-ts timestamp t))
 			     (start-date-earlier-p (ot-ts-date< start-ts (nth iter dates)))
 			     (end-date-later-p (ot-ts-date< (nth iter dates) end-ts)))
 			(add-text-properties 0 (length entry)
 					     `( time-string ,(and ot-display-time
-								  (not (or end-date-later-p start-date-earlier-p))
-								  (concat (ts-format " %H:%M" start-ts)
-									  (and end-ts (ts-format "-%H:%M" end-ts))))
+								  (or repeated (not (or end-date-later-p start-date-earlier-p)))
+								  (concat
+								   (ts-format " %H:%M" start-ts)
+								   (and end-ts (ts-format "-%H:%M" end-ts))
+								   (and repeated
+									(concat
+									 " "
+									 (pcase (org-element-property :repeater-type timestamp)
+									   (`cumulate "+") (`catch-up "++") (`restart ".+"))
+									 (let ((val (org-element-property :repeater-value timestamp)))
+									   (and val (number-to-string val)))
+									 (pcase (org-element-property :repeater-unit timestamp)
+									   (`hour "h") (`day "d") (`week "w") (`month "m") (`year "y"))))))
 						block-height ,(- (if (and start-ts end-ts)
 								     (max
 								      (default-font-height)
 								      (round
 								       (* (/ (ts-diff
-									      (if end-date-later-p
+									      (if (and end-date-later-p (not repeated))
 										  (ts-apply :hour 23 :minute 59 :second 0 (nth iter dates))
 										end-ts)
-									      (if start-date-earlier-p
+									      (if (and start-date-earlier-p (not repeated))
 										  (ts-apply :hour 0 :minute 1 :second 0 (nth iter dates))
 										start-ts))
 									     60)
 									  scale)))
 								   (default-font-height))
 								 (if (ot-get-event entry) 2 1))
-						y ,(+ (round (* (- (if start-date-earlier-p
+						y ,(+ (round (* (- (if (and start-date-earlier-p (not repeated))
 								       0
 								     (+ (* 60 (org-element-property :hour-start timestamp))
 									(org-element-property :minute-start timestamp)))
 								   (* min-hour 60))
 								scale))
 						      (if (ot-get-event entry) 2 1))
-						n-day-indicator ,(cond
-								  ((and end-date-later-p start-date-earlier-p) "↕️")
-								  (end-date-later-p "⬇️")
-								  (start-date-earlier-p "⬆️")))
+						n-day-indicator ,(and (not repeated)
+								      (cond
+								       ((and end-date-later-p start-date-earlier-p) "↕️")
+								       (end-date-later-p "⬇️")
+								       (start-date-earlier-p "⬆️"))))
 					     entry)))
 		    ;; Timeblocks layout algorithm
 		    (dolist (entry entries)
