@@ -1718,6 +1718,21 @@ Available view options:
 				     (let* ((timestamp (ot-get-sched-or-event x))
 					    (start-ts (ot--parse-org-element-ts timestamp)))
 				       (or
+					(and
+					 (member (org-element-property :repeater-type timestamp) '(restart catch-up))
+					 (ot-ts-date<= start-ts date))
+					(and (eq (org-element-property :repeater-type timestamp) 'cumulate)
+					     (when-let ((start start-ts)
+							(value (org-element-property :repeater-value timestamp))
+							(unit (pcase (org-element-property :repeater-unit timestamp)
+								(`week
+								 (setq value (* value 7))
+								 'day)
+								((and _ u) u))))
+					       ;; TODO rewrite
+					       (while (ot-ts-date< start date)
+						 (setq start (ts-inc unit value start)))
+					       (ot-ts-date= start date)))
 					(ot-ts-date= start-ts date)
 					(when-let ((end-ts (ot--parse-org-element-ts timestamp t)))
 					  (and (ot-ts-date< start-ts date)
