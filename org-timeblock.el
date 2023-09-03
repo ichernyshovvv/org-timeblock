@@ -928,7 +928,7 @@ insert \"EVENT\" in the prefix."
 	(mend (org-element-property :minute-end timestamp)))
     (propertize
      (format
-      (if eventp " EVENT % -12s    " "       % -12s    ")
+      (if eventp " EVENT % -12s % -6s " "       % -12s % -6s ")
       (if (ot--daterangep timestamp)
 	  ""
 	(concat (and hstart mstart
@@ -942,7 +942,15 @@ insert \"EVENT\" in the prefix."
 		     (format
 		      "-%02d:%02d"
 		      hend
-		      mend)))))
+		      mend))))
+      (concat
+       ""
+       (pcase (org-element-property :repeater-type timestamp)
+	 (`cumulate "+") (`catch-up "++") (`restart ".+"))
+       (when-let ((val (org-element-property :repeater-value timestamp)))
+	 (number-to-string val))
+       (pcase (org-element-property :repeater-unit timestamp)
+	 (`hour "h") (`day "d") (`week "w") (`month "m") (`year "y"))))
      'prefix t)))
 
 (cl-defun ot-read-ts (ts &optional (prompt "TIME:"))
