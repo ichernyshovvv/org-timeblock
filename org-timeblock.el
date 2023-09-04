@@ -1581,7 +1581,8 @@ Return t on success, otherwise - nil."
 When called interactively, prompt for the date.
 When called from Lisp, DATE should be a date as returned by
 `org-read-date'"
-  (interactive (list (ts-parse (org-read-date))))
+  (interactive (list (ts-parse (org-read-date nil nil nil nil
+					      (ts-internal (nth (1- ot-current-column) (ot-get-dates)))))))
   (when date
     (setq ot-daterange (cons date (ts-inc 'day ot-n-days-view date)))
     (ot-redraw-buffers)))
