@@ -557,7 +557,7 @@ Default background color is used when BASE-COLOR is nil."
 					    entries)))
 		  (let* ((window-height (window-body-height window t))
 			 (window-width (/ (window-body-width window t) (length dates)))
-			 (timeline-left-padding 25)
+			 (timeline-left-padding (* 2 (apply #'max (mapcar #'string-pixel-width '("1" "2" "3" "4" "5" "6" "7" "8" "9")))))
 			 (block-max-width (- window-width timeline-left-padding))
 			 (min-hour
 			  (if-let ((ot-view-options)
@@ -679,7 +679,7 @@ Default background color is used when BASE-COLOR is nil."
 			(svg-text
 			 ot-svg-obj (format "%d" lines-iter)
 			 :y (+ y 5)
-			 :x (+ 5 (* window-width iter))
+			 :x (* window-width iter)
 			 :fill (face-attribute 'default :foreground))))
 		    ;; Drawing all the entries inside the timeline
 		    (dolist (entry entries)
