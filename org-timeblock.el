@@ -633,13 +633,16 @@ Default background color is used when BASE-COLOR is nil."
 									  scale)))
 								   (default-font-height))
 								 (if (ot-get-event entry) 2 1))
-						y ,(+ (round (* (- (if (and start-date-earlier-p (not repeated))
-								       0
-								     (+ (* 60 (org-element-property :hour-start timestamp))
-									(org-element-property :minute-start timestamp)))
-								   (* min-hour 60))
-								scale))
-						      (if (ot-get-event entry) 2 1))
+						y ,(if-let ((value (+ (round (* (- (if (and start-date-earlier-p (not repeated))
+										       0
+										     (+ (* 60 (org-element-property :hour-start timestamp))
+											(org-element-property :minute-start timestamp)))
+										   (* min-hour 60))
+										scale))
+								      (if (ot-get-event entry) 2 1)))
+							    ((< (- ot-svg-height value) (default-font-height))))
+						       (- ot-svg-height (default-font-height))
+						     value)
 						n-day-indicator ,(and (not repeated)
 								      (cond
 								       ((and end-date-later-p start-date-earlier-p) "↕️")
