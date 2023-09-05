@@ -1063,7 +1063,7 @@ with time (timerange or just start time)."
 		       (sched (org-element-property :scheduled (org-element-at-point)))
 		       (event (ot-get-event-timestamp))
 		       (marker (copy-marker (point) t))
-		       (tags (mapcar 'substring-no-properties (org-element-property :tags (org-element-at-point)))))
+		       (tags (mapcar #'substring-no-properties (org-get-tags (org-element-at-point)))))
 		   (cons
 		    (when event
 		      (propertize (concat (ot--construct-entry-prefix event t) title)
@@ -1444,7 +1444,7 @@ If EVENTP is non-nil the entry is considered as an event."
 				  (ot-get-event-timestamp)
 				(org-element-property :scheduled (org-element-at-point))))
 		   (title (org-get-heading t nil t t))
-		   (tags (mapcar 'substring-no-properties (org-element-property :tags (org-element-at-point)))))
+		   (tags (mapcar #'substring-no-properties (org-get-tags (org-element-at-point)))))
 	       (setq colors (ot-get-colors tags))
 	       (propertize
 		(concat (ot--construct-entry-prefix timestamp eventp) title)
