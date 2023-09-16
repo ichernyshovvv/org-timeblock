@@ -1337,29 +1337,33 @@ When BACKWARD is non-nil, move backward."
 
 ;;;; Planning commands
 
-(defun ot-clock-in (&optional arg)
-  "Start the clock on the currently selected block."
+(defun ot-clock-in (&optional select)
+  "Start the clock on the currently selected block.
+See `org-clock-in' to read about what tasks selection options
+SELECT prefix argument provides."
   (interactive "P")
-  (if (equal arg '(4))
-      (org-clock-in arg)
+  (if (equal select '(4))
+      (org-clock-in select)
     (when-let ((marker (ot-selected-block-marker)))
       (with-current-buffer (marker-buffer marker)
 	(widen)
 	(goto-char marker)
 	(ot-show-context)
-	(org-clock-in arg)))))
+	(org-clock-in select)))))
 
-(defun ot-list-clock-in (&optional arg)
-  "Start the clock on the item at point."
+(defun ot-list-clock-in (&optional select)
+  "Start the clock on the item at point.
+See `org-clock-in' to read about what tasks selection options
+SELECT prefix argument provides."
   (interactive "P")
-  (if (equal arg '(4))
-      (org-clock-in arg)
+  (if (equal select '(4))
+      (org-clock-in select)
     (when-let ((marker (get-text-property (line-beginning-position) 'marker)))
       (with-current-buffer (marker-buffer marker)
 	(widen)
 	(goto-char marker)
 	(ot-show-context)
-	(org-clock-in arg)))))
+	(org-clock-in select)))))
 
 (defun ot-list-get-current-date ()
   "Get date at point."
