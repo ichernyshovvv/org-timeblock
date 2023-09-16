@@ -205,6 +205,8 @@ tasks and those tasks that have not been sorted yet.")
   "RET" #'ot-goto
   "TAB" #'ot-goto-other-window
   "d" #'ot-set-duration
+  "i" #'ot-clock-in
+  "o" #'org-clock-out
   "g" #'ot-redraw-buffers
   "j" #'ot-jump-to-day
   "s" #'ot-schedule
@@ -226,6 +228,8 @@ tasks and those tasks that have not been sorted yet.")
   "TAB" #'ot-list-goto-other-window
   "S" #'ot-list-toggle-sort-function
   "d" #'ot-list-set-duration
+  "i" #'ot-list-clock-in
+  "o" #'org-clock-out
   "g" #'ot-redraw-buffers
   "j" #'ot-jump-to-day
   "q" #'ot-quit
@@ -1332,6 +1336,30 @@ When BACKWARD is non-nil, move backward."
   (ot-redraw-buffers))
 
 ;;;; Planning commands
+
+(defun ot-clock-in (&optional arg)
+  "Start the clock on the currently selected block."
+  (interactive "P")
+  (if (equal arg '(4))
+      (org-clock-in arg)
+    (when-let ((marker (ot-selected-block-marker)))
+      (with-current-buffer (marker-buffer marker)
+	(widen)
+	(goto-char marker)
+	(ot-show-context)
+	(org-clock-in arg)))))
+
+(defun ot-list-clock-in (&optional arg)
+  "Start the clock on the item at point."
+  (interactive "P")
+  (if (equal arg '(4))
+      (org-clock-in arg)
+    (when-let ((marker (get-text-property (line-beginning-position) 'marker)))
+      (with-current-buffer (marker-buffer marker)
+	(widen)
+	(goto-char marker)
+	(ot-show-context)
+	(org-clock-in arg)))))
 
 (defun ot-list-get-current-date ()
   "Get date at point."
