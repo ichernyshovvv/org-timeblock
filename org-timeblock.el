@@ -3,7 +3,7 @@
 ;; Copyright (C) 2023  Ilya Chernyshov
 
 ;; Author: Ilya Chernyshov <ichernyshovvv@gmail.com>
-;; Version: 0.1
+;; Version: 0.2-pre
 ;; Package-Requires: ((emacs "28.1") (compat "29.1") (org-ql "0.7") (org "9.0") (svg "1.1") (persist "0.5"))
 ;; Keywords: org, calendar, timeblocking, agenda
 ;; URL: https://github.com/ichernyshovvv/org-timeblock
