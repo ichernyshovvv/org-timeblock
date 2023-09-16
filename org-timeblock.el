@@ -64,12 +64,12 @@
 	  (const :tag "Show outline path." t)))
 
 (defcustom ot-n-days-view 3
-  "Number of days displayed in org-timeblock."
+  "Number of days displayed in `org-timeblock'."
   :group 'org-timeblock
   :type 'integer)
 
 (defcustom ot-list-sortline-face 'org-agenda-dimmed-todo-face
-  "Number of days displayed in org-timeblock."
+  "Number of days displayed in `org-timeblock'."
   :group 'org-timeblock
   :type 'face)
 
