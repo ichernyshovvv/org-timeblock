@@ -100,7 +100,7 @@ Requirements:
 
 If you use Emacs 29, you can install the package via
 
-~M-x package-vc-install RET https://github.com/ichernyshovvv/org-timeblock/ RET~
+~M-x package-vc-install RET https://github.com/ichernyshovvv/org-timeblock RET~
 
 ** Guix
 
