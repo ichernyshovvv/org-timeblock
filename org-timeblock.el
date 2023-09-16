@@ -1781,8 +1781,7 @@ SVG image (.svg), PDF (.pdf) is produced."
       (user-error "Cannot write agenda to file %s" file))
   (let ((file (expand-file-name file)))
     (with-temp-buffer
-      (let* ((svg-obj ot-svg-obj)
-	     (dates (ot-get-dates))
+      (let* ((dates (ot-get-dates))
 	     (max-length (/ (+ (/ ot-svg-width (default-font-width))) (length dates)))
 	     (date-format
 	      (pcase max-length
@@ -1790,20 +1789,31 @@ SVG image (.svg), PDF (.pdf) is produced."
 		((pred (< 11)) "[%Y-%m-%d]")
 		((pred (< 6)) "[%m-%d]")
 		((pred (< 3)) "[%d]"))))
+	(dom-add-child-before
+	 ot-svg-obj
+	 (dom-node
+	  'rect
+	  (list
+	   (cons 'x 0)
+	   (cons 'y 0)
+	   (cons 'width ot-svg-width)
+	   (cons 'height ot-svg-height)
+	   (cons 'fill (face-attribute 'default :background)))))
 	(dotimes (iter (length dates))
 	  (svg-text
-	   svg-obj (ts-format date-format (nth iter dates))
+	   ot-svg-obj (ts-format date-format (nth iter dates))
 	   :y ot-svg-height
 	   :x (+ 5 (* (/ ot-svg-width (length dates)) iter))
 	   :fill (face-attribute 'default :foreground)))
-	(svg-print svg-obj))
+	(svg-print ot-svg-obj))
       (pcase (file-name-extension file)
 	((or "pdf" "png")
 	 (unless (executable-find "inkscape")
 	   (user-error "Inkscape executable not found"))
 	 (call-process-region (point-min) (point-max) "inkscape" nil nil nil "--pipe"
 			      (concat "--export-filename=" file)))
-	((or "svg" `nil) (write-region nil nil file))))))
+	((or "svg" `nil) (write-region nil nil file)))
+      (ot-redraw-timeblocks))))
 
 ;;;; Predicates
 
