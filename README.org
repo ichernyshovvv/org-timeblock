@@ -11,6 +11,7 @@ Schedule your days visually, using [[https://en.wikipedia.org/wiki/Timeblocking]
 - [[#usage][Usage]]
 - [[#customization][Customization]]
 - [[#todos][TODOs]]
+- [[#changelog][Changelog]]
 
 * Screenshots
 :PROPERTIES:
@@ -191,3 +192,10 @@ commands:
 :END:
 - [ ] Implement caching mechanism for SVG data
 - [ ] Improve timeblocks layout algorithm
+* Changelog
+:PROPERTIES:
+:CUSTOM_ID: changelog
+:END:
+
+** 0.1
+First tagged release.
