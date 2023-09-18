@@ -209,6 +209,7 @@ tasks and those tasks that have not been sorted yet.")
   "o" #'org-clock-out
   "g" #'ot-redraw-buffers
   "j" #'ot-jump-to-day
+  "C-s" #'ot-save
   "s" #'ot-schedule
   "t" #'ot-toggle-timeblock-list
   "v" #'ot-switch-scaling
@@ -221,7 +222,7 @@ tasks and those tasks that have not been sorted yet.")
   "<up>" #'ot-list-previous-line
   "C-<down>" #'ot-day-later
   "C-<up>" #'ot-day-earlier
-  "C-s" #'ot-list-save
+  "C-s" #'ot-save
   "M-<down>" #'ot-list-drag-line-forward
   "M-<up>" #'ot-list-drag-line-backward
   "RET" #'ot-list-goto
@@ -825,30 +826,31 @@ commands"
 	  #'ot-order<))
   (ot-redraw-buffers))
 
-(defun ot-list-save ()
-  "Save orgmode files, sorting line and tasks positions."
+(defun ot-save ()
+  "Save org files, sorting line and tasks positions in `org-timeblock-list' buffer."
   (interactive)
-  (unless (eq major-mode 'org-timeblock-list-mode)
-    (user-error "Not in org-timeblock buffer"))
-  (let ((count 0)
-	(inhibit-read-only t)
-	date
-	(dates (ot-get-dates)))
-    (save-excursion
-      (goto-char (point-min))
-      (while (not (eobp))
-	(cond ((eq (get-text-property (line-beginning-position) 'face) 'ot-list-header)
-	       (setq count 0
-		     date (pop dates)))
-	      ((get-text-property (line-beginning-position) 'marker)
-	       (when-let ((m (get-text-property (line-beginning-position) 'marker))
-			  (id (ot-construct-id m (ot-get-event nil (line-beginning-position)))))
-		 (setf (alist-get id (alist-get (ts-format "%Y-%m-%d" date) ot-list-entries-pos nil nil #'equal) nil nil #'equal)
+  (with-current-buffer (get-buffer-create ot-list-buffer)
+    (unless (eq major-mode 'org-timeblock-list-mode)
+      (user-error "Not in org-timeblock-list buffer"))
+    (let ((count 0)
+	  (inhibit-read-only t)
+	  date
+	  (dates (ot-get-dates)))
+      (save-excursion
+	(goto-char (point-min))
+	(while (not (eobp))
+	  (cond ((eq (get-text-property (line-beginning-position) 'face) 'ot-list-header)
+		 (setq count 0
+		       date (pop dates)))
+		((get-text-property (line-beginning-position) 'marker)
+		 (when-let ((m (get-text-property (line-beginning-position) 'marker))
+			    (id (ot-construct-id m (ot-get-event nil (line-beginning-position)))))
+		   (setf (alist-get id (alist-get (ts-format "%Y-%m-%d" date) ot-list-entries-pos nil nil #'equal) nil nil #'equal)
+			 (cl-incf count))))
+		((get-text-property (line-beginning-position) 'sort-ind)
+		 (setf (alist-get (ts-format "%Y-%m-%d" date) ot-list-sortline-pos nil nil 'equal)
 		       (cl-incf count))))
-	      ((get-text-property (line-beginning-position) 'sort-ind)
-	       (setf (alist-get (ts-format "%Y-%m-%d" date) ot-list-sortline-pos nil nil 'equal)
-		     (cl-incf count))))
-	(forward-line))))
+	  (forward-line)))))
   (org-save-all-org-buffers))
 
 (defun ot-quit ()
