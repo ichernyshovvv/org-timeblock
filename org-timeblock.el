@@ -1347,11 +1347,9 @@ SELECT prefix argument provides."
   (if (equal select '(4))
       (org-clock-in select)
     (when-let ((marker (ot-selected-block-marker)))
-      (with-current-buffer (marker-buffer marker)
-	(org-with-wide-buffer
-	 (goto-char marker)
-	 (ot-show-context)
-	 (org-clock-in select))))))
+      (org-with-point-at marker
+	(ot-show-context)
+	(org-clock-in select)))))
 
 (defun ot-list-clock-in (&optional select)
   "Start the clock on the item at point.
@@ -1361,11 +1359,9 @@ SELECT prefix argument provides."
   (if (equal select '(4))
       (org-clock-in select)
     (when-let ((marker (get-text-property (line-beginning-position) 'marker)))
-      (with-current-buffer (marker-buffer marker)
-	(org-with-wide-buffer
-	 (goto-char marker)
-	 (ot-show-context)
-	 (org-clock-in select))))))
+      (org-with-point-at marker
+	(ot-show-context)
+	(org-clock-in select)))))
 
 (defun ot-list-get-current-date ()
   "Get date at point."
