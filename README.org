@@ -99,6 +99,10 @@ Requirements:
 - Emacs 28.1 (or higher)
 - SVG support in your Emacs build
 
+** MELPA
+
+You can install the package from MELPA using ~M-x package-install org-timeblock~
+
 ** package-vc-install (Emacs 29)
 
 If you use Emacs 29, you can install the package via
