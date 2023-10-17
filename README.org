@@ -25,7 +25,7 @@ org-timeblock-mode buffer:
 You can press ~[t]~ to toggle the display of org-timeblock-list-mode
 buffer.  Foreground colors for timeblocks are generated randomly, but
 you can assign specific background and foreground colors in
-customizable variable ~org-timeblock-tag-colors~: 
+customizable variable ~org-timeblock-tag-colors~:
 
 [[file:screenshots/org-timeblock-with-list-mode.png]]
 
@@ -69,6 +69,7 @@ There are two major modes provided by the package:
   - org-timeblock-switch-view ~[V]~
   - org-timeblock-write ~[w]~
   - org-timeblock-jump-to-day ~[j]~
+  - org-timeblock-todo-set ~[T]~
 
 - ~org-timeblock-list-mode~.  Displays a list of org tasks that are
   scheduled or orgmode events for selected day.  It's sort of like a
@@ -88,6 +89,7 @@ There are two major modes provided by the package:
   - org-timeblock-switch-scaling ~[v]~
   - org-timeblock-switch-view ~[V]~
   - org-timeblock-list-toggle-timeblock ~[t]~
+  - org-timeblock-todo-set ~[T]~
 
 * Installation
 :PROPERTIES:

@@ -212,6 +212,7 @@ tasks and those tasks that have not been sorted yet.")
   "C-s" #'org-timeblock-save
   "s" #'org-timeblock-schedule
   "t" #'org-timeblock-toggle-timeblock-list
+  "T" #'org-timeblock-todo-set
   "v" #'org-timeblock-switch-scaling
   "V" #'org-timeblock-switch-view
   "w" #'org-timeblock-write)
@@ -236,6 +237,7 @@ tasks and those tasks that have not been sorted yet.")
   "q" #'org-timeblock-quit
   "s" #'org-timeblock-list-schedule
   "t" #'org-timeblock-list-toggle-timeblock
+  "T" #'org-timeblock-todo-set
   "v" #'org-timeblock-switch-scaling
   "V" #'org-timeblock-switch-view)
 
@@ -254,6 +256,25 @@ tasks and those tasks that have not been sorted yet.")
 	  (org-timeblock-redraw-buffers))))
     (define-key org-timeblock-list-mode-map (kbd (cdr elem)) command-name)
     (define-key org-timeblock-mode-map (kbd (cdr elem)) command-name)))
+
+(defun org-timeblock-todo-set (&optional arg)
+  "Change the TODO state of an item in org-timeblock.
+
+Check `org-todo' for more information, including on the values of
+ARG."
+  (interactive "P")
+  (when-let ((marker
+              (pcase major-mode
+			    (`org-timeblock-list-mode
+			     (get-text-property (line-beginning-position) 'marker))
+			    (`org-timeblock-mode
+			     (org-timeblock-selected-block-marker)))))
+	(with-current-buffer (marker-buffer marker)
+      (save-excursion
+        (goto-char marker)
+        (org-timeblock-show-context)
+        (org-todo arg)))
+	(org-timeblock-redraw-buffers)))
 
 ;;;; Modes
 
