@@ -218,6 +218,8 @@ tasks and those tasks that have not been sorted yet.")
   "t" #'org-timeblock-toggle-timeblock-list
   "v" #'org-timeblock-switch-scaling
   "V" #'org-timeblock-switch-view
+  "m" #'org-timeblock-mark-block
+  "u" #'org-timeblock-unmark-block
   "w" #'org-timeblock-write)
 
 (defvar-keymap org-timeblock-list-mode-map
@@ -1541,21 +1543,16 @@ If EVENTP is non-nil the entry is considered as an event."
   (org-timeblock-select-block-for-current-entry)
   (org-timeblock-show-olp-maybe (get-text-property (line-beginning-position) 'marker)))
 
-(defun org-timeblock-toggle-mark-block ()
-  "Mark or unmark selected block."
+(defun org-timeblock-mark-block ()
+  "Mark selected block."
   (interactive)
   (let ((inhibit-read-only t))
     (goto-char (point-min))
     (when (re-search-forward (format "<rect .*? id=\"\\([^\"]+\\)\" fill=\"\\(%s\\)\"" org-timeblock-sel-block-color) nil t)
-      (let* ((id (match-string-no-properties 1))
-	     (block (assoc id org-timeblock-mark-data)))
-	(if block
-	    (progn
-	      (replace-match (cdr block) nil nil nil 2)
-	      (setq org-timeblock-mark-data (remove block org-timeblock-mark-data)))
-	  (replace-match org-timeblock-marked-block-color nil nil nil 2)
-	  (push (cons id org-timeblock-prev-selected-block-color)
-		org-timeblock-mark-data)))
+      (let ((id (car (save-match-data (split-string (match-string-no-properties 1) "_")))))
+	(replace-match org-timeblock-marked-block-color nil nil nil 2)
+	(cl-pushnew (cons id org-timeblock-prev-selected-block-color) org-timeblock-mark-data
+		    :test (lambda (x y) (string= (car y) (car x)))))
       (unless (save-excursion (re-search-forward (format "<rect .+? column=\"%d\"" org-timeblock-current-column) nil t))
 	(goto-char (point-min))))
     (when (and (re-search-forward (format "<rect .*? column=\"%d\"" org-timeblock-current-column) nil t)
@@ -1565,6 +1562,28 @@ If EVENTP is non-nil the entry is considered as an event."
       (org-timeblock-redisplay)
       (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
       t)))
+
+(defun org-timeblock-unmark-block ()
+  "Unmark selected block."
+  (interactive)
+  (let ((inhibit-read-only t))
+    (goto-char (point-min))
+    (when (re-search-forward (format "<rect .*? id=\"\\([^\"]+\\)\" fill=\"\\(%s\\)\"" org-timeblock-sel-block-color) nil t)
+      (if-let ((id (car (save-match-data (split-string (match-string-no-properties 1) "_"))))
+	       (blk (assoc id org-timeblock-mark-data)))
+	  (progn
+	    (replace-match (cdr blk) nil nil nil 2)
+	    (setq org-timeblock-mark-data (remove blk org-timeblock-mark-data))
+	    (unless (save-excursion (re-search-forward (format "<rect .+? column=\"%d\"" org-timeblock-current-column) nil t))
+	      (goto-char (point-min)))
+	    (when (and (re-search-forward (format "<rect .*? column=\"%d\"" org-timeblock-current-column) nil t)
+		       (re-search-backward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t))
+	      (setq org-timeblock-prev-selected-block-color (match-string-no-properties 1))
+	      (replace-match org-timeblock-sel-block-color nil nil nil 1)
+	      (org-timeblock-redisplay)
+	      (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
+	      t))
+	(org-timeblock-forward-block)))))
 
 (defun org-timeblock-forward-block ()
   "Select the next timeblock in *org-timeblock* buffer.
