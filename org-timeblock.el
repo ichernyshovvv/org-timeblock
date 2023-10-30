@@ -1431,14 +1431,56 @@ Duration format:
 	(org-timeblock-redraw-timeblocks)))))
 
 (defun org-timeblock-schedule ()
-  "Change the timestamp for the selected block.
-The org-element timestamp object may be from an event or from a
-SCHEDULED property."
+  "Change the timestamp for selected block or all marked blocks.
+The blocks may be events or tasks with SCHEDULED property."
   (interactive)
-  (when-let ((id (org-timeblock-selected-block-id))
-	     (marker (org-timeblock-selected-block-marker))
-	     (date (nth (1- org-timeblock-current-column) (org-timeblock-get-dates))))
-    (org-timeblock--schedule-time date marker (org-timeblock-block-eventp id))
+  (let ((date (nth (1- org-timeblock-current-column) (org-timeblock-get-dates))))
+    (if org-timeblock-mark-data
+	(let* ((mark-data (sort org-timeblock-mark-data
+				(lambda (x y)
+				  (let ((marker-x (org-timeblock-get-marker-by-id (car x)))
+					(marker-y (org-timeblock-get-marker-by-id (car y))))
+				    (ts<=
+				     (org-with-point-at marker-x
+				       (org-timeblock--parse-org-element-ts
+					(org-element-property :scheduled (org-element-at-point))))
+				     (org-with-point-at marker-y
+				       (org-timeblock--parse-org-element-ts
+					(org-element-property :scheduled (org-element-at-point)))))))))
+	       (id (caar mark-data))
+	       (marker (org-timeblock-get-marker-by-id id))
+	       (interval 5)
+	       (timestamp (org-timeblock--schedule-time date marker (org-timeblock-block-eventp id)))
+	       (end-or-start-ts (or (org-timeblock--parse-org-element-ts timestamp t)
+				    (org-timeblock--parse-org-element-ts timestamp))))
+	  (pop mark-data)
+	  (pcase interval
+	    ((pred integerp)
+	     (dolist (block mark-data)
+	       (let* ((id (car block))
+		      (marker (org-timeblock-get-marker-by-id id)))
+		 (org-with-point-at marker
+		   (let* ((eventp (org-timeblock-block-eventp id))
+			  (timestamp (if eventp
+					 (org-timeblock-get-event-timestamp)
+				       (org-element-property :scheduled (org-element-at-point))))
+			  (start-ts (org-timeblock--parse-org-element-ts timestamp))
+			  (end-ts (org-timeblock--parse-org-element-ts timestamp t))
+			  (duration (when (and start-ts end-ts) (/ (round (ts-diff end-ts start-ts)) 60)))
+			  (new-start-ts (ts-inc 'minute interval end-or-start-ts))
+			  (new-end-ts (when duration (ts-inc 'minute duration new-start-ts))))
+		     (if eventp
+			 (progn
+			   (save-excursion
+			     (org-timeblock-delete-event-timestamp)
+			     (insert
+			      (org-timeblock-ts-to-org-timerange new-start-ts new-end-ts)))
+			   (org-timeblock-get-event-timestamp))
+		       (org-timeblock--schedule new-start-ts new-end-ts))
+		     (setq end-or-start-ts (or new-end-ts new-start-ts)))))))))
+      (when-let ((id (org-timeblock-selected-block-id))
+		 (marker (org-timeblock-selected-block-marker)))
+	(org-timeblock--schedule-time date marker (org-timeblock-block-eventp id))))
     (org-timeblock-redraw-buffers)
     (org-timeblock-redisplay)))
 
