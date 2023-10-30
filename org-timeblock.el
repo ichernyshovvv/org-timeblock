@@ -341,6 +341,10 @@ Mouse position is of the form (X . Y)."
   (when-let ((id (org-timeblock-selected-block-id)))
     (cadr (seq-find (lambda (x) (string= (car x) id)) org-timeblock-data))))
 
+(defun org-timeblock-get-marker-by-id (id)
+  "Return a marker pointing to the org entry of selected timeblock."
+  (cadr (seq-find (lambda (x) (string= (car x) id)) org-timeblock-data)))
+
 (defun org-timeblock-block-eventp (id)
   "Return t if block with ID is an event."
   (caddr (seq-find (lambda (x) (string= (car x) id)) org-timeblock-data)))
