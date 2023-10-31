@@ -1471,9 +1471,18 @@ The blocks may be events or tasks with SCHEDULED property."
 		  (pcase (caddr (seq-find (lambda (x) (eq (cadr x) answer)) choices))
 		    (`user-input (read-number "Interval (minutes): "))
 		    ((and n _) n))))
-	       (timestamp (org-timeblock--schedule-time date marker (org-timeblock-block-eventp id)))
-	       (end-or-start-ts (or (org-timeblock--parse-org-element-ts timestamp t)
-				    (org-timeblock--parse-org-element-ts timestamp))))
+	       (eventp (org-timeblock-block-eventp id))
+	       (prev-timestamp
+		(org-with-point-at marker
+		  (if eventp
+		      (org-timeblock-get-event-timestamp)
+		    (org-element-property :scheduled (org-element-at-point)))))
+	       (prev-end-or-start-ts
+		(or (org-timeblock--parse-org-element-ts prev-timestamp t)
+		    (org-timeblock--parse-org-element-ts prev-timestamp)))
+	       (timestamp (org-timeblock--schedule-time date marker eventp))
+	       (new-end-or-start-ts (or (org-timeblock--parse-org-element-ts timestamp t)
+					(org-timeblock--parse-org-element-ts timestamp))))
 	  (pop mark-data)
 	  (pcase interval
 	    ((pred integerp)
@@ -1488,7 +1497,7 @@ The blocks may be events or tasks with SCHEDULED property."
 			  (start-ts (org-timeblock--parse-org-element-ts timestamp))
 			  (end-ts (org-timeblock--parse-org-element-ts timestamp t))
 			  (duration (when (and start-ts end-ts) (/ (round (ts-diff end-ts start-ts)) 60)))
-			  (new-start-ts (ts-inc 'minute interval end-or-start-ts))
+			  (new-start-ts (ts-inc 'minute interval new-end-or-start-ts))
 			  (new-end-ts (when duration (ts-inc 'minute duration new-start-ts))))
 		     (if eventp
 			 (progn
@@ -1498,9 +1507,32 @@ The blocks may be events or tasks with SCHEDULED property."
 			      (org-timeblock-ts-to-org-timerange new-start-ts new-end-ts)))
 			   (org-timeblock-get-event-timestamp))
 		       (org-timeblock--schedule new-start-ts new-end-ts))
-		     (setq end-or-start-ts (or new-end-ts new-start-ts)))))))
+		     (setq new-end-or-start-ts (or new-end-ts new-start-ts)))))))
 	    (`savetime
-	     (message "TODO"))))
+	     (dolist (block mark-data)
+	       (let* ((id (car block))
+		      (marker (org-timeblock-get-marker-by-id id)))
+		 (org-with-point-at marker
+		   (let* ((eventp (org-timeblock-block-eventp id))
+			  (timestamp (if eventp
+					 (org-timeblock-get-event-timestamp)
+				       (org-element-property :scheduled (org-element-at-point))))
+			  (start-ts (org-timeblock--parse-org-element-ts timestamp))
+			  (end-ts (org-timeblock--parse-org-element-ts timestamp t))
+			  (duration (when (and start-ts end-ts) (/ (round (ts-diff end-ts start-ts)) 60)))
+			  (int (/ (round (ts-diff start-ts prev-end-or-start-ts)) 60))
+			  (new-start-ts (ts-inc 'minute int new-end-or-start-ts))
+			  (new-end-ts (when duration (ts-inc 'minute duration new-start-ts))))
+		     (if eventp
+			 (progn
+			   (save-excursion
+			     (org-timeblock-delete-event-timestamp)
+			     (insert
+			      (org-timeblock-ts-to-org-timerange new-start-ts new-end-ts)))
+			   (org-timeblock-get-event-timestamp))
+		       (org-timeblock--schedule new-start-ts new-end-ts))
+		     (setq new-end-or-start-ts (or new-end-ts new-start-ts))
+		     (setq prev-end-or-start-ts (or end-ts start-ts)))))))))
       (when-let ((id (org-timeblock-selected-block-id))
 		 (marker (org-timeblock-selected-block-marker)))
 	(org-timeblock--schedule-time date marker (org-timeblock-block-eventp id))))
