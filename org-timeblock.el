@@ -913,15 +913,7 @@ Time format is \"HHMM\""
 			 (org-timeblock-ts-date<= date (cdr org-timeblock-daterange))
 			 (org-timeblock-ts-date<= (car org-timeblock-daterange) date))))
 	  (org-timeblock-jump-to-day prev-date))
-	(if eventp
-	    (progn
-	      (save-excursion
-		(org-timeblock-delete-event-timestamp)
-		(insert
-		 (org-timeblock-ts-to-org-timerange new-start-ts new-end-ts)))
-	      (org-timeblock-get-event-timestamp))
-	  (org-timeblock--schedule new-start-ts new-end-ts)
-	  (org-element-property :scheduled (org-element-at-point)))))))
+	  (org-timeblock--schedule new-start-ts new-end-ts eventp)))))
 
 (defun org-timeblock--daterangep (timestamp)
   "Return t if org timestamp object TIMESTAMP is a daterange with no time."
@@ -1140,29 +1132,42 @@ TS is a org-element timestamp object."
       (make-ts :year year-start :month month-start :day day-start
 	       :hour (or hour-start 0) :minute (or minute-start 0) :second 0))))
 
-(defun org-timeblock--schedule (start-ts &optional end-ts)
-  "Schedule the entry at point.
-START-TS and END-TS are ts.el time objects."
-  (let* ((timestamp (org-element-property :scheduled (org-element-at-point)))
-	 (repeat-string (org-get-repeat))
-	 (warning-string
-	  (concat
-	   (pcase (org-element-property :warning-type timestamp)
-	     (`first "--") (`all "-"))
-	   (let ((val (org-element-property :warning-value timestamp)))
-	     (and val (number-to-string val)))
-	   (pcase (org-element-property :warning-unit timestamp)
-	     (`hour "h") (`day "d") (`week "w") (`month "m") (`year "y"))))
-	 (dates-equal-p (org-timeblock-ts-date= start-ts end-ts)))
-    (cond
-     ((or (not end-ts) dates-equal-p)
-      (org-schedule nil (org-timeblock-ts-to-org-timerange start-ts end-ts)))
-     ((and end-ts (not dates-equal-p))
-      (org-schedule nil (org-timeblock-ts-to-org-timerange start-ts))
-      (org-back-to-heading t)
-      (forward-line)
-      (when (re-search-forward org-scheduled-time-regexp (line-end-position) t)
-	(insert "--" (org-timeblock-ts-to-org-timerange end-ts nil repeat-string warning-string)))))))
+(defun org-timeblock--schedule (start-ts &optional end-ts eventp)
+  "Schedule org entry at point.
+START-TS and END-TS are ts.el time objects.
+
+If EVENTP is non-nil, reschedule event.
+Otherwise, change SCHEDULED property
+
+Return new org-element timestamp object."
+  (if eventp
+      (progn
+	(save-excursion
+	  (org-timeblock-delete-event-timestamp)
+	  (insert
+	   (org-timeblock-ts-to-org-timerange start-ts end-ts)))
+	(org-timeblock-get-event-timestamp))
+    (let* ((timestamp (org-element-property :scheduled (org-element-at-point)))
+	   (repeat-string (org-get-repeat))
+	   (warning-string
+	    (concat
+	     (pcase (org-element-property :warning-type timestamp)
+	       (`first "--") (`all "-"))
+	     (let ((val (org-element-property :warning-value timestamp)))
+	       (and val (number-to-string val)))
+	     (pcase (org-element-property :warning-unit timestamp)
+	       (`hour "h") (`day "d") (`week "w") (`month "m") (`year "y"))))
+	   (dates-equal-p (org-timeblock-ts-date= start-ts end-ts)))
+      (cond
+       ((or (not end-ts) dates-equal-p)
+	(org-schedule nil (org-timeblock-ts-to-org-timerange start-ts end-ts)))
+       ((and end-ts (not dates-equal-p))
+	(org-schedule nil (org-timeblock-ts-to-org-timerange start-ts))
+	(org-back-to-heading t)
+	(forward-line)
+	(when (re-search-forward org-scheduled-time-regexp (line-end-position) t)
+	  (insert "--" (org-timeblock-ts-to-org-timerange end-ts nil repeat-string warning-string)))))
+      (org-element-property :scheduled (org-element-at-point)))))
 
 (defun org-timeblock-delete-event-timestamp ()
   "Delete event timestamp for the entry at point.
@@ -1281,15 +1286,7 @@ If EVENTP is non-nil, use entry's timestamp."
       (unless (and (org-element-property :hour-start timestamp)
 		   (org-element-property :minute-start timestamp))
 	(user-error "No scheduled time specified for this entry"))
-      (if eventp
-	  (progn
-	    (save-excursion
-	      (org-timeblock-delete-event-timestamp)
-	      (insert
-	       (org-timeblock-ts-to-org-timerange start-ts new-end-ts)))
-	    (org-timeblock-get-event-timestamp))
-	(org-timeblock--schedule start-ts new-end-ts)
-	(org-element-property :scheduled (org-element-at-point))))))
+      (org-timeblock--schedule start-ts new-end-ts eventp))))
 
 (defun org-timeblock-list-drag-line-backward ()
   "Drag an agenda line backward by ARG lines."
@@ -1499,14 +1496,7 @@ The blocks may be events or tasks with SCHEDULED property."
 			  (duration (when (and start-ts end-ts) (/ (round (ts-diff end-ts start-ts)) 60)))
 			  (new-start-ts (ts-inc 'minute interval new-end-or-start-ts))
 			  (new-end-ts (when duration (ts-inc 'minute duration new-start-ts))))
-		     (if eventp
-			 (progn
-			   (save-excursion
-			     (org-timeblock-delete-event-timestamp)
-			     (insert
-			      (org-timeblock-ts-to-org-timerange new-start-ts new-end-ts)))
-			   (org-timeblock-get-event-timestamp))
-		       (org-timeblock--schedule new-start-ts new-end-ts))
+		     (org-timeblock--schedule new-start-ts new-end-ts eventp)
 		     (setq new-end-or-start-ts (or new-end-ts new-start-ts)))))))
 	    (`savetime
 	     (dolist (block mark-data)
@@ -1523,14 +1513,7 @@ The blocks may be events or tasks with SCHEDULED property."
 			  (int (/ (round (ts-diff start-ts prev-end-or-start-ts)) 60))
 			  (new-start-ts (ts-inc 'minute int new-end-or-start-ts))
 			  (new-end-ts (when duration (ts-inc 'minute duration new-start-ts))))
-		     (if eventp
-			 (progn
-			   (save-excursion
-			     (org-timeblock-delete-event-timestamp)
-			     (insert
-			      (org-timeblock-ts-to-org-timerange new-start-ts new-end-ts)))
-			   (org-timeblock-get-event-timestamp))
-		       (org-timeblock--schedule new-start-ts new-end-ts))
+		     (org-timeblock--schedule new-start-ts new-end-ts eventp)
 		     (setq new-end-or-start-ts (or new-end-ts new-start-ts))
 		     (setq prev-end-or-start-ts (or end-ts start-ts)))))))))
       (when-let ((id (org-timeblock-selected-block-id))
