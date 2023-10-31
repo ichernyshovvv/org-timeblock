@@ -1440,16 +1440,37 @@ The blocks may be events or tasks with SCHEDULED property."
 				(lambda (x y)
 				  (let ((marker-x (org-timeblock-get-marker-by-id (car x)))
 					(marker-y (org-timeblock-get-marker-by-id (car y))))
+				    ;; TODO
 				    (ts<=
 				     (org-with-point-at marker-x
 				       (org-timeblock--parse-org-element-ts
-					(org-element-property :scheduled (org-element-at-point))))
+					(if (org-timeblock-block-eventp (car x))
+					    (org-timeblock-get-event-timestamp)
+					  (org-element-property :scheduled (org-element-at-point)))))
 				     (org-with-point-at marker-y
 				       (org-timeblock--parse-org-element-ts
-					(org-element-property :scheduled (org-element-at-point)))))))))
+					(if (org-timeblock-block-eventp (car y))
+					    (org-timeblock-get-event-timestamp)
+					  (org-element-property :scheduled (org-element-at-point))))))))))
 	       (id (caar mark-data))
 	       (marker (org-timeblock-get-marker-by-id id))
-	       (interval 5)
+	       (interval
+		(let* ((choices `(("[s]ide-by-side (0 mins between blocks)" ?s 0)
+				  ("save [t]ime between blocks" ?t savetime)
+				  ("enter your [i]nterval" ?i user-input)))
+		       (answer
+			(read-char-from-minibuffer
+			 (mapconcat
+			  (lambda (x)
+			    (and (string-match "\\[.\\]" (car x))
+				 (replace-match (propertize (format "[%c]" (cadr x)) 'face 'error) nil nil (car x))))
+			  choices
+			  "\n")
+			 (mapcar #'cadr choices))))
+		  (message "")
+		  (pcase (caddr (seq-find (lambda (x) (eq (cadr x) answer)) choices))
+		    (`user-input (read-number "Interval (minutes): "))
+		    ((and n _) n))))
 	       (timestamp (org-timeblock--schedule-time date marker (org-timeblock-block-eventp id)))
 	       (end-or-start-ts (or (org-timeblock--parse-org-element-ts timestamp t)
 				    (org-timeblock--parse-org-element-ts timestamp))))
@@ -1477,7 +1498,9 @@ The blocks may be events or tasks with SCHEDULED property."
 			      (org-timeblock-ts-to-org-timerange new-start-ts new-end-ts)))
 			   (org-timeblock-get-event-timestamp))
 		       (org-timeblock--schedule new-start-ts new-end-ts))
-		     (setq end-or-start-ts (or new-end-ts new-start-ts)))))))))
+		     (setq end-or-start-ts (or new-end-ts new-start-ts)))))))
+	    (`savetime
+	     (message "TODO"))))
       (when-let ((id (org-timeblock-selected-block-id))
 		 (marker (org-timeblock-selected-block-marker)))
 	(org-timeblock--schedule-time date marker (org-timeblock-block-eventp id))))
