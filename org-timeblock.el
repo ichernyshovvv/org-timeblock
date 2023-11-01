@@ -323,6 +323,16 @@ If OBJECT is nil, try to get the property from current buffer at POSITION.
   (or (org-timeblock-get-sched object position)
       (org-timeblock-get-event object position)))
 
+(cl-defsubst org-timeblock-get-timestamp (&optional eventp)
+  "Return active timestamp of the entry at point.
+If EVENTP is non-nil, return event timestamp.
+Otherwise, return SCHEDULED property.
+
+Returned value is org-element timestamp object."
+  (if eventp
+      (org-timeblock-get-event-timestamp)
+    (org-element-property :scheduled (org-element-at-point))))
+
 (defun org-timeblock-mouse-pixel-pos ()
   "Return current mouse position in the window of the *org-timeblock* buffer.
 If mouse position is outside of the window, return nil.
@@ -897,9 +907,7 @@ Time format is \"HHMM\""
 		       (org-timeblock-ts-date<= date (cdr org-timeblock-daterange))
 		       (org-timeblock-ts-date<= (car org-timeblock-daterange) date))
 		(org-timeblock-jump-to-day date)))))
-      (let* ((timestamp (if eventp
-			    (org-timeblock-get-event-timestamp)
-			  (org-element-property :scheduled (org-element-at-point))))
+      (let* ((timestamp (org-timeblock-get-timestamp eventp))
 	     (start-ts (org-timeblock--parse-org-element-ts timestamp))
 	     (end-ts (org-timeblock--parse-org-element-ts timestamp t))
 	     (duration (when (and start-ts end-ts) (/ (round (ts-diff end-ts start-ts)) 60)))
@@ -1277,10 +1285,7 @@ If EVENTP is non-nil, use entry's timestamp."
     (user-error "Non-existent marker's buffer"))
   (org-with-point-at marker
     (org-timeblock-show-context)
-    (let* ((timestamp
-	    (if eventp
-		(org-timeblock-get-event-timestamp)
-	      (org-element-property :scheduled (org-element-at-point))))
+    (let* ((timestamp (org-timeblock-get-timestamp eventp))
 	   (start-ts (ts-parse-org-element timestamp))
 	   (new-end-ts (when duration (ts-inc 'minute duration start-ts))))
       (unless (and (org-element-property :hour-start timestamp)
@@ -1438,9 +1443,8 @@ The blocks may be events or tasks with SCHEDULED property."
 				  (cl-macrolet ((get-ts (x)
 						  `(org-with-point-at (org-timeblock-get-marker-by-id (car ,x))
 						     (org-timeblock--parse-org-element-ts
-						      (if (org-timeblock-block-eventp (car ,x))
-							  (org-timeblock-get-event-timestamp)
-							(org-element-property :scheduled (org-element-at-point)))))))
+						      (org-timeblock-get-timestamp
+						       (org-timeblock-block-eventp (car ,x)))))))
 				    (ts<= (get-ts x) (get-ts y))))))
 	       (id (caar mark-data))
 	       (marker (org-timeblock-get-marker-by-id id))
@@ -1464,9 +1468,7 @@ The blocks may be events or tasks with SCHEDULED property."
 	       (eventp (org-timeblock-block-eventp id))
 	       (prev-timestamp
 		(org-with-point-at marker
-		  (if eventp
-		      (org-timeblock-get-event-timestamp)
-		    (org-element-property :scheduled (org-element-at-point)))))
+		  (org-timeblock-get-timestamp eventp)))
 	       (prev-end-or-start-ts
 		(or (org-timeblock--parse-org-element-ts prev-timestamp t)
 		    (org-timeblock--parse-org-element-ts prev-timestamp)))
@@ -1481,9 +1483,7 @@ The blocks may be events or tasks with SCHEDULED property."
 		      (marker (org-timeblock-get-marker-by-id id)))
 		 (org-with-point-at marker
 		   (let* ((eventp (org-timeblock-block-eventp id))
-			  (timestamp (if eventp
-					 (org-timeblock-get-event-timestamp)
-				       (org-element-property :scheduled (org-element-at-point))))
+			  (timestamp (org-timeblock-get-timestamp eventp))
 			  (start-ts (org-timeblock--parse-org-element-ts timestamp))
 			  (end-ts (org-timeblock--parse-org-element-ts timestamp t))
 			  (duration (when (and start-ts end-ts) (/ (round (ts-diff end-ts start-ts)) 60)))
@@ -1497,9 +1497,7 @@ The blocks may be events or tasks with SCHEDULED property."
 		      (marker (org-timeblock-get-marker-by-id id)))
 		 (org-with-point-at marker
 		   (let* ((eventp (org-timeblock-block-eventp id))
-			  (timestamp (if eventp
-					 (org-timeblock-get-event-timestamp)
-				       (org-element-property :scheduled (org-element-at-point))))
+			  (timestamp (org-timeblock-get-timestamp eventp))
 			  (start-ts (org-timeblock--parse-org-element-ts timestamp))
 			  (end-ts (org-timeblock--parse-org-element-ts timestamp t))
 			  (duration (when (and start-ts end-ts) (/ (round (ts-diff end-ts start-ts)) 60)))
@@ -1557,9 +1555,7 @@ If EVENTP is non-nil the entry is considered as an event."
     (let ((inhibit-read-only t)
 	  (new-entry
 	   (org-with-point-at marker
-	     (let ((timestamp (if eventp
-				  (org-timeblock-get-event-timestamp)
-				(org-element-property :scheduled (org-element-at-point))))
+	     (let ((timestamp (org-timeblock-get-timestamp eventp))
 		   (title (org-get-heading t nil t t))
 		   (tags (mapcar #'substring-no-properties (org-get-tags (org-element-at-point)))))
 	       (setq colors (org-timeblock-get-colors tags))
