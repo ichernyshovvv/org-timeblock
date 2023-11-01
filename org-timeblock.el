@@ -370,12 +370,21 @@ Mouse position is of the form (X . Y)."
 	    (org-timeblock-ts-date< start-date (cdr org-timeblock-daterange))))
     (nreverse dates)))
 
+(defun org-timeblock-goto-selected-rect ()
+  "Move point to selected rect."
+  (re-search-forward
+   (format (rx "<rect " (*? any)
+	       " id=\"" (group (+ (not "\""))) "\""
+	       " fill=\"" (group "%s") "\"")
+	   org-timeblock-sel-block-color)
+   nil t))
+
 (defun org-timeblock-selected-block-id ()
   "Return an id of the entry of selected timeblock.
 id is constructed via `org-timeblock-construct-id'"
   (goto-char (point-min))
   (and
-   (re-search-forward (format "<rect .*? id=\"\\([^\"]+\\)\" fill=\"%s\"" org-timeblock-sel-block-color) nil t)
+   (org-timeblock-goto-selected-rect)
    (car (split-string (match-string-no-properties 1) "_"))))
 
 (defmacro org-timeblock-on (accessor op lhs rhs)
@@ -1661,7 +1670,7 @@ Modifies match-data.  First match group a fill property."
   (interactive)
   (let ((inhibit-read-only t))
     (goto-char (point-min))
-    (when (re-search-forward (format "<rect .*? id=\"\\([^\"]+\\)\" fill=\"\\(%s\\)\"" org-timeblock-sel-block-color) nil t)
+    (when (org-timeblock-goto-selected-rect)
       (let ((id (car (save-match-data (split-string (match-string-no-properties 1) "_")))))
 	(replace-match org-timeblock-marked-block-color nil nil nil 2)
 	(cl-pushnew (cons id org-timeblock-prev-selected-block-color) org-timeblock-mark-data
@@ -1678,7 +1687,7 @@ Modifies match-data.  First match group a fill property."
   (interactive)
   (let ((inhibit-read-only t))
     (goto-char (point-min))
-    (when (re-search-forward (format "<rect .*? id=\"\\([^\"]+\\)\" fill=\"\\(%s\\)\"" org-timeblock-sel-block-color) nil t)
+    (when (org-timeblock-goto-selected-rect)
       (if-let ((id (car (save-match-data (split-string (match-string-no-properties 1) "_"))))
 	       (blk (assoc id org-timeblock-mark-data)))
 	  (progn
