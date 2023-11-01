@@ -469,10 +469,7 @@ A and B are ts.el ts objects."
 		  count)))
 	     (inhibit-read-only t))
     (with-current-buffer org-timeblock-buffer
-      (goto-char (point-min))
-      (when (re-search-forward (format " fill=\"\\(%s\\)\"" org-timeblock-sel-block-color) nil t)
-	(replace-match org-timeblock-prev-selected-block-color nil nil nil 1)
-	(goto-char (point-min)))
+      (org-timeblock-unselect-block)
       (when (re-search-forward (format " id=\"%s\" fill=\"\\([^\"]+\\)\"" (format "%s_%d" id column-number)) nil t)
 	(setq org-timeblock-prev-selected-block-color (match-string 1))
 	(replace-match org-timeblock-sel-block-color nil nil nil 1)
@@ -1598,10 +1595,7 @@ If EVENTP is non-nil the entry is considered as an event."
 	     (inhibit-read-only t)
 	     (window (get-buffer-window org-timeblock-buffer))
 	     (window-width (window-body-width window t)))
-    (goto-char (point-min))
-    (when (re-search-forward (format " fill=\"\\(%s\\)\"" org-timeblock-sel-block-color) nil t)
-      (replace-match (or org-timeblock-prev-selected-block-color "#ffffff") nil nil nil 1)
-      (goto-char (point-min)))
+    (org-timeblock-unselect-block)
     (when-let ((found (car (dom-search
 			    org-timeblock-svg-obj
 			    (lambda (node)
@@ -1619,9 +1613,18 @@ If EVENTP is non-nil the entry is considered as an event."
     (org-timeblock-redisplay)
     (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))))
 
+(defun org-timeblock-unselect-block ()
+  "Unselect selected block.  Return t on success.
+Modifies match-data.  First group is a fill property.
+"
+  (goto-char (point-min))
+  (when (re-search-forward (format " fill=\"\\(%s\\)\"" org-timeblock-sel-block-color) nil t)
+    (replace-match (or org-timeblock-prev-selected-block-color "#ffffff") nil nil nil 1)
+    t))
+
 (defun org-timeblock-forward-rect ()
   "Move point to next or first rectangle.
-Modifies match-data.  First match group is a fill property."
+Modifies match-data.  First group is a fill property."
   (or (and (re-search-forward (format "<rect .+? column=\"%d\"" org-timeblock-current-column) nil t)
 	   (re-search-backward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t))
       (and
@@ -1694,9 +1697,7 @@ Modifies match-data.  First match group a fill property."
 Return t on success, otherwise - nil."
   (interactive)
   (let ((inhibit-read-only t))
-    (goto-char (point-min))
-    (when (re-search-forward (format " fill=\"\\(%s\\)\"" org-timeblock-sel-block-color) nil t)
-      (replace-match org-timeblock-prev-selected-block-color nil nil nil 1))
+    (org-timeblock-unselect-block)
     (when (org-timeblock-forward-rect)
       (setq org-timeblock-prev-selected-block-color (match-string-no-properties 1))
       (replace-match org-timeblock-sel-block-color nil nil nil 1)
@@ -1735,9 +1736,7 @@ heading at MARKER in the echo area."
 Return t on success, otherwise - nil."
   (interactive)
   (let ((inhibit-read-only t))
-    (goto-char (point-max))
-    (when (re-search-backward (format " fill=\"\\(%s\\)\"" org-timeblock-sel-block-color) nil t)
-      (replace-match org-timeblock-prev-selected-block-color nil nil nil 1))
+    (org-timeblock-unselect-block)
     (when (org-timeblock-backward-rect)
       (setq org-timeblock-prev-selected-block-color (match-string-no-properties 1))
       (replace-match org-timeblock-sel-block-color nil nil nil 1)
