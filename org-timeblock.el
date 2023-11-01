@@ -354,7 +354,7 @@ Mouse position is of the form (X . Y)."
     (cadr (seq-find (lambda (x) (string= (car x) id)) org-timeblock-data))))
 
 (defun org-timeblock-get-marker-by-id (id)
-  "Return a marker pointing to the org entry of selected timeblock."
+  "Return a marker of entry with ID."
   (cadr (seq-find (lambda (x) (string= (car x) id)) org-timeblock-data)))
 
 (defun org-timeblock-block-eventp (id)
@@ -1624,8 +1624,7 @@ If EVENTP is non-nil the entry is considered as an event."
 
 (defun org-timeblock-unselect-block ()
   "Unselect selected block.  Return t on success.
-Modifies match-data.  First group is a fill property.
-"
+Modifies the match data.  First group is a fill property."
   (goto-char (point-min))
   (when (re-search-forward (format " fill=\"\\(%s\\)\"" org-timeblock-sel-block-color) nil t)
     (replace-match (or org-timeblock-prev-selected-block-color "#ffffff") nil nil nil 1)
@@ -1633,23 +1632,35 @@ Modifies match-data.  First group is a fill property.
 
 (defun org-timeblock-forward-rect ()
   "Move point to next or first rectangle.
-Modifies match-data.  First group is a fill property."
-  (or (and (re-search-forward (format "<rect .+? column=\"%d\"" org-timeblock-current-column) nil t)
-	   (re-search-backward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t))
-      (and
-       (goto-char (point-min))
-       (re-search-forward (format "<rect .+? column=\"%d\"" org-timeblock-current-column) nil t)
-       (re-search-backward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t))))
+Modifies the match data.  First group is a fill property."
+  (let ((rect (rx "<rect " (*? any)
+		  " id=\"" (+ (not "\"")) "\""
+		  " fill=\"" (group (+ (not "\""))) "\""))
+	(rect-cur-column
+	 (format "<rect .+? column=\"%d\""
+		 org-timeblock-current-column)))
+    (or (and (re-search-forward rect-cur-column nil t)
+	     (re-search-backward rect nil t))
+	(and
+	 (goto-char (point-min))
+	 (re-search-forward rect-cur-column nil t)
+	 (re-search-backward rect nil t)))))
 
 (defun org-timeblock-backward-rect ()
   "Move point to previous or last rectangle.
-Modifies match-data.  First match group a fill property."
-  (or (and (re-search-backward (format "<rect .+? column=\"%d\"" org-timeblock-current-column) nil t)
-	   (re-search-forward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t))
-      (and
-       (goto-char (point-max))
-       (re-search-backward (format "<rect .+? column=\"%d\"" org-timeblock-current-column) nil t)
-       (re-search-forward "<rect .*? id=\"[^\"]+\" fill=\"\\([^\"]+\\)\"" nil t))))
+Modifies the match data.  First match group a fill property."
+  (let ((rect (rx "<rect " (*? any)
+		  " id=\"" (+ (not "\"")) "\""
+		  " fill=\"" (group (+ (not "\""))) "\""))
+	(rect-cur-column
+	 (format "<rect .+? column=\"%d\""
+		 org-timeblock-current-column)))
+    (or (and (re-search-backward rect-cur-column nil t)
+	     (re-search-forward rect nil t))
+	(and
+	 (goto-char (point-max))
+	 (re-search-backward rect-cur-column nil t)
+	 (re-search-forward rect nil t)))))
 
 (defun org-timeblock-list-next-line ()
   "Move cursor to the next line."
