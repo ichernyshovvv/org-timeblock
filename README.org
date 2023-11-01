@@ -61,10 +61,11 @@ There are two major modes provided by the package:
   - org-timeblock-set-duration ~[d]~
   - org-timeblock-reschedule ~[s]~
   - org-timeblock-new-task ~[+]~
-  - org-timeblock-toggle-timeblock-list ~[t]~
+  - org-timeblock-toggle-timeblock-list ~[T]~
   - org-timeblock-clock-in ~[i]~ (to clock out, press ~o~)
-  - org-timeblock-todo ~[1]~
-  - org-timeblock-done ~[5]~
+  - org-timeblock-todo ~[t]~
+  - org-timeblock-fast-todo ~[1]~
+  - org-timeblock-fast-done ~[5]~
   - org-timeblock-switch-scaling ~[v]~
   - org-timeblock-switch-view ~[V]~
   - org-timeblock-write ~[w]~
@@ -80,14 +81,15 @@ There are two major modes provided by the package:
   ~org-timeblock-list-toggle-sort-function [S]~ command.
   - org-timeblock-list-schedule ~[s]~
   - org-timeblock-list-set-duration ~[d]~
-  - org-timeblock-todo ~[1]~
-  - org-timeblock-done ~[5]~
+  - org-timeblock-todo ~[t]~
+  - org-timeblock-fast-todo ~[1]~
+  - org-timeblock-fast-done ~[5]~
   - org-timeblock-list-drag-line-forward/backward ~[M-<down>/<up>]~
   - org-timeblock-list-toggle-sort-function ~[S]~
   - org-timeblock-list-clock-in ~[i]~ (to clock out, press ~o~)
   - org-timeblock-switch-scaling ~[v]~
   - org-timeblock-switch-view ~[V]~
-  - org-timeblock-list-toggle-timeblock ~[t]~
+  - org-timeblock-list-toggle-timeblock ~[T]~
 
 * Installation
 :PROPERTIES:

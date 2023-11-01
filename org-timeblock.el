@@ -109,7 +109,7 @@
   "Fast TODO keyword selection with single keys.
 
 Alist where each cons is an orgmode todo state and a key.  For
-each car a command is created (\"TODO\" -> `org-timeblock-todo')
+each car a command is created (\"TODO\" -> `org-timeblock-fast-todo')
 and then bound inside `org-timeblock-list-mode-map' and
 `org-timeblock-mode-map' respectively to a key in cdr.
 
@@ -215,7 +215,8 @@ tasks and those tasks that have not been sorted yet.")
   "j" #'org-timeblock-jump-to-day
   "C-s" #'org-timeblock-save
   "s" #'org-timeblock-schedule
-  "t" #'org-timeblock-toggle-timeblock-list
+  "T" #'org-timeblock-toggle-timeblock-list
+  "t" #'org-timeblock-todo
   "v" #'org-timeblock-switch-scaling
   "V" #'org-timeblock-switch-view
   "m" #'org-timeblock-mark-block
@@ -241,13 +242,14 @@ tasks and those tasks that have not been sorted yet.")
   "j" #'org-timeblock-jump-to-day
   "q" #'org-timeblock-quit
   "s" #'org-timeblock-list-schedule
-  "t" #'org-timeblock-list-toggle-timeblock
+  "T" #'org-timeblock-list-toggle-timeblock
+  "t" #'org-timeblock-todo
   "v" #'org-timeblock-switch-scaling
   "V" #'org-timeblock-switch-view)
 
 ;; Generate todo commands and bind them to a corresponding key
 (dolist (elem org-timeblock-fast-todo-commands)
-  (let ((command-name (intern (format "%s%s" 'org-timeblock- (downcase (car elem))))))
+  (let ((command-name (intern (format "%s%s" 'org-timeblock-fast- (downcase (car elem))))))
     (defalias command-name
       (lambda ()
 	(interactive)
@@ -1297,6 +1299,21 @@ If EVENTP is non-nil, use entry's timestamp."
   "Drag an agenda line backward by ARG lines."
   (interactive)
   (org-timeblock-list-drag-line-forward t))
+
+(defun org-timeblock-todo (&optional arg)
+  "Change the TODO state of an item in org-timeblock.
+
+Check `org-todo' for more information, including on the values of
+ARG."
+  (interactive "P")
+  (when-let ((marker (pcase major-mode
+		       (`org-timeblock-list-mode
+			(get-text-property (line-beginning-position) 'marker))
+		       (`org-timeblock-mode
+			(org-timeblock-selected-block-marker)))))
+    (org-with-point-at marker
+      (call-interactively #'org-todo))
+    (org-timeblock-redraw-buffers)))
 
 (defun org-timeblock--set-todo (marker todo)
   "Set TODO state to the entry at MARKER."
