@@ -1435,20 +1435,13 @@ The blocks may be events or tasks with SCHEDULED property."
     (if org-timeblock-mark-data
 	(let* ((mark-data (sort org-timeblock-mark-data
 				(lambda (x y)
-				  (let ((marker-x (org-timeblock-get-marker-by-id (car x)))
-					(marker-y (org-timeblock-get-marker-by-id (car y))))
-				    ;; TODO
-				    (ts<=
-				     (org-with-point-at marker-x
-				       (org-timeblock--parse-org-element-ts
-					(if (org-timeblock-block-eventp (car x))
-					    (org-timeblock-get-event-timestamp)
-					  (org-element-property :scheduled (org-element-at-point)))))
-				     (org-with-point-at marker-y
-				       (org-timeblock--parse-org-element-ts
-					(if (org-timeblock-block-eventp (car y))
-					    (org-timeblock-get-event-timestamp)
-					  (org-element-property :scheduled (org-element-at-point))))))))))
+				  (cl-macrolet ((get-ts (x)
+						  `(org-with-point-at (org-timeblock-get-marker-by-id (car ,x))
+						     (org-timeblock--parse-org-element-ts
+						      (if (org-timeblock-block-eventp (car ,x))
+							  (org-timeblock-get-event-timestamp)
+							(org-element-property :scheduled (org-element-at-point)))))))
+				    (ts<= (get-ts x) (get-ts y))))))
 	       (id (caar mark-data))
 	       (marker (org-timeblock-get-marker-by-id id))
 	       (interval
