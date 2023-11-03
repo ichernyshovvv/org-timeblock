@@ -95,7 +95,7 @@
 	  (const :tag "The new task will be scheduled to a time picked by user." pick)
 	  (string :tag "Time of the format \"HH:MM\".  The new task will be scheduled to a time.")))
 
-(defcustom org-timeblock-view-options t
+(defcustom org-timeblock-scale-options t
   "Options that are used to decide which part of visual schedule must be hidden."
   :group 'org-timeblock
   :type '(choice
@@ -593,12 +593,12 @@ Default background color is used when BASE-COLOR is nil."
 			 (timeline-left-padding (* 2 (default-font-width)))
 			 (block-max-width (- window-width timeline-left-padding))
 			 (min-hour
-			  (if-let ((org-timeblock-view-options)
+			  (if-let ((org-timeblock-scale-options)
 				   (hours
 				    (remove
 				     nil
 				     (append
-				      (list (unless (eq org-timeblock-view-options 'hide-all) (ts-hour (ts-now))))
+				      (list (unless (eq org-timeblock-scale-options 'hide-all) (ts-hour (ts-now))))
 				      (mapcar
 				       (lambda (entry)
 					 (let ((s-or-e (org-timeblock-get-sched-or-event entry)))
@@ -1868,7 +1868,7 @@ Available view options:
 	    choices)
 	   (mapcar #'cadr choices))))
     (message "")
-    (setq org-timeblock-view-options
+    (setq org-timeblock-scale-options
 	  (caddr (seq-find (lambda (x) (eq (cadr x) answer)) choices)))
     (org-timeblock-redraw-timeblocks)))
 
