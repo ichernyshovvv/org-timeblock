@@ -1613,6 +1613,7 @@ If EVENTP is non-nil the entry is considered as an event."
 				     (<= (car pos) (+ x (dom-attr node 'width)))
 				     (<= (cdr pos) (+ y (dom-attr node 'height)))
 				     (> (cdr pos) y))))))))
+      (goto-char (point-min))
       (re-search-forward (format "id=\"%s\" fill=\"\\([^\"]+\\)\"" (dom-attr found 'id)) nil t)
       (setq org-timeblock-prev-selected-block-color (match-string-no-properties 1))
       (replace-match org-timeblock-sel-block-color nil nil nil 1))
