@@ -1472,17 +1472,15 @@ The blocks may be events or tasks with SCHEDULED property."
 	       (id (caar mark-data))
 	       (marker (org-timeblock-get-marker-by-id id))
 	       (interval
-		(let* ((choices `(("[s]ide-by-side (0 mins between blocks)" ?s 0)
-				  ("save [t]ime between blocks" ?t savetime)
-				  ("enter your [i]nterval" ?i user-input)))
+		(let* ((choices '(("side-by-side (0 mins between blocks)" ?s 0)
+				  ("save time between blocks" ?b savetime)
+				  ("enter your interval" ?i user-input)))
 		       (answer
 			(read-char-from-minibuffer
 			 (mapconcat
-			  (lambda (x)
-			    (and (string-match "\\[.\\]" (car x))
-				 (replace-match (propertize (format "[%c]" (cadr x)) 'face 'error) nil nil (car x))))
-			  choices
-			  "\n")
+			  (lambda (x) (concat (propertize (char-to-string (cadr x)) 'face 'error)
+					      " " (car x) "\n"))
+			  choices)
 			 (mapcar #'cadr choices))))
 		  (message "")
 		  (pcase (caddr (seq-find (lambda (x) (eq (cadr x) answer)) choices))
