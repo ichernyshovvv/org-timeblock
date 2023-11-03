@@ -1856,12 +1856,20 @@ Available view options:
 2. Hide hours in the past (if there are no timeblocks).
 3. Hide all free hours before the first timeblock."
   (interactive)
-  (setq org-timeblock-view-options
-	(pcase org-timeblock-view-options
-	  (`nil 'hide-all)
-	  (`hide-all 't)
-	  (`t 'nil)))
-  (org-timeblock-redraw-timeblocks))
+  (let* ((choices '(("Hide hours in the past (if there are no timeblocks)." ?c t)
+		    ("Do not hide anything.  All 24 hours will be displayed." ?a nil)
+		    ("Hide all free hours before the first timeblock." ?h hide-all)))
+	 (answer
+	  (read-char-from-minibuffer
+	   (mapconcat
+	    (lambda (x) (concat (propertize (char-to-string (cadr x)) 'face 'error)
+				" " (car x) "\n"))
+	    choices)
+	   (mapcar #'cadr choices))))
+    (message "")
+    (setq org-timeblock-view-options
+	  (caddr (seq-find (lambda (x) (eq (cadr x) answer)) choices)))
+    (org-timeblock-redraw-timeblocks)))
 
 (defun org-timeblock-switch-view ()
   "Switch current view to 1-7-days view."
