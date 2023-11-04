@@ -221,6 +221,7 @@ tasks and those tasks that have not been sorted yet.")
   "V" #'org-timeblock-switch-view
   "m" #'org-timeblock-mark-block
   "u" #'org-timeblock-unmark-block
+  "U" #'org-timeblock-unmark-all-blocks
   "w" #'org-timeblock-write)
 
 (defvar-keymap org-timeblock-list-mode-map
@@ -1710,6 +1711,23 @@ Modifies the match data.  First match group a fill property."
 	      (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
 	      t))
 	(org-timeblock-forward-block)))))
+
+(defun org-timeblock-unmark-all-blocks ()
+  (interactive)
+  (let ((inhibit-read-only t))
+    (goto-char (point-min))
+    (while (re-search-forward
+	    (format (rx "<rect " (*? any)
+			" id=\"" (group (+ (not "\""))) "\""
+			" fill=\"" (group "%s") "\"")
+		    org-timeblock-marked-block-color)
+	    nil t)
+      (when-let ((id (car (save-match-data (split-string (match-string-no-properties 1) "_"))))
+		 (blk (assoc id org-timeblock-mark-data)))
+	(replace-match (cdr blk) nil nil nil 2)
+	(setq org-timeblock-mark-data (remove blk org-timeblock-mark-data))))
+    (org-timeblock-unmark-block)
+    (org-timeblock-backward-block)))
 
 (defun org-timeblock-forward-block ()
   "Select the next timeblock in *org-timeblock* buffer.
