@@ -1893,15 +1893,14 @@ Available view options:
 (defun org-timeblock-switch-view ()
   "Switch current view to 1-7-days view."
   (interactive)
-  (let ((cur-date (nth (1- org-timeblock-current-column) (org-timeblock-get-dates))))
-    (pcase (string-to-number (completing-read "Number of days in the view: " '("1" "2" "3" "4" "5" "6" "7") nil t))
-      (`1
-       (setq org-timeblock-n-days-view 1
-	     org-timeblock-daterange (list cur-date)))
-      ((and days _)
-       (setq org-timeblock-n-days-view days
-	     org-timeblock-daterange (cons cur-date (ts-inc 'day days cur-date))))))
-  (setq org-timeblock-current-column 1)
+  (let ((cur-date (nth (1- org-timeblock-current-column) (org-timeblock-get-dates)))
+	(span (- (read-char-from-minibuffer "Span span [1-7]: " '(?1 ?2 ?3 ?4 ?5 ?6 ?7)) 48)))
+    (setq org-timeblock-daterange
+	  (if (= span 1)
+	      (list cur-date)
+	    (cons cur-date (ts-inc 'day span cur-date)))
+	  org-timeblock-n-days-view span
+	  org-timeblock-current-column 1))
   (org-timeblock-redraw-buffers))
 
 (defun org-timeblock-list-toggle-timeblock ()
