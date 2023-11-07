@@ -56,6 +56,15 @@
   :group 'org
   :link '(url-link "https://github.com/ichernyshovvv/org-timeblock"))
 
+(defcustom org-timeblock-show-future-repeats t
+  "Non-nil shows repeated entries in the future dates of repeat.
+When set to the symbol `next' only the first future repeat is shown."
+  :group 'org-timeblock
+  :type '(choice
+	  (const :tag "Show all repeated entries" t)
+	  (const :tag "Show next repeated entry" next)
+	  (const :tag "Do not show repeated entries" nil)))
+
 (defcustom org-timeblock-show-outline-path nil
   "Non-nil means show outline path in echo area for the selected item."
   :group 'org-timeblock
@@ -570,17 +579,25 @@ Default background color is used when BASE-COLOR is nil."
 						     (start-ts (org-timeblock--parse-org-element-ts timestamp)))
 						(or
 						 (org-timeblock-ts-date= start-ts date)
-						 (when-let ((value (org-element-property :repeater-value timestamp))
+						 (when-let ((org-timeblock-show-future-repeats)
+							    (value (org-element-property :repeater-value timestamp))
 							    (unit (org-element-property :repeater-unit timestamp))
 							    (start start-ts))
-						   (or (eq unit 'day)
-						       (progn
-							 (when (eq 'week unit)
-							   (setq value (* value 7)
-								 unit 'day))
-							 (while (org-timeblock-ts-date< start date)
-							   (setq start (ts-inc unit value start)))
-							 (org-timeblock-ts-date= start date))))
+						   (or
+						    (and (eq unit 'day)
+							 (= value 1)
+							 (if (eq org-timeblock-show-future-repeats 'next)
+							     (org-timeblock-ts-date= (ts-inc 'day 1 start) date)
+							   org-timeblock-show-future-repeats))   
+						    (progn
+						      (when (eq 'week unit)
+							(setq value (* value 7)
+							      unit 'day))
+						      (if (eq org-timeblock-show-future-repeats 'next)
+							  (setq start (ts-inc unit value start))
+							(while (org-timeblock-ts-date< start date)
+							  (setq start (ts-inc unit value start))))
+						      (org-timeblock-ts-date= start date))))
 						 (when-let ((end-ts (org-timeblock--parse-org-element-ts timestamp t)))
 						   (and (org-timeblock-ts-date< start-ts date)
 							(org-timeblock-ts-date<= date end-ts))))))
