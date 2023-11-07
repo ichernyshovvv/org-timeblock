@@ -569,22 +569,18 @@ Default background color is used when BASE-COLOR is nil."
 						     (date (nth iter dates))
 						     (start-ts (org-timeblock--parse-org-element-ts timestamp)))
 						(or
-						 (and
-						  (member (org-element-property :repeater-type timestamp) '(restart catch-up))
-						  (org-timeblock-ts-date<= start-ts date))
-						 (and (eq (org-element-property :repeater-type timestamp) 'cumulate)
-						      (when-let ((start start-ts)
-								 (value (org-element-property :repeater-value timestamp))
-								 (unit (pcase (org-element-property :repeater-unit timestamp)
-									 (`week
-									  (setq value (* value 7))
-									  'day)
-									 ((and _ u) u))))
-							;; TODO rewrite
-							(while (org-timeblock-ts-date< start date)
-							  (setq start (ts-inc unit value start)))
-							(org-timeblock-ts-date= start date)))
 						 (org-timeblock-ts-date= start-ts date)
+						 (when-let ((value (org-element-property :repeater-value timestamp))
+							    (unit (org-element-property :repeater-unit timestamp))
+							    (start start-ts))
+						   (or (eq unit 'day)
+						       (progn
+							 (when (eq 'week unit)
+							   (setq value (* value 7)
+								 unit 'day))
+							 (while (org-timeblock-ts-date< start date)
+							   (setq start (ts-inc unit value start)))
+							 (org-timeblock-ts-date= start date))))
 						 (when-let ((end-ts (org-timeblock--parse-org-element-ts timestamp t)))
 						   (and (org-timeblock-ts-date< start-ts date)
 							(org-timeblock-ts-date<= date end-ts))))))
