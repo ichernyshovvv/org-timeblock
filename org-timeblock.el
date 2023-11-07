@@ -603,7 +603,8 @@ Default background color is used when BASE-COLOR is nil."
 				      (mapcar
 				       (lambda (entry)
 					 (let ((s-or-e (org-timeblock-get-sched-or-event entry)))
-					   (if (org-timeblock-ts-date< (org-timeblock--parse-org-element-ts s-or-e) (nth iter dates))
+					   (if (and (org-timeblock-ts-date< (org-timeblock--parse-org-element-ts s-or-e) (nth iter dates))
+						    (not (org-element-property :repeater-type s-or-e)))
 					       0
 					     (org-element-property :hour-start s-or-e))))
 				       entries)))))
