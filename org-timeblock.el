@@ -110,7 +110,10 @@ When set to the symbol `next' only the first future repeat is shown."
   :type '(choice
 	  (const :tag "Hide hours in the past (if there are no timeblocks)." t)
 	  (const :tag "Do not hide anything.  All 24 hours will be displayed." nil)
-	  (const :tag "Hide all free hours before the first timeblock." hide-all)))
+	  (const :tag "Hide all free hours before the first timeblock." hide-all)
+	  (cons :tag "Display specified range of hours [earliest; latest)."
+		(integer :tag "Min Hour")
+		(integer :tag "Max Hour"))))
 
 (defcustom org-timeblock-fast-todo-commands
   '(("TODO" . "1")
@@ -607,23 +610,27 @@ Default background color is used when BASE-COLOR is nil."
 			 (timeline-left-padding (* 2 (default-font-width)))
 			 (block-max-width (- window-width timeline-left-padding))
 			 (min-hour
-			  (if-let ((org-timeblock-scale-options)
-				   (hours
-				    (remove
-				     nil
-				     (append
-				      (list (unless (eq org-timeblock-scale-options 'hide-all) (ts-hour (ts-now))))
-				      (mapcar
-				       (lambda (entry)
-					 (let ((s-or-e (org-timeblock-get-sched-or-event entry)))
-					   (if (and (org-timeblock-ts-date< (org-timeblock--parse-org-element-ts s-or-e) (nth iter dates))
-						    (not (org-element-property :repeater-type s-or-e)))
-					       0
-					     (org-element-property :hour-start s-or-e))))
-				       entries)))))
-			      (apply #'min hours)
-			    0))
-			 (scale (/ (float window-height) (float (* (- 24 min-hour) 60))))
+			  (pcase org-timeblock-scale-options
+			    ((pred consp) (car org-timeblock-scale-options))
+			    (`nil 0)
+			    (_ (apply #'min (remove
+					     nil
+					     (append
+					      (list (unless (eq org-timeblock-scale-options 'hide-all) (ts-hour (ts-now))))
+					      (mapcar
+					       (lambda (entry)
+						 (let ((s-or-e (org-timeblock-get-sched-or-event entry)))
+						   (if (and (org-timeblock-ts-date< (org-timeblock--parse-org-element-ts s-or-e) (nth iter dates))
+							    (not (org-element-property :repeater-type s-or-e)))
+						       0
+						     (org-element-property :hour-start s-or-e))))
+					       entries)))))))
+			 (max-hour (if (consp org-timeblock-scale-options)
+				       (if (= (cdr org-timeblock-scale-options) 24)
+					   24
+					 (1+ (cdr org-timeblock-scale-options)))
+				     24))
+			 (scale (/ (float window-height) (float (* (- max-hour min-hour) 60))))
 			 (cur-time (ts-now))
 			 (cur-time-indicator
 			  (* scale
@@ -717,7 +724,7 @@ Default background color is used when BASE-COLOR is nil."
 					(throw 'found-column k))))))))
 		    ;; Drawing hour lines
 		    (let ((lines-iter (if (> min-hour 0) (1- min-hour) 0)) y)
-		      (while (< (cl-incf lines-iter) 24)
+		      (while (< (cl-incf lines-iter) max-hour)
 			(setq y (round (* scale (- lines-iter min-hour) 60)))
 			(svg-line
 			 org-timeblock-svg-obj
@@ -1891,7 +1898,8 @@ Available view options:
   (interactive)
   (let* ((choices '(("Hide hours in the past (if there are no timeblocks)." ?c t)
 		    ("Do not hide anything.  All 24 hours will be displayed." ?a nil)
-		    ("Hide all free hours before the first timeblock." ?h hide-all)))
+		    ("Hide all free hours before the first timeblock." ?h hide-all)
+		    ("Display specified range of hours [earliest; latest]." ?v user)))
 	 (answer
 	  (read-char-from-minibuffer
 	   (mapconcat
@@ -1901,7 +1909,12 @@ Available view options:
 	   (mapcar #'cadr choices))))
     (message "")
     (setq org-timeblock-scale-options
-	  (caddr (seq-find (lambda (x) (eq (cadr x) answer)) choices)))
+	  (pcase (caddr (seq-find (lambda (x) (eq (cadr x) answer)) choices))
+	    (`user (let (min-hour max-hour)
+		     (while (not (<= 0 (setq min-hour (read-number "Min [0-23]: " )) 23)))
+		     (while (not (< min-hour (setq max-hour (read-number (format "Max (%d; 24]: " min-hour))) 25)))
+		     (cons min-hour max-hour)))
+	    ((and n _) n)))
     (org-timeblock-redraw-timeblocks)))
 
 (defun org-timeblock-switch-view ()
