@@ -571,10 +571,18 @@ Default background color is used when BASE-COLOR is nil."
       (if-let ((entries (org-timeblock-get-entries :sort-func #'org-timeblock-sched-or-event< :exclude-dateranges t :with-time t))
 	       (dates (org-timeblock-get-dates))
 	       (window (get-buffer-window org-timeblock-buffer))
-	       (overall-window-height (setq org-timeblock-svg-height (window-body-height window t)))
-	       (overall-window-width (setq org-timeblock-svg-width (window-body-width window t))))
-	  (progn
-	    (setq org-timeblock-svg-obj (svg-create overall-window-width overall-window-height))
+	       (_ (setq org-timeblock-svg-height (window-body-height window t)
+			org-timeblock-svg-width (window-body-width window t))))
+	  (let* ((column-width (/ org-timeblock-svg-width (length dates)))
+		 (timeline-left-padding (* 2 (default-font-width)))
+		 (block-max-width (- column-width timeline-left-padding))
+		 (max-hour (if (consp org-timeblock-scale-options)
+			       (if (= (cdr org-timeblock-scale-options) 24)
+				   24
+				 (1+ (cdr org-timeblock-scale-options)))
+			     24))
+		 (cur-time (ts-now)))
+	    (setq org-timeblock-svg-obj (svg-create org-timeblock-svg-width org-timeblock-svg-height))
 	    (dotimes (iter (length dates))
 	      (if-let ((entries (seq-filter (lambda (x)
 					      (let* ((timestamp (org-timeblock-get-sched-or-event x))
@@ -605,11 +613,7 @@ Default background color is used when BASE-COLOR is nil."
 						   (and (org-timeblock-ts-date< start-ts date)
 							(org-timeblock-ts-date<= date end-ts))))))
 					    entries)))
-		  (let* ((window-height (window-body-height window t))
-			 (window-width (/ (window-body-width window t) (length dates)))
-			 (timeline-left-padding (* 2 (default-font-width)))
-			 (block-max-width (- window-width timeline-left-padding))
-			 (min-hour
+		  (let* ((min-hour
 			  (pcase org-timeblock-scale-options
 			    ((pred consp) (car org-timeblock-scale-options))
 			    (`nil 0)
@@ -625,13 +629,7 @@ Default background color is used when BASE-COLOR is nil."
 						       0
 						     (org-element-property :hour-start s-or-e))))
 					       entries)))))))
-			 (max-hour (if (consp org-timeblock-scale-options)
-				       (if (= (cdr org-timeblock-scale-options) 24)
-					   24
-					 (1+ (cdr org-timeblock-scale-options)))
-				     24))
-			 (scale (/ (float window-height) (float (* (- max-hour min-hour) 60))))
-			 (cur-time (ts-now))
+			 (scale (/ org-timeblock-svg-height (float (* (- max-hour min-hour) 60))))
 			 (cur-time-indicator
 			  (* scale
 			     (-
@@ -728,16 +726,16 @@ Default background color is used when BASE-COLOR is nil."
 			(setq y (round (* scale (- lines-iter min-hour) 60)))
 			(svg-line
 			 org-timeblock-svg-obj
-			 (+ timeline-left-padding (* window-width iter))
+			 (+ timeline-left-padding (* column-width iter))
 			 y
-			 (+ window-width (* window-width iter))
+			 (+ column-width (* column-width iter))
 			 y
 			 :stroke-dasharray "4"
 			 :stroke hour-lines-color)
 			(svg-text
 			 org-timeblock-svg-obj (format "%d" lines-iter)
 			 :y (+ y 5)
-			 :x (* window-width iter)
+			 :x (* column-width iter)
 			 :fill (face-attribute 'default :foreground))))
 		    ;; Drawing all the entries inside the timeline
 		    (dolist (entry entries)
@@ -757,7 +755,7 @@ Default background color is used when BASE-COLOR is nil."
 				 (block-height (get-text-property 0 'block-height entry))
 				 ((> (+ y block-height) 0))
 				 (x (+ (+ timeline-left-padding (round (* (1- (cdr (assoc (get-text-property 0 'id entry) columns))) (/ block-max-width length))))
-				       (* window-width iter)
+				       (* column-width iter)
 				       (if (org-timeblock-get-event entry) 2 1)))
 				 (block-width (- (round (/ block-max-width length)) (if (org-timeblock-get-event entry) 2 1)))
 				 (title (concat (get-text-property 0 'title entry)
@@ -814,23 +812,20 @@ Default background color is used when BASE-COLOR is nil."
 				      :fill (or (cadr colors) hour-lines-color)
 				      :font-size (aref (font-info (face-font 'default)) 2))))))
 		    ;; Drawing current time indicator
-		    (when (and org-timeblock-current-time-indicator
-			       (org-timeblock-ts-date= (nth iter dates) (ts-now)))
-		      (svg-polygon
-		       org-timeblock-svg-obj
-		       (list
-			(cons (+ (* window-width iter) (- block-max-width 5)) cur-time-indicator)
-			(cons (+ (* window-width iter) block-max-width 25) (- cur-time-indicator 5))
-			(cons (+ (* window-width iter) block-max-width 25) (+ cur-time-indicator 5)))
-		       :fill-color "red")))
-		(let* ((window (get-buffer-window org-timeblock-buffer))
-		       (window-height (window-body-height window t))
-		       (window-width (/ (window-body-width window t) (length dates)))
-		       (message "No data."))
+		    (and org-timeblock-current-time-indicator
+			 (org-timeblock-ts-date= (nth iter dates) cur-time)
+			 (svg-polygon
+			  org-timeblock-svg-obj
+			  (list
+			   (cons (+ (* column-width iter) (- block-max-width 5)) cur-time-indicator)
+			   (cons (+ (* column-width iter) block-max-width 25) (- cur-time-indicator 5))
+			   (cons (+ (* column-width iter) block-max-width 25) (+ cur-time-indicator 5)))
+			  :fill-color "red")))
+		(let ((message "No data."))
 		  (svg-text org-timeblock-svg-obj message
-			    :y (/ window-height 2)
-			    :x (+ (- (/ window-width 2) (/ (* (default-font-width) (length message)) 2))
-				  (* window-width iter))
+			    :y (/ org-timeblock-svg-height 2)
+			    :x (+ (- (/ column-width 2) (/ (* (default-font-width) (length message)) 2))
+				  (* column-width iter))
 			    :fill (face-attribute 'default :foreground)
 			    :font-size (aref (font-info (face-font 'default)) 2)))))
 	    (svg-print org-timeblock-svg-obj))
