@@ -380,7 +380,7 @@ Mouse position is of the form (X . Y)."
     (while (and
 	    (push start-date dates)
 	    (setq start-date (ts-inc 'day 1 start-date))
-	    (org-timeblock-ts-date< start-date (cdr org-timeblock-daterange))))
+	    (org-timeblock-ts-date<= start-date (cdr org-timeblock-daterange))))
     (nreverse dates)))
 
 (defun org-timeblock-goto-selected-rect ()
@@ -571,8 +571,8 @@ Default background color is used when BASE-COLOR is nil."
       (if-let ((entries (org-timeblock-get-entries :sort-func #'org-timeblock-sched-or-event< :exclude-dateranges t :with-time t))
 	       (dates (org-timeblock-get-dates))
 	       (window (get-buffer-window org-timeblock-buffer))
-	       (_ (setq org-timeblock-svg-height (window-body-height window t)
-			org-timeblock-svg-width (window-body-width window t))))
+	       ((setq org-timeblock-svg-height (window-body-height window t)
+		      org-timeblock-svg-width (window-body-width window t))))
 	  (let* ((column-width (/ org-timeblock-svg-width (length dates)))
 		 (timeline-left-padding (* 2 (default-font-width)))
 		 (block-max-width (- column-width timeline-left-padding))
@@ -588,30 +588,45 @@ Default background color is used when BASE-COLOR is nil."
 					      (let* ((timestamp (org-timeblock-get-sched-or-event x))
 						     (date (nth iter dates))
 						     (start-ts (org-timeblock--parse-org-element-ts timestamp)))
-						(or
-						 (org-timeblock-ts-date= start-ts date)
-						 (when-let ((org-timeblock-show-future-repeats)
-							    (value (org-element-property :repeater-value timestamp))
-							    (unit (org-element-property :repeater-unit timestamp))
-							    (start start-ts))
-						   (or
-						    (and (eq unit 'day)
-							 (= value 1)
-							 (if (eq org-timeblock-show-future-repeats 'next)
-							     (org-timeblock-ts-date= (ts-inc 'day 1 start) date)
-							   org-timeblock-show-future-repeats))   
-						    (progn
-						      (when (eq 'week unit)
-							(setq value (* value 7)
-							      unit 'day))
-						      (if (eq org-timeblock-show-future-repeats 'next)
-							  (setq start (ts-inc unit value start))
-							(while (org-timeblock-ts-date< start date)
-							  (setq start (ts-inc unit value start))))
-						      (org-timeblock-ts-date= start date))))
-						 (when-let ((end-ts (org-timeblock--parse-org-element-ts timestamp t)))
-						   (and (org-timeblock-ts-date< start-ts date)
-							(org-timeblock-ts-date<= date end-ts))))))
+						(and
+						 (or (not (consp org-timeblock-scale-options))
+						     (<= (car org-timeblock-scale-options)
+							 (org-element-property :hour-start timestamp)
+							 (cdr org-timeblock-scale-options))
+						     (and
+						      (org-element-property :hour-end timestamp)
+						      (or (<=
+							   (org-element-property :hour-start timestamp)
+							   (car org-timeblock-scale-options)
+							   (org-element-property :hour-end timestamp))
+							  (<= (car org-timeblock-scale-options)
+							      (org-element-property :hour-end timestamp)
+							      (cdr org-timeblock-scale-options)))))
+						 (or
+						  (org-timeblock-ts-date= start-ts date)
+						  (when-let ((org-timeblock-show-future-repeats)
+							     (value (org-element-property :repeater-value timestamp))
+							     (unit (org-element-property :repeater-unit timestamp))
+							     (start start-ts))
+						    (or
+						     (and (eq unit 'day)
+							  (= value 1)
+							  (if (eq org-timeblock-show-future-repeats 'next)
+							      (org-timeblock-ts-date= (ts-inc 'day 1 start) date)
+							    (and org-timeblock-show-future-repeats
+								 (org-timeblock-ts-date<= start date))))
+						     (progn
+						       (when (eq 'week unit)
+							 (setq value (* value 7)
+							       unit 'day))
+						       (if (eq org-timeblock-show-future-repeats 'next)
+							   (setq start (ts-inc unit value start))
+							 (while (org-timeblock-ts-date< start date)
+							   (setq start (ts-inc unit value start))))
+						       (org-timeblock-ts-date= start date))))
+						  (when-let ((end-ts (org-timeblock--parse-org-element-ts timestamp t)))
+						    (and (org-timeblock-ts-date< start-ts date)
+							 (org-timeblock-ts-date<= date end-ts)))))))
 					    entries)))
 		  (let* ((min-hour
 			  (pcase org-timeblock-scale-options
@@ -676,21 +691,33 @@ Default background color is used when BASE-COLOR is nil."
 								      (default-font-height)
 								      (round
 								       (* (/ (ts-diff
-									      (if (and end-date-later-p (not repeated))
-										  (ts-apply :hour 23 :minute 59 :second 0 (nth iter dates))
+									      (if (or (and end-date-later-p (not repeated))
+										      (ts<
+										       (ts-apply :hour (1- max-hour) :minute 59 :second 0 (nth iter dates))
+										       (ts-apply :hour (ts-hour end-ts)
+												 :minute (ts-minute end-ts) (nth iter dates))))
+										  (ts-apply :hour (1- max-hour) :minute 59 :second 0 (nth iter dates))
 										end-ts)
-									      (if (and start-date-earlier-p (not repeated))
-										  (ts-apply :hour 0 :minute 1 :second 0 (nth iter dates))
+									      (if (or (and start-date-earlier-p (not repeated))
+										      (ts<
+										       (ts-apply :hour (ts-hour start-ts)
+												 :minute (ts-minute start-ts) (nth iter dates))
+										       (ts-apply :hour min-hour :minute 0 :second 0 (nth iter dates))))
+										  (ts-apply :hour min-hour :minute 0 :second 0 (nth iter dates))
 										start-ts))
 									     60)
 									  scale)))
 								   (default-font-height))
 								 (if (org-timeblock-get-event entry) 2 1))
-						y ,(if-let ((value (+ (round (* (- (if (and start-date-earlier-p (not repeated))
-										       0
-										     (+ (* 60 (org-element-property :hour-start timestamp))
-											(org-element-property :minute-start timestamp)))
-										   (* min-hour 60))
+						y ,(if-let ((value (+ (round (* (if (or (and start-date-earlier-p (not repeated))
+											(ts<
+											 (ts-apply :hour (ts-hour start-ts)
+												   :minute (ts-minute start-ts) (nth iter dates))
+											 (ts-apply :hour min-hour :minute 0 :second 0 (nth iter dates))))
+										    0
+										  (- (+ (* 60 (org-element-property :hour-start timestamp))
+											(org-element-property :minute-start timestamp))
+										     (* min-hour 60)))
 										scale))
 								      (if (org-timeblock-get-event entry) 2 1)))
 							    ((< (- org-timeblock-svg-height value) (default-font-height))))
@@ -832,7 +859,7 @@ Default background color is used when BASE-COLOR is nil."
 	(let* ((window (get-buffer-window org-timeblock-buffer))
 	       (window-height (window-body-height window t))
 	       (window-width (window-body-width window t))
-	       (message "No entries found for this date."))
+	       (message "No data."))
 	  (setq org-timeblock-svg-obj (svg-create window-width window-height))
 	  (svg-text
 	   org-timeblock-svg-obj message
@@ -1907,7 +1934,7 @@ Available view options:
 	  (pcase (caddr (seq-find (lambda (x) (eq (cadr x) answer)) choices))
 	    (`user (let (min-hour max-hour)
 		     (while (not (<= 0 (setq min-hour (read-number "Min [0-23]: " )) 23)))
-		     (while (not (< min-hour (setq max-hour (read-number (format "Max (%d; 24]: " min-hour))) 25)))
+		     (while (not (<= min-hour (setq max-hour (read-number (format "Max [%d; 24]: " min-hour))) 24)))
 		     (cons min-hour max-hour)))
 	    ((and n _) n)))
     (org-timeblock-redraw-timeblocks)))
@@ -1920,7 +1947,7 @@ Available view options:
     (setq org-timeblock-daterange
 	  (if (= span 1)
 	      (list cur-date)
-	    (cons cur-date (ts-inc 'day span cur-date)))
+	    (cons cur-date (ts-inc 'day (1- span) cur-date)))
 	  org-timeblock-n-days-view span
 	  org-timeblock-current-column 1))
   (org-timeblock-redraw-buffers))
