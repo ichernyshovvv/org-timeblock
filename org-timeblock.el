@@ -1406,7 +1406,9 @@ When BACKWARD is non-nil, move backward."
   "Enter `org-timeblock-list-mode'."
   (interactive)
   (switch-to-buffer org-timeblock-list-buffer)
-  (setq org-timeblock-daterange (cons (ts-now) (ts-inc 'day org-timeblock-n-days-view (ts-now))))
+  (setq org-timeblock-daterange
+	(cons (ts-now)
+	      (ts-inc 'day (1- org-timeblock-n-days-view) (ts-now))))
   (org-timeblock-redraw-buffers))
 
 ;;;###autoload
@@ -1414,7 +1416,9 @@ When BACKWARD is non-nil, move backward."
   "Enter `org-timeblock-mode'."
   (interactive)
   (switch-to-buffer org-timeblock-buffer)
-  (setq org-timeblock-daterange (cons (ts-now) (ts-inc 'day org-timeblock-n-days-view (ts-now))))
+  (setq org-timeblock-daterange
+	(cons (ts-now)
+	      (ts-inc 'day (1- org-timeblock-n-days-view) (ts-now))))
   (org-timeblock-redraw-buffers))
 
 ;;;; Planning commands
@@ -1843,7 +1847,9 @@ When called from Lisp, DATE should be a date as returned by
   (interactive (list (ts-parse (org-read-date nil nil nil nil
 					      (ts-internal (nth (1- org-timeblock-current-column) (org-timeblock-get-dates)))))))
   (when date
-    (setq org-timeblock-daterange (cons date (ts-inc 'day org-timeblock-n-days-view date)))
+    (setq org-timeblock-daterange
+	  (cons date
+		(ts-inc 'day (1- org-timeblock-n-days-view) date)))
     (org-timeblock-redraw-buffers)))
 
 (defun org-timeblock-day-earlier ()
