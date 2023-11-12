@@ -2125,6 +2125,13 @@ When called from Lisp, DATE should be a date as returned by
     (goto-char pos)
     (org-timeblock-show-context)))
 
+(defun org-timeblock-read-number-in-range (min max)
+  "Read a number in [MIN; MAX] and return it."
+  (cl-loop as n = (read-number
+		   (format "Number [%d; %d]: " min max))
+	   until (<= min n max)
+	   finally return n))
+
 (defun org-timeblock-switch-scaling ()
   "Switch between different scaling modes in `org-timeblock-mode'.
 
@@ -2149,9 +2156,10 @@ Available view options:
     (message "")
     (setq org-timeblock-scale-options
 	  (pcase (caddr (seq-find (lambda (x) (eq (cadr x) answer)) choices))
-	    (`user (let (min-hour max-hour)
-		     (while (not (<= 0 (setq min-hour (read-number "Min [0-23]: " )) 23)))
-		     (while (not (<= min-hour (setq max-hour (read-number (format "Max [%d; 24]: " min-hour))) 24)))
+	    (`user (let* ((min-hour
+			   (org-timeblock-read-number-in-range 0 23))
+			  (max-hour
+			   (org-timeblock-read-number-in-range min-hour 24)))
 		     (cons min-hour max-hour)))
 	    ((and n _) n)))
     (org-timeblock-redraw-timeblocks)))
