@@ -234,6 +234,7 @@ tasks and those tasks that have not been sorted yet.")
   "v" #'org-timeblock-switch-scaling
   "V" #'org-timeblock-switch-view
   "m" #'org-timeblock-mark-block
+  "%" #'org-timeblock-mark-by-regexp
   "u" #'org-timeblock-unmark-block
   "U" #'org-timeblock-unmark-all-blocks
   "w" #'org-timeblock-write)
@@ -1938,6 +1939,34 @@ Modifies the match data.  First match group a fill property."
 	(org-timeblock-redisplay)
 	(org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
 	t))))
+
+(defun org-timeblock-mark-by-regexp (regexp)
+  "Mark blocks by regexp."
+  (interactive "sMark entries matching regexp: ")
+  (let ((inhibit-read-only t))
+    (dolist (entry
+	     (seq-filter
+	      (lambda (x) (string-match regexp x))
+	      (org-timeblock-get-entries
+	       :sort-func #'org-timeblock-sched-or-event<
+	       :exclude-dateranges t :with-time t)))
+      (when-let ((id (get-text-property 0 'id entry))
+		 ((org-timeblock-goto-rect-with-id id)))
+	(replace-match org-timeblock-marked-block-color nil nil nil 1)
+	(cl-pushnew (cons id org-timeblock-prev-selected-block-color)
+		    org-timeblock-mark-data
+		    :test (lambda (x y) (string= (car y) (car x))))))
+    (org-timeblock-redisplay)))
+
+(defun org-timeblock-goto-rect-with-id (id)
+  "Move point to selected rect."
+  (goto-char (point-min))
+  (re-search-forward
+   (format (rx "<rect " (*? any)
+	       " id=\"" "%s" "_" (one-or-more num) "\""
+	       " fill=\"" (group (+ (not "\""))) "\"")
+	   id)
+   nil t))
 
 (defun org-timeblock-unmark-block ()
   "Unmark selected block."
