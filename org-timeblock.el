@@ -268,6 +268,7 @@ tasks and those tasks that have not been sorted yet.")
 				      (downcase (car elem))))))
     (defalias command-name
       (lambda ()
+	"Todo command generated based on `org-timeblock-fast-todo-commands'."
 	(interactive)
 	(when-let ((m (pcase major-mode
 			(`org-timeblock-list-mode
