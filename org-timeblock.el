@@ -99,10 +99,11 @@ When set to the symbol `next' only the first future repeat is shown."
   'pick
   "Time to which new tasks are scheduled via `org-timeblock-new-task'."
   :group 'org-timeblock
-  :type '(choice
-	  (const :tag "Unspecified.  The new task will be scheduled to a date with no time" nil)
-	  (const :tag "The new task will be scheduled to a time picked by user." pick)
-	  (string :tag "Time of the format \"HH:MM\".  The new task will be scheduled to a time.")))
+  :type
+  '(choice
+    (const :tag "Unspecified.  The new task will be scheduled to a date with no time" nil)
+    (const :tag "The new task will be scheduled to a time picked by user." pick)
+    (string :tag "Time of the format \"HH:MM\".  The new task will be scheduled to a time.")))
 
 (defcustom org-timeblock-scale-options t
   "Options that are used to decide which part of visual schedule must be hidden."
@@ -195,7 +196,8 @@ a user have previously opened in `org-timeblock-list-mode'.")
     (?m . 1))
   "Duration multipliers used in `org-timeblock-read-duration'.")
 
-(defvar org-timeblock-buffer "*org-timeblock*" "The name of the buffer displaying visual schedule.")
+(defvar org-timeblock-buffer
+  "*org-timeblock*" "The name of the buffer displaying visual schedule.")
 
 (defvar org-timeblock-list-buffer "*org-timeblock-list*"
   "The name of the buffer displaying the list of tasks and events.")
@@ -262,7 +264,8 @@ tasks and those tasks that have not been sorted yet.")
 
 ;; Generate todo commands and bind them to a corresponding key
 (dolist (elem org-timeblock-fast-todo-commands)
-  (let ((command-name (intern (format "%s%s" 'org-timeblock-fast- (downcase (car elem))))))
+  (let ((command-name (intern (format "%s%s" 'org-timeblock-fast-
+				      (downcase (car elem))))))
     (defalias command-name
       (lambda ()
 	(interactive)
@@ -279,7 +282,8 @@ tasks and those tasks that have not been sorted yet.")
 ;;;; Modes
 
 (defvar image-transform-resize)
-(define-derived-mode org-timeblock-mode image-mode "Org-Timeblock" :interactive nil
+(define-derived-mode org-timeblock-mode
+  image-mode "Org-Timeblock" :interactive nil
   (if-let ((window (get-buffer-window org-timeblock-buffer))
 	   ((or (< (window-body-height window t) org-timeblock-svg-height)
 		(< (window-body-width window t) org-timeblock-svg-width))))
@@ -287,8 +291,12 @@ tasks and those tasks that have not been sorted yet.")
     (setq image-transform-resize nil
 	  header-line-format
 	  (let* ((dates (org-timeblock-get-dates))
-		 (left-fringe (/ (car (window-fringes window)) (default-font-width)))
-		 (max-length (/ (+ (/ (window-body-width window t) (default-font-width)) left-fringe) (length dates)))
+		 (left-fringe (/ (car (window-fringes window))
+				 (default-font-width)))
+		 (max-length (/ (+ (/ (window-body-width window t)
+				      (default-font-width))
+				   left-fringe)
+				(length dates)))
 		 (date-format
 		  (pcase max-length
 		    ((pred (< 15)) "[%Y-%m-%d %a]")
@@ -299,12 +307,17 @@ tasks and those tasks that have not been sorted yet.")
 		 (result (make-string left-fringe ? )))
 	    (dotimes (iter (length dates))
 	      (cl-callf concat result
-		(propertize (format right-margin (ts-format date-format (nth iter dates))) 'face
-			    (and (= org-timeblock-current-column (1+ iter)) `(:background ,org-timeblock-sel-block-color)))))
+		(propertize
+		 (format right-margin
+			 (ts-format date-format (nth iter dates)))
+		 'face
+		 (and (= org-timeblock-current-column (1+ iter))
+		      `(:background ,org-timeblock-sel-block-color)))))
 	    result)
 	  buffer-read-only t)))
 
-(define-derived-mode org-timeblock-list-mode special-mode "Org-Timeblock-List" :interactive nil
+(define-derived-mode org-timeblock-list-mode
+  special-mode "Org-Timeblock-List" :interactive nil
   (setq truncate-lines t))
 
 ;;;; Functions
@@ -476,7 +489,8 @@ A and B are ts.el ts objects."
 (defun org-timeblock-select-block-for-current-entry ()
   "Select block for the entry at point in `org-timeblock-list-mode'."
   (when-let (((get-buffer-window org-timeblock-buffer))
-	     (timestamp (org-timeblock-get-sched-or-event nil (line-beginning-position)))
+	     (timestamp (org-timeblock-get-sched-or-event
+			 nil (line-beginning-position)))
 	     ((org-element-property :hour-start timestamp))
 	     ((not (org-timeblock--daterangep timestamp)))
 	     (id (get-text-property (line-beginning-position) 'id))
@@ -484,7 +498,8 @@ A and B are ts.el ts objects."
 	      (save-excursion
 		(let ((count 0))
 		  (while (not (bobp))
-		    (while (not (eq (get-text-property (point) 'face) 'org-timeblock-list-header))
+		    (while (not (eq (get-text-property (point) 'face)
+				    'org-timeblock-list-header))
 		      (forward-line -1))
 		    (cl-incf count)
 		    (forward-line -1))
@@ -492,7 +507,10 @@ A and B are ts.el ts objects."
 	     (inhibit-read-only t))
     (with-current-buffer org-timeblock-buffer
       (org-timeblock-unselect-block)
-      (when (re-search-forward (format " id=\"%s\" fill=\"\\([^\"]+\\)\"" (format "%s_%d" id column-number)) nil t)
+      (when (re-search-forward (format
+				" id=\"%s\" fill=\"\\([^\"]+\\)\""
+				(format "%s_%d" id column-number))
+			       nil t)
 	(setq org-timeblock-prev-selected-block-color (match-string 1))
 	(replace-match org-timeblock-sel-block-color nil nil nil 1)
 	(re-search-forward " column=\"\\([^\"]+\\)\"" nil t)
@@ -525,7 +543,8 @@ Otherwise, return nil.
 (defun org-timeblock--random-color ()
   "Generate random color based on BASE-COLOR and RANGE.
 Default background color is used when BASE-COLOR is nil."
-  (let* ((default-background-color (ignore-errors (face-attribute 'default :background)))
+  (let* ((default-background-color
+	  (ignore-errors (face-attribute 'default :background)))
 	 (base-color
           (cond ((eq 'unspecified default-background-color)
                  "#fff")
@@ -568,7 +587,9 @@ Default background color is used when BASE-COLOR is nil."
   (with-current-buffer (get-buffer-create org-timeblock-buffer)
     (let ((inhibit-read-only t))
       (erase-buffer)
-      (if-let ((entries (org-timeblock-get-entries :sort-func #'org-timeblock-sched-or-event< :exclude-dateranges t :with-time t))
+      (if-let ((entries (org-timeblock-get-entries
+			 :sort-func #'org-timeblock-sched-or-event<
+			 :exclude-dateranges t :with-time t))
 	       (dates (org-timeblock-get-dates))
 	       (window (get-buffer-window org-timeblock-buffer))
 	       ((setq org-timeblock-svg-height (window-body-height window t)
@@ -584,50 +605,52 @@ Default background color is used when BASE-COLOR is nil."
 		 (cur-time (ts-now)))
 	    (setq org-timeblock-svg-obj (svg-create org-timeblock-svg-width org-timeblock-svg-height))
 	    (dotimes (iter (length dates))
-	      (if-let ((entries (seq-filter (lambda (x)
-					      (let* ((timestamp (org-timeblock-get-sched-or-event x))
-						     (date (nth iter dates))
-						     (start-ts (org-timeblock--parse-org-element-ts timestamp)))
-						(and
-						 (or (not (consp org-timeblock-scale-options))
-						     (<= (car org-timeblock-scale-options)
-							 (org-element-property :hour-start timestamp)
-							 (cdr org-timeblock-scale-options))
-						     (and
-						      (org-element-property :hour-end timestamp)
-						      (or (<=
-							   (org-element-property :hour-start timestamp)
-							   (car org-timeblock-scale-options)
-							   (org-element-property :hour-end timestamp))
-							  (<= (car org-timeblock-scale-options)
-							      (org-element-property :hour-end timestamp)
-							      (cdr org-timeblock-scale-options)))))
-						 (or
-						  (org-timeblock-ts-date= start-ts date)
-						  (when-let ((org-timeblock-show-future-repeats)
-							     (value (org-element-property :repeater-value timestamp))
-							     (unit (org-element-property :repeater-unit timestamp))
-							     (start start-ts))
-						    (or
-						     (and (eq unit 'day)
-							  (= value 1)
-							  (if (eq org-timeblock-show-future-repeats 'next)
-							      (org-timeblock-ts-date= (ts-inc 'day 1 start) date)
-							    (and org-timeblock-show-future-repeats
-								 (org-timeblock-ts-date<= start date))))
-						     (progn
-						       (when (eq 'week unit)
-							 (setq value (* value 7)
-							       unit 'day))
-						       (if (eq org-timeblock-show-future-repeats 'next)
-							   (setq start (ts-inc unit value start))
-							 (while (org-timeblock-ts-date< start date)
-							   (setq start (ts-inc unit value start))))
-						       (org-timeblock-ts-date= start date))))
-						  (when-let ((end-ts (org-timeblock--parse-org-element-ts timestamp t)))
-						    (and (org-timeblock-ts-date< start-ts date)
-							 (org-timeblock-ts-date<= date end-ts)))))))
-					    entries)))
+	      (if-let ((entries
+			(seq-filter
+			 (lambda (x)
+			   (let* ((timestamp (org-timeblock-get-sched-or-event x))
+				  (date (nth iter dates))
+				  (start-ts (org-timeblock--parse-org-element-ts timestamp)))
+			     (and
+			      (or (not (consp org-timeblock-scale-options))
+				  (<= (car org-timeblock-scale-options)
+				      (org-element-property :hour-start timestamp)
+				      (cdr org-timeblock-scale-options))
+				  (and
+				   (org-element-property :hour-end timestamp)
+				   (or (<=
+					(org-element-property :hour-start timestamp)
+					(car org-timeblock-scale-options)
+					(org-element-property :hour-end timestamp))
+				       (<= (car org-timeblock-scale-options)
+					   (org-element-property :hour-end timestamp)
+					   (cdr org-timeblock-scale-options)))))
+			      (or
+			       (org-timeblock-ts-date= start-ts date)
+			       (when-let ((org-timeblock-show-future-repeats)
+					  (value (org-element-property :repeater-value timestamp))
+					  (unit (org-element-property :repeater-unit timestamp))
+					  (start start-ts))
+				 (or
+				  (and (eq unit 'day)
+				       (= value 1)
+				       (if (eq org-timeblock-show-future-repeats 'next)
+					   (org-timeblock-ts-date= (ts-inc 'day 1 start) date)
+					 (and org-timeblock-show-future-repeats
+					      (org-timeblock-ts-date<= start date))))
+				  (progn
+				    (when (eq 'week unit)
+				      (setq value (* value 7)
+					    unit 'day))
+				    (if (eq org-timeblock-show-future-repeats 'next)
+					(setq start (ts-inc unit value start))
+				      (while (org-timeblock-ts-date< start date)
+					(setq start (ts-inc unit value start))))
+				    (org-timeblock-ts-date= start date))))
+			       (when-let ((end-ts (org-timeblock--parse-org-element-ts timestamp t)))
+				 (and (org-timeblock-ts-date< start-ts date)
+				      (org-timeblock-ts-date<= date end-ts)))))))
+			 entries)))
 		  (let* ((min-hour
 			  (pcase org-timeblock-scale-options
 			    ((pred consp) (car org-timeblock-scale-options))
@@ -655,80 +678,105 @@ Default background color is used when BASE-COLOR is nil."
 			 placed
 			 (bg-rgb-sum (apply #'+ (org-timeblock--parse-hex-color org-timeblock-background-color)))
 			 (get-color
-			  (if (string= org-timeblock-background-color (face-attribute 'default :background))
-			      (lambda (title) (cl-callf (lambda (x) (or x (org-timeblock--random-color))) (alist-get title org-timeblock-colors nil nil #'equal)))
-			    (setq org-timeblock-background-color (face-attribute 'default :background))
+			  (if (string= org-timeblock-background-color
+				       (face-attribute 'default :background))
+			      (lambda (title)
+				(cl-callf (lambda (x) (or x (org-timeblock--random-color)))
+				    (alist-get title org-timeblock-colors nil nil #'equal)))
+			    (setq org-timeblock-background-color
+				  (face-attribute 'default :background))
 			    (setq org-timeblock-sel-block-color
-				  (if (> (setq bg-rgb-sum (apply #'+ (org-timeblock--parse-hex-color org-timeblock-background-color))) 550)
+				  (if (> (setq bg-rgb-sum
+					       (apply #'+
+						      (org-timeblock--parse-hex-color
+						       org-timeblock-background-color)))
+					 550)
 				      org-timeblock-sel-block-color-light
 				    org-timeblock-sel-block-color-dark))
-			    (lambda (title) (setf (alist-get title org-timeblock-colors nil nil #'equal) (org-timeblock--random-color)))))
-			 (hour-lines-color (if (> bg-rgb-sum 550) "#7b435c" "#cdcdcd")))
+			    (lambda (title)
+			      (setf (alist-get title org-timeblock-colors
+					       nil nil #'equal)
+				    (org-timeblock--random-color)))))
+			 (hour-lines-color
+			  (if (> bg-rgb-sum 550) "#7b435c" "#cdcdcd")))
 		    (dolist (entry entries)
 		      (let* ((timestamp (org-timeblock-get-sched-or-event entry))
-			     (repeated (org-element-property :repeater-type timestamp))
-			     (start-ts (org-timeblock--parse-org-element-ts timestamp))
-			     (end-ts (org-timeblock--parse-org-element-ts timestamp t))
-			     (start-date-earlier-p (org-timeblock-ts-date< start-ts (nth iter dates)))
-			     (end-date-later-p (org-timeblock-ts-date< (nth iter dates) end-ts)))
-			(add-text-properties 0 (length entry)
-					     `( time-string ,(and org-timeblock-display-time
-								  (or repeated (not (or end-date-later-p start-date-earlier-p)))
-								  (concat
-								   (ts-format " %H:%M" start-ts)
-								   (and end-ts (ts-format "-%H:%M" end-ts))
-								   (and repeated
-									(concat
-									 " "
-									 (pcase (org-element-property :repeater-type timestamp)
-									   (`cumulate "+") (`catch-up "++") (`restart ".+"))
-									 (let ((val (org-element-property :repeater-value timestamp)))
-									   (and val (number-to-string val)))
-									 (pcase (org-element-property :repeater-unit timestamp)
-									   (`hour "h") (`day "d") (`week "w") (`month "m") (`year "y"))))))
-						block-height ,(- (if (and start-ts end-ts)
-								     (max
-								      (default-font-height)
-								      (round
-								       (* (/ (ts-diff
-									      (if (or (and end-date-later-p (not repeated))
-										      (ts<
-										       (ts-apply :hour (1- max-hour) :minute 59 :second 0 (nth iter dates))
-										       (ts-apply :hour (ts-hour end-ts)
-												 :minute (ts-minute end-ts) (nth iter dates))))
-										  (ts-apply :hour (1- max-hour) :minute 59 :second 0 (nth iter dates))
-										end-ts)
-									      (if (or (and start-date-earlier-p (not repeated))
-										      (ts<
-										       (ts-apply :hour (ts-hour start-ts)
-												 :minute (ts-minute start-ts) (nth iter dates))
-										       (ts-apply :hour min-hour :minute 0 :second 0 (nth iter dates))))
-										  (ts-apply :hour min-hour :minute 0 :second 0 (nth iter dates))
-										start-ts))
-									     60)
-									  scale)))
-								   (default-font-height))
-								 (if (org-timeblock-get-event entry) 2 1))
-						y ,(if-let ((value (+ (round (* (if (or (and start-date-earlier-p (not repeated))
-											(ts<
-											 (ts-apply :hour (ts-hour start-ts)
-												   :minute (ts-minute start-ts) (nth iter dates))
-											 (ts-apply :hour min-hour :minute 0 :second 0 (nth iter dates))))
-										    0
-										  (- (+ (* 60 (org-element-property :hour-start timestamp))
-											(org-element-property :minute-start timestamp))
-										     (* min-hour 60)))
-										scale))
-								      (if (org-timeblock-get-event entry) 2 1)))
-							    ((< (- org-timeblock-svg-height value) (default-font-height))))
-						       (- org-timeblock-svg-height (default-font-height))
-						     value)
-						n-day-indicator ,(and (not repeated)
-								      (cond
-								       ((and end-date-later-p start-date-earlier-p) "↕️")
-								       (end-date-later-p "⬇️")
-								       (start-date-earlier-p "⬆️"))))
-					     entry)))
+			     (repeated (org-element-property
+					:repeater-type timestamp))
+			     (start-ts (org-timeblock--parse-org-element-ts
+					timestamp))
+			     (end-ts (org-timeblock--parse-org-element-ts
+				      timestamp t))
+			     (start-date-earlier-p (org-timeblock-ts-date<
+						    start-ts (nth iter dates)))
+			     (end-date-later-p (org-timeblock-ts-date<
+						(nth iter dates) end-ts)))
+			(add-text-properties
+			 0 (length entry)
+			 `( time-string
+			    ,(and
+			      org-timeblock-display-time
+			      (or repeated (not
+					    (or end-date-later-p
+						start-date-earlier-p)))
+			      (concat
+			       (ts-format " %H:%M" start-ts)
+			       (and end-ts (ts-format "-%H:%M" end-ts))
+			       (and repeated
+				    (concat
+				     " "
+				     (pcase (org-element-property :repeater-type timestamp)
+				       (`cumulate "+") (`catch-up "++") (`restart ".+"))
+				     (let ((val (org-element-property :repeater-value timestamp)))
+				       (and val (number-to-string val)))
+				     (pcase (org-element-property :repeater-unit timestamp)
+				       (`hour "h") (`day "d") (`week "w") (`month "m") (`year "y"))))))
+			    block-height
+			    ,(- (if (and start-ts end-ts)
+				    (max
+				     (default-font-height)
+				     (round
+				      (* (/ (ts-diff
+					     (if (or (and end-date-later-p (not repeated))
+						     (ts<
+						      (ts-apply :hour (1- max-hour) :minute 59 :second 0 (nth iter dates))
+						      (ts-apply :hour (ts-hour end-ts)
+								:minute (ts-minute end-ts) (nth iter dates))))
+						 (ts-apply :hour (1- max-hour) :minute 59 :second 0 (nth iter dates))
+					       end-ts)
+					     (if (or (and start-date-earlier-p (not repeated))
+						     (ts<
+						      (ts-apply :hour (ts-hour start-ts)
+								:minute (ts-minute start-ts) (nth iter dates))
+						      (ts-apply :hour min-hour :minute 0 :second 0 (nth iter dates))))
+						 (ts-apply :hour min-hour :minute 0 :second 0 (nth iter dates))
+					       start-ts))
+					    60)
+					 scale)))
+				  (default-font-height))
+				(if (org-timeblock-get-event entry) 2 1))
+			    y
+			    ,(if-let ((value (+ (round (* (if (or (and start-date-earlier-p (not repeated))
+								  (ts<
+								   (ts-apply :hour (ts-hour start-ts)
+									     :minute (ts-minute start-ts) (nth iter dates))
+								   (ts-apply :hour min-hour :minute 0 :second 0 (nth iter dates))))
+							      0
+							    (- (+ (* 60 (org-element-property :hour-start timestamp))
+								  (org-element-property :minute-start timestamp))
+							       (* min-hour 60)))
+							  scale))
+						(if (org-timeblock-get-event entry) 2 1)))
+				      ((< (- org-timeblock-svg-height value) (default-font-height))))
+				 (- org-timeblock-svg-height (default-font-height))
+			       value)
+			    n-day-indicator
+			    ,(and (not repeated)
+				  (cond
+				   ((and end-date-later-p start-date-earlier-p) "↕️")
+				   (end-date-later-p "⬇️")
+				   (start-date-earlier-p "⬆️"))))
+			 entry)))
 		    ;; Timeblocks layout algorithm
 		    (dolist (entry entries)
 		      (let ((id (get-text-property 0 'id entry)))
@@ -766,38 +814,59 @@ Default background color is used when BASE-COLOR is nil."
 			 :fill (face-attribute 'default :foreground))))
 		    ;; Drawing all the entries inside the timeline
 		    (dolist (entry entries)
-		      (when-let ((length (1+ (length (seq-uniq
-						      (mapcar
-						       ;; get columns for those entries
-						       (lambda (x)
-							 (cdr (assoc (get-text-property 0 'id x) columns)))
-						       ;; find those with which current entry is in intersection
-						       (seq-filter
-							(lambda (x)
-							  (unless (equal (get-text-property 0 'id entry) (get-text-property 0 'id x))
-							    (org-timeblock-intersect-p entry x)))
-							entries))
-						      #'eq))))
+		      (when-let ((length
+				  (1+ (length
+				       (seq-uniq
+					(mapcar
+					 ;; get columns for those entries
+					 (lambda (x)
+					   (cdr (assoc (get-text-property 0 'id x) columns)))
+					 ;; find those with which current entry is in intersection
+					 (seq-filter
+					  (lambda (x)
+					    (unless
+						(equal
+						 (get-text-property 0 'id entry)
+						 (get-text-property 0 'id x))
+					      (org-timeblock-intersect-p entry x)))
+					  entries))
+					#'eq))))
 				 (y (get-text-property 0 'y entry))
-				 (block-height (get-text-property 0 'block-height entry))
+				 (block-height
+				  (get-text-property 0 'block-height entry))
 				 ((> (+ y block-height) 0))
-				 (x (+ (+ timeline-left-padding (round (* (1- (cdr (assoc (get-text-property 0 'id entry) columns))) (/ block-max-width length))))
+				 (x (+ (+ timeline-left-padding
+					  (round
+					   (* (1- (cdr
+						   (assoc
+						    (get-text-property 0 'id entry)
+						    columns)))
+					      (/ block-max-width length))))
 				       (* column-width iter)
 				       (if (org-timeblock-get-event entry) 2 1)))
-				 (block-width (- (round (/ block-max-width length)) (if (org-timeblock-get-event entry) 2 1)))
-				 (title (concat (get-text-property 0 'title entry)
-						(get-text-property 0 'n-day-indicator entry)))
+				 (block-width
+				  (- (round (/ block-max-width length))
+				     (if (org-timeblock-get-event entry) 2 1)))
+				 (title
+				  (concat (get-text-property 0 'title entry)
+					  (get-text-property 0 'n-day-indicator entry)))
 				 ;; Splitting the title of an entry
 				 (heading-list
-				  (if (> (* (length title) (default-font-width)) block-width)
+				  (if (> (* (length title) (default-font-width))
+					 block-width)
 				      (seq-take
 				       (seq-partition title (/ block-width (default-font-width)))
-				       (let ((lines-count (round (/ block-height (default-font-height)))))
+				       (let ((lines-count
+					      (round
+					       (/ block-height (default-font-height)))))
 					 (if (= 0 lines-count) 1 lines-count)))
 				    `(,title))))
-			(let ((time-string (get-text-property 0 'time-string entry))
-			      (colors (org-timeblock-get-colors (get-text-property 0 'tags entry))))
-			  (when (< (/ block-width (default-font-width)) (length time-string))
+			(let ((time-string
+			       (get-text-property 0 'time-string entry))
+			      (colors (org-timeblock-get-colors
+				       (get-text-property 0 'tags entry))))
+			  (when (< (/ block-width (default-font-width))
+				   (length time-string))
 			    (setq time-string nil))
 			  (when-let ((time-string)
 				     ((< (- block-height
@@ -815,46 +884,67 @@ Default background color is used when BASE-COLOR is nil."
 				    (setq time-string nil)
 				    x))
 				(car (last heading-list))))
-			  (push (list (get-text-property 0 'id entry) (get-text-property 0 'marker entry) (org-timeblock-get-event entry)) org-timeblock-data)
+			  (push (list (get-text-property 0 'id entry)
+				      (get-text-property 0 'marker entry)
+				      (org-timeblock-get-event entry))
+				org-timeblock-data)
 			  ;; Appending generated rectangle for current entry
-			  (svg-rectangle org-timeblock-svg-obj x y block-width block-height
-					 :column (1+ iter)
-					 :stroke (if (org-timeblock-get-event entry) "#5b0103" "#cdcdcd")
-					 :stroke-width (if (org-timeblock-get-event entry) 2 1)
-					 :opacity "0.7"
-					 :fill (or (car colors) (funcall get-color title))
-					 :id (format "%s_%d" (get-text-property 0 'id entry) (1+ iter)))
+			  (svg-rectangle
+			   org-timeblock-svg-obj x y block-width block-height
+			   :column (1+ iter)
+			   :stroke (if (org-timeblock-get-event entry)
+				       "#5b0103" "#cdcdcd")
+			   :stroke-width (if (org-timeblock-get-event entry) 2 1)
+			   :opacity "0.7"
+			   :fill (or (car colors)
+				     (funcall get-color title))
+			   :id (format
+				"%s_%d"
+				(get-text-property 0 'id entry)
+				(1+ iter)))
 			  ;; Setting the title of current entry
 			  (let ((y (- y 5)))
 			    (dolist (heading-part heading-list)
 			      (svg-text org-timeblock-svg-obj heading-part
 					:x x
 					:y (cl-incf y (default-font-height))
-					:fill (or (cadr colors) (face-attribute 'default :foreground))
-					:font-size (aref (font-info (face-font 'default)) 2))))
+					:fill (or (cadr colors)
+						  (face-attribute 'default :foreground))
+					:font-size
+					(aref (font-info (face-font 'default)) 2))))
 			  (when time-string
 			    (svg-text org-timeblock-svg-obj time-string
-				      :x (- (+ x block-width) (* (length time-string) (default-font-width)))
+				      :x (- (+ x block-width)
+					    (* (length time-string)
+					       (default-font-width)))
 				      :y (- (+ y block-height) 2)
 				      :fill (or (cadr colors) hour-lines-color)
-				      :font-size (aref (font-info (face-font 'default)) 2))))))
+				      :font-size
+				      (aref (font-info (face-font 'default)) 2))))))
 		    ;; Drawing current time indicator
 		    (and org-timeblock-current-time-indicator
 			 (org-timeblock-ts-date= (nth iter dates) cur-time)
 			 (svg-polygon
 			  org-timeblock-svg-obj
 			  (list
-			   (cons (+ (* column-width iter) (- block-max-width 5)) cur-time-indicator)
-			   (cons (+ (* column-width iter) block-max-width 25) (- cur-time-indicator 5))
-			   (cons (+ (* column-width iter) block-max-width 25) (+ cur-time-indicator 5)))
+			   (cons (+ (* column-width iter) (- block-max-width 5))
+				 cur-time-indicator)
+			   (cons (+ (* column-width iter) block-max-width 25)
+				 (- cur-time-indicator 5))
+			   (cons (+ (* column-width iter) block-max-width 25)
+				 (+ cur-time-indicator 5)))
 			  :fill-color "red")))
 		(let ((message "No data."))
 		  (svg-text org-timeblock-svg-obj message
 			    :y (/ org-timeblock-svg-height 2)
-			    :x (+ (- (/ column-width 2) (/ (* (default-font-width) (length message)) 2))
+			    :x (+ (- (/ column-width 2)
+				     (/ (* (default-font-width)
+					   (length message))
+					2))
 				  (* column-width iter))
 			    :fill (face-attribute 'default :foreground)
-			    :font-size (aref (font-info (face-font 'default)) 2)))))
+			    :font-size
+			    (aref (font-info (face-font 'default)) 2)))))
 	    (svg-print org-timeblock-svg-obj))
 	(let* ((window (get-buffer-window org-timeblock-buffer))
 	       (window-height (window-body-height window t))
@@ -864,7 +954,8 @@ Default background color is used when BASE-COLOR is nil."
 	  (svg-text
 	   org-timeblock-svg-obj message
 	   :y (/ window-height 2)
-	   :x (- (/ window-width 2) (/ (* (default-font-width) (length message)) 2))
+	   :x (- (/ window-width 2)
+		 (/ (* (default-font-width) (length message)) 2))
 	   :fill (face-attribute 'default :foreground))
 	  (svg-print org-timeblock-svg-obj)))
       (setq org-timeblock-mark-data nil)
@@ -912,16 +1003,25 @@ commands"
       (save-excursion
 	(goto-char (point-min))
 	(while (not (eobp))
-	  (cond ((eq (get-text-property (line-beginning-position) 'face) 'org-timeblock-list-header)
+	  (cond ((eq (get-text-property (line-beginning-position) 'face)
+		     'org-timeblock-list-header)
 		 (setq count 0
 		       date (pop dates)))
 		((get-text-property (line-beginning-position) 'marker)
-		 (when-let ((m (get-text-property (line-beginning-position) 'marker))
-			    (id (org-timeblock-construct-id m (org-timeblock-get-event nil (line-beginning-position)))))
-		   (setf (alist-get id (alist-get (ts-format "%Y-%m-%d" date) org-timeblock-list-entries-pos nil nil #'equal) nil nil #'equal)
+		 (when-let ((m (get-text-property
+				(line-beginning-position) 'marker))
+			    (id (org-timeblock-construct-id
+				 m (org-timeblock-get-event
+				    nil (line-beginning-position)))))
+		   (setf (alist-get id (alist-get (ts-format "%Y-%m-%d" date)
+						  org-timeblock-list-entries-pos
+						  nil nil #'equal)
+				    nil nil #'equal)
 			 (cl-incf count))))
 		((get-text-property (line-beginning-position) 'sort-ind)
-		 (setf (alist-get (ts-format "%Y-%m-%d" date) org-timeblock-list-sortline-pos nil nil 'equal)
+		 (setf (alist-get (ts-format "%Y-%m-%d" date)
+				  org-timeblock-list-sortline-pos
+				  nil nil 'equal)
 		       (cl-incf count))))
 	  (forward-line)))))
   (org-save-all-org-buffers))
@@ -949,20 +1049,25 @@ Time format is \"HHMM\""
     (let (ts-type prev-date)
       (while (null ts-type)
 	(pcase (read-char-from-minibuffer
-		(format "Schedule (%s): time[s]tamp, time[r]ange, other [d]ay" (ts-format "%Y-%m-%d" date))
+		(format "Schedule (%s): time[s]tamp, time[r]ange, other [d]ay"
+			(ts-format "%Y-%m-%d" date))
 		'(?s ?r ?d))
 	  (?r (setq ts-type 'timerange))
 	  (?s (setq ts-type 'timestamp))
 	  (?d (setq prev-date date
-		    date (ts-parse (org-read-date nil nil nil nil (ts-internal date))))
+		    date (ts-parse
+			  (org-read-date nil nil nil nil (ts-internal date))))
 	      (unless (or
-		       (org-timeblock-ts-date<= date (cdr org-timeblock-daterange))
-		       (org-timeblock-ts-date<= (car org-timeblock-daterange) date))
+		       (org-timeblock-ts-date<=
+			date (cdr org-timeblock-daterange))
+		       (org-timeblock-ts-date<=
+			(car org-timeblock-daterange) date))
 		(org-timeblock-jump-to-day date)))))
       (let* ((timestamp (org-timeblock-get-timestamp eventp))
 	     (start-ts (org-timeblock--parse-org-element-ts timestamp))
 	     (end-ts (org-timeblock--parse-org-element-ts timestamp t))
-	     (duration (when (and start-ts end-ts) (/ (round (ts-diff end-ts start-ts)) 60)))
+	     (duration (when (and start-ts end-ts)
+			 (/ (round (ts-diff end-ts start-ts)) 60)))
 	     (new-start-ts (org-timeblock-read-ts date "START-TIME: "))
 	     (new-end-ts
 	      (if (eq ts-type 'timerange)
@@ -970,8 +1075,10 @@ Time format is \"HHMM\""
 		(when duration (ts-inc 'minute duration new-start-ts)))))
 	(when (and prev-date
 		   (not (or
-			 (org-timeblock-ts-date<= date (cdr org-timeblock-daterange))
-			 (org-timeblock-ts-date<= (car org-timeblock-daterange) date))))
+			 (org-timeblock-ts-date<=
+			  date (cdr org-timeblock-daterange))
+			 (org-timeblock-ts-date<=
+			  (car org-timeblock-daterange) date))))
 	  (org-timeblock-jump-to-day prev-date))
 	  (org-timeblock--schedule new-start-ts new-end-ts eventp)))))
 
@@ -1034,10 +1141,12 @@ PROMPT can overwrite the default prompt."
     (catch 'exit
       (while t
 	(let ((len (length time))
-	      (ch (read-char-exclusive (concat "[format: HHMM] " prompt (reverse time)))))
+	      (ch (read-char-exclusive
+		   (concat "[format: HHMM] " prompt (reverse time)))))
 	  (cond
 	   ((or (and (= len 0) (<= ?0 ch ?2))
-		(and (= len 1) (if (< (car time) ?2) (<= ?0 ch ?9) (<= ?0 ch ?3)))
+		(and (= len 1)
+		     (if (< (car time) ?2) (<= ?0 ch ?9) (<= ?0 ch ?3)))
 		(and (= len 2) (<= ?0 ch ?5)))
 	    (push ch time))
 	   ((and (= len 3) (<= ?0 ch ?9))
@@ -1079,7 +1188,8 @@ If EVENTP is non-nil, use entry's TIMESTAMP property."
       (goto-char (point-min))
       (org-element-timestamp-parser))))
 
-(cl-defun org-timeblock-get-entries (&key sort-func exclude-dateranges with-time)
+(cl-defun org-timeblock-get-entries
+    (&key sort-func exclude-dateranges with-time)
   "Return entries relevant to `org-timeblock-date'.
 
 SORT-FUNC is either nil, in which case items are sorted via
@@ -1101,8 +1211,12 @@ with time (timerange or just start time)."
 	;; which is the only property that's not stored in org buffers
 	(let ((timestamp (org-timeblock-get-sched-or-event entry)))
 	  (dolist (date (org-timeblock-get-dates))
-	    (when (and (org-timeblock-ts-date<= (org-timeblock--parse-org-element-ts timestamp) date)
-		       (org-timeblock-ts-date<= date (org-timeblock--parse-org-element-ts timestamp t)))
+	    (when (and (org-timeblock-ts-date<=
+			(org-timeblock--parse-org-element-ts timestamp)
+			date)
+		       (org-timeblock-ts-date<=
+			date
+			(org-timeblock--parse-org-element-ts timestamp t)))
 	      (put-text-property
 	       0 (length entry)
 	       'order (alist-get
@@ -1132,25 +1246,33 @@ with time (timerange or just start time)."
 	       :action
 	       (lambda ()
 		 (let ((title (org-get-heading t nil t t))
-		       (sched (org-element-property :scheduled (org-element-at-point)))
+		       (sched (org-element-property
+			       :scheduled (org-element-at-point)))
 		       (event (org-timeblock-get-event-timestamp))
 		       (marker (copy-marker (point) t))
-		       (tags (mapcar #'substring-no-properties (org-get-tags (org-element-at-point)))))
+		       (tags (mapcar #'substring-no-properties
+				     (org-get-tags (org-element-at-point)))))
 		   (cons
 		    (when event
-		      (propertize (concat (org-timeblock--construct-entry-prefix event t) title)
-				  'event event
-				  'marker marker
-				  'tags tags
-				  'id (org-timeblock-construct-id nil t)
-				  'title title))
+		      (propertize
+		       (concat
+			(org-timeblock--construct-entry-prefix event t)
+			title)
+		       'event event
+		       'marker marker
+		       'tags tags
+		       'id (org-timeblock-construct-id nil t)
+		       'title title))
 		    (when sched
-		      (propertize (concat (org-timeblock--construct-entry-prefix sched) title)
-				  'sched sched
-				  'marker marker
-				  'tags tags
-				  'id (org-timeblock-construct-id)
-				  'title title)))))))
+		      (propertize
+		       (concat
+			(org-timeblock--construct-entry-prefix sched)
+			title)
+		       'sched sched
+		       'marker marker
+		       'tags tags
+		       'id (org-timeblock-construct-id)
+		       'title title)))))))
 	    flattened)
 	(dolist (el result flattened)
 	  (and (car el) (push (car el) flattened))
@@ -1162,7 +1284,8 @@ with time (timerange or just start time)."
 Return value is of the form (\"background color\" \"foreground color\")."
   (catch 'found
     (dolist (tag tags)
-      (when-let ((colors (cdr (seq-find (lambda (x) (string= (car x) tag)) org-timeblock-tag-colors))))
+      (when-let ((colors (cdr (seq-find (lambda (x) (string= (car x) tag))
+					org-timeblock-tag-colors))))
 	(throw 'found colors)))))
 
 (defun org-timeblock--parse-org-element-ts (ts &optional end)
@@ -1188,7 +1311,8 @@ TS is a org-element timestamp object."
 		   (and hour-end hour-start (/= hour-start hour-end))
 		   (and minute-end minute-start (/= minute-start minute-end)))
 	      (make-ts :year year-end :month month-end :day day-end
-		       :hour (or hour-end 0) :minute (or minute-end 0) :second 0))))
+		       :hour (or hour-end 0)
+		       :minute (or minute-end 0) :second 0))))
       (make-ts :year year-start :month month-start :day day-start
 	       :hour (or hour-start 0) :minute (or minute-start 0) :second 0))))
 
@@ -1225,8 +1349,12 @@ Return new org-element timestamp object."
 	(org-schedule nil (org-timeblock-ts-to-org-timerange start-ts))
 	(org-back-to-heading t)
 	(forward-line)
-	(when (re-search-forward org-scheduled-time-regexp (line-end-position) t)
-	  (insert "--" (org-timeblock-ts-to-org-timerange end-ts nil repeat-string warning-string)))))
+	(when (re-search-forward org-scheduled-time-regexp
+				 (line-end-position) t)
+	  (insert "--"
+		  (org-timeblock-ts-to-org-timerange
+		   end-ts
+		   nil repeat-string warning-string)))))
       (org-element-property :scheduled (org-element-at-point)))))
 
 (defun org-timeblock-delete-event-timestamp ()
@@ -1245,7 +1373,8 @@ Leave point where the timestamp was."
 	      (re-search-forward org-ts-regexp end t))
       (replace-match ""))))
 
-(defun org-timeblock-ts-to-org-timerange (ts-start &optional ts-end repeat-string warning-string)
+(defun org-timeblock-ts-to-org-timerange
+    (ts-start &optional ts-end repeat-string warning-string)
   "Create an Org timestamp range string.
 
 TS-START and TS-END are ts.el time objects.
@@ -1267,7 +1396,8 @@ WARNING-STRING is a warning string of the form \"-[0-9]+[hdwmy]\""
       (concat
        "<" start-date (and start-time (concat " " start-time))
        (if (equal end-date start-date)
-	   (and end-time (not (equal end-time start-time)) (concat "-" end-time))
+	   (and end-time (not (equal end-time start-time))
+		(concat "-" end-time))
 	 (and
 	  end-date
 	  (concat
@@ -1295,22 +1425,31 @@ Valid duration formats:
 	 (valid-multipliers all-multipliers)
 	 typed-multipliers)
     (catch 'dur
-      (while-let ((multipliers (apply #'propertize
-				      (concat "[" valid-multipliers "]")
-				      (and (or (length= dur 0) (member (string-to-char (substring dur -1)) all-multipliers))
-					   '(face org-agenda-dimmed-todo-face))))
-		  (ch (read-char-exclusive (concat "DURATION ([0-9]+" multipliers "):" dur))))
+      (while-let ((multipliers
+		   (apply #'propertize
+			  (concat "[" valid-multipliers "]")
+			  (and (or (length= dur 0)
+				   (member (string-to-char (substring dur -1))
+					   all-multipliers))
+			       '(face org-agenda-dimmed-todo-face))))
+		  (ch (read-char-exclusive
+		       (concat "DURATION ([0-9]+" multipliers "):" dur))))
 	(cond
 	 ((<= ?0 ch ?9)
 	  (setq dur (format "%s%c" dur ch)))
 	 ((or (and (eq ch ?\C-m) (length> dur 0))
-	      (and (member ch valid-multipliers) (string-match-p "[0-9]+$" dur)))
+	      (and (member ch valid-multipliers)
+		   (string-match-p "[0-9]+$" dur)))
 	  (when-let (((member ch '(?m ?\C-m)))
 		     (minutes 0)
 		     (start 0))
 	    (setq dur (concat dur "m"))
-	    (while (string-match (concat "\\([0-9]+\\)\\([" typed-multipliers "m]\\)") dur start)
-	      (cl-incf minutes (* (cdr (assq (string-to-char (match-string 2 dur)) org-timeblock-duration-multipliers))
+	    (while (string-match
+		    (concat "\\([0-9]+\\)\\([" typed-multipliers "m]\\)")
+		    dur start)
+	      (cl-incf minutes (* (cdr
+				   (assq (string-to-char (match-string 2 dur))
+					 org-timeblock-duration-multipliers))
 				  (string-to-number (match-string 1 dur))))
 	      (setq start (match-end 0)))
 	    (throw 'dur minutes))
@@ -1387,7 +1526,8 @@ When BACKWARD is non-nil, move backward."
 				   (line-number-at-pos)))
 	    (save-excursion
 	      (if backward (forward-line -1) (forward-line))
-	      (eq (get-text-property (line-beginning-position) 'face) 'org-timeblock-list-header)))
+	      (eq (get-text-property (line-beginning-position) 'face)
+		  'org-timeblock-list-header)))
     (user-error "Can not move further"))
   (let ((inhibit-read-only t)
 	(end (save-excursion (move-beginning-of-line 2) (point)))
@@ -1450,13 +1590,19 @@ SELECT prefix argument provides."
 (defun org-timeblock-list-get-current-date ()
   "Get date at point."
   (save-excursion
-    (while (not (eq (get-text-property (point) 'face) 'org-timeblock-list-header))
+    (while (not (eq (get-text-property (point) 'face)
+		    'org-timeblock-list-header))
       (forward-line -1))
-    (ts-parse (buffer-substring (line-beginning-position) (line-end-position)))))
+    (ts-parse (buffer-substring
+	       (line-beginning-position) (line-end-position)))))
 
-(cl-defun org-timeblock-new-task (&optional (date (pcase major-mode
-					 (`org-timeblock-mode (nth (1- org-timeblock-current-column) (org-timeblock-get-dates)))
-					 (`org-timeblock-list-mode (org-timeblock-list-get-current-date)))))
+(cl-defun org-timeblock-new-task
+    (&optional (date (pcase major-mode
+		       (`org-timeblock-mode
+			(nth (1- org-timeblock-current-column)
+			     (org-timeblock-get-dates)))
+		       (`org-timeblock-list-mode
+			(org-timeblock-list-get-current-date)))))
   "Create a task scheduled to DATE.
 If DATE is nil, use the date in the current view.
 
@@ -1474,9 +1620,13 @@ The new task is created in `org-timeblock-inbox-file'"
       (insert "TODO " title " ")
       (pcase org-timeblock-new-task-time
 	(`pick (org-timeblock--schedule-time date))
-	((pred stringp) (unless (string-match-p "\\([01][0-9]\\|2[0-3]\\):[0-5][0-9]" org-timeblock-new-task-time)
-			  (user-error "Wrong time format specified in `org-timeblock-new-task-time'"))
-	 (org-schedule nil (concat (ts-format "%Y-%m-%d " date) org-timeblock-new-task-time)))
+	((pred stringp)
+	 (unless
+	     (string-match-p "\\([01][0-9]\\|2[0-3]\\):[0-5][0-9]"
+			     org-timeblock-new-task-time)
+	   (user-error "Wrong time format specified in `org-timeblock-new-task-time'"))
+	 (org-schedule nil (concat (ts-format "%Y-%m-%d " date)
+				   org-timeblock-new-task-time)))
 	(`nil (org-schedule nil (ts-format "%Y-%m-%d" date)))
 	(_ (user-error "Invalid custom variable value")))
       (save-buffer)))
@@ -1494,11 +1644,16 @@ Duration format:
 2h30
 45"
   (interactive)
-  (when (org-timeblock--daterangep (org-timeblock-get-sched-or-event nil (line-beginning-position)))
+  (when (org-timeblock--daterangep
+	 (org-timeblock-get-sched-or-event nil (line-beginning-position)))
     (user-error "Can not reschedule entries with daterange timestamp"))
   (let ((eventp (org-timeblock-get-event nil (line-beginning-position))))
     (when-let ((duration (org-timeblock-read-duration))
-	       (timestamp (org-timeblock--duration duration (get-text-property (line-beginning-position) 'marker) eventp)))
+	       (timestamp
+		(org-timeblock--duration
+		 duration
+		 (get-text-property (line-beginning-position) 'marker)
+		 eventp)))
       (org-timeblock-list-update-entry eventp)
       (when (get-buffer-window org-timeblock-buffer)
 	(org-timeblock-redraw-timeblocks)))))
@@ -1507,16 +1662,20 @@ Duration format:
   "Change the timestamp for selected block or all marked blocks.
 The blocks may be events or tasks with SCHEDULED property."
   (interactive)
-  (let ((date (nth (1- org-timeblock-current-column) (org-timeblock-get-dates))))
+  (let ((date (nth (1- org-timeblock-current-column)
+		   (org-timeblock-get-dates))))
     (if org-timeblock-mark-data
-	(let* ((mark-data (sort org-timeblock-mark-data
-				(lambda (x y)
-				  (cl-macrolet ((get-ts (x)
-						  `(org-with-point-at (org-timeblock-get-marker-by-id (car ,x))
-						     (org-timeblock--parse-org-element-ts
-						      (org-timeblock-get-timestamp
-						       (org-timeblock-block-eventp (car ,x)))))))
-				    (ts<= (get-ts x) (get-ts y))))))
+	(let* ((mark-data
+		(sort org-timeblock-mark-data
+		      (lambda (x y)
+			(cl-macrolet
+			    ((get-ts (x)
+			       `(org-with-point-at
+				    (org-timeblock-get-marker-by-id (car ,x))
+				  (org-timeblock--parse-org-element-ts
+				   (org-timeblock-get-timestamp
+				    (org-timeblock-block-eventp (car ,x)))))))
+			  (ts<= (get-ts x) (get-ts y))))))
 	       (id (caar mark-data))
 	       (marker (org-timeblock-get-marker-by-id id))
 	       (interval
@@ -1526,12 +1685,15 @@ The blocks may be events or tasks with SCHEDULED property."
 		       (answer
 			(read-char-from-minibuffer
 			 (mapconcat
-			  (lambda (x) (concat (propertize (char-to-string (cadr x)) 'face 'error)
-					      " " (car x) "\n"))
+			  (lambda (x)
+			    (concat
+			     (propertize (char-to-string (cadr x)) 'face 'error)
+			     " " (car x) "\n"))
 			  choices)
 			 (mapcar #'cadr choices))))
 		  (message "")
-		  (pcase (caddr (seq-find (lambda (x) (eq (cadr x) answer)) choices))
+		  (pcase (caddr
+			  (seq-find (lambda (x) (eq (cadr x) answer)) choices))
 		    (`user-input (read-number "Interval (minutes): "))
 		    ((and n _) n))))
 	       (eventp (org-timeblock-block-eventp id))
@@ -1542,8 +1704,9 @@ The blocks may be events or tasks with SCHEDULED property."
 		(or (org-timeblock--parse-org-element-ts prev-timestamp t)
 		    (org-timeblock--parse-org-element-ts prev-timestamp)))
 	       (timestamp (org-timeblock--schedule-time date marker eventp))
-	       (new-end-or-start-ts (or (org-timeblock--parse-org-element-ts timestamp t)
-					(org-timeblock--parse-org-element-ts timestamp))))
+	       (new-end-or-start-ts
+		(or (org-timeblock--parse-org-element-ts timestamp t)
+		    (org-timeblock--parse-org-element-ts timestamp))))
 	  (pop mark-data)
 	  (pcase interval
 	    ((pred integerp)
@@ -1553,13 +1716,20 @@ The blocks may be events or tasks with SCHEDULED property."
 		 (org-with-point-at marker
 		   (let* ((eventp (org-timeblock-block-eventp id))
 			  (timestamp (org-timeblock-get-timestamp eventp))
-			  (start-ts (org-timeblock--parse-org-element-ts timestamp))
-			  (end-ts (org-timeblock--parse-org-element-ts timestamp t))
-			  (duration (when (and start-ts end-ts) (/ (round (ts-diff end-ts start-ts)) 60)))
-			  (new-start-ts (ts-inc 'minute interval new-end-or-start-ts))
-			  (new-end-ts (when duration (ts-inc 'minute duration new-start-ts))))
+			  (start-ts
+			   (org-timeblock--parse-org-element-ts timestamp))
+			  (end-ts
+			   (org-timeblock--parse-org-element-ts timestamp t))
+			  (duration (when (and start-ts end-ts)
+				      (/ (round (ts-diff end-ts start-ts)) 60)))
+			  (new-start-ts
+			   (ts-inc 'minute interval new-end-or-start-ts))
+			  (new-end-ts
+			   (when duration
+			     (ts-inc 'minute duration new-start-ts))))
 		     (org-timeblock--schedule new-start-ts new-end-ts eventp)
-		     (setq new-end-or-start-ts (or new-end-ts new-start-ts)))))))
+		     (setq new-end-or-start-ts
+			   (or new-end-ts new-start-ts)))))))
 	    (`savetime
 	     (dolist (block mark-data)
 	       (let* ((id (car block))
@@ -1567,18 +1737,27 @@ The blocks may be events or tasks with SCHEDULED property."
 		 (org-with-point-at marker
 		   (let* ((eventp (org-timeblock-block-eventp id))
 			  (timestamp (org-timeblock-get-timestamp eventp))
-			  (start-ts (org-timeblock--parse-org-element-ts timestamp))
-			  (end-ts (org-timeblock--parse-org-element-ts timestamp t))
-			  (duration (when (and start-ts end-ts) (/ (round (ts-diff end-ts start-ts)) 60)))
-			  (int (/ (round (ts-diff start-ts prev-end-or-start-ts)) 60))
-			  (new-start-ts (ts-inc 'minute int new-end-or-start-ts))
-			  (new-end-ts (when duration (ts-inc 'minute duration new-start-ts))))
+			  (start-ts (org-timeblock--parse-org-element-ts
+				     timestamp))
+			  (end-ts (org-timeblock--parse-org-element-ts
+				   timestamp t))
+			  (duration (when (and start-ts end-ts)
+				      (/ (round (ts-diff end-ts start-ts)) 60)))
+			  (int (/
+				(round (ts-diff start-ts prev-end-or-start-ts))
+				60))
+			  (new-start-ts
+			   (ts-inc 'minute int new-end-or-start-ts))
+			  (new-end-ts
+			   (when duration
+			     (ts-inc 'minute duration new-start-ts))))
 		     (org-timeblock--schedule new-start-ts new-end-ts eventp)
 		     (setq new-end-or-start-ts (or new-end-ts new-start-ts))
 		     (setq prev-end-or-start-ts (or end-ts start-ts)))))))))
       (when-let ((id (org-timeblock-selected-block-id))
 		 (marker (org-timeblock-selected-block-marker)))
-	(org-timeblock--schedule-time date marker (org-timeblock-block-eventp id))))
+	(org-timeblock--schedule-time
+	 date marker (org-timeblock-block-eventp id))))
     (org-timeblock-redraw-buffers)
     (org-timeblock-redisplay)))
 
@@ -1606,11 +1785,15 @@ Duration format:
 The org-element timestamp object may be from an event or from a
 SCHEDULED property."
   (interactive)
-  (when (org-timeblock--daterangep (org-timeblock-get-sched nil (line-beginning-position)))
+  (when (org-timeblock--daterangep
+	 (org-timeblock-get-sched nil (line-beginning-position)))
     (user-error "Can not reschedule entries with daterange timestamp"))
   (let ((eventp (org-timeblock-get-event nil (line-beginning-position))))
     (when-let ((date (org-timeblock-list-get-current-date))
-	       (timestamp (org-timeblock--schedule-time date (get-text-property (line-beginning-position) 'marker) eventp)))
+	       (timestamp (org-timeblock--schedule-time
+			   date
+			   (get-text-property (line-beginning-position) 'marker)
+			   eventp)))
       (org-timeblock-list-update-entry eventp)
       (when (get-buffer-window org-timeblock-buffer)
 	(org-timeblock-redraw-timeblocks)))))
@@ -1626,10 +1809,12 @@ If EVENTP is non-nil the entry is considered as an event."
 	   (org-with-point-at marker
 	     (let ((timestamp (org-timeblock-get-timestamp eventp))
 		   (title (org-get-heading t nil t t))
-		   (tags (mapcar #'substring-no-properties (org-get-tags (org-element-at-point)))))
+		   (tags (mapcar #'substring-no-properties
+				 (org-get-tags (org-element-at-point)))))
 	       (setq colors (org-timeblock-get-colors tags))
 	       (propertize
-		(concat (org-timeblock--construct-entry-prefix timestamp eventp) title)
+		(concat (org-timeblock--construct-entry-prefix timestamp eventp)
+			title)
 		(if eventp 'event 'sched) timestamp
 		'marker marker
 		'tags tags
@@ -1639,7 +1824,9 @@ If EVENTP is non-nil the entry is considered as an event."
       (insert (propertize
 	       (concat new-entry "\n")
 	       'face
-	       `(:extend t ,@(and (car colors) (list :background (car colors))) ,@(and (cadr colors) (list :foreground (cadr colors)))))))))
+	       `(:extend t ,@(and (car colors) (list :background (car colors)))
+			 ,@(and (cadr colors)
+				(list :foreground (cadr colors)))))))))
 
 ;;;; Navigation commands
 
@@ -1662,10 +1849,14 @@ If EVENTP is non-nil the entry is considered as an event."
 				     (<= (cdr pos) (+ y (dom-attr node 'height)))
 				     (> (cdr pos) y))))))))
       (goto-char (point-min))
-      (re-search-forward (format "id=\"%s\" fill=\"\\([^\"]+\\)\"" (dom-attr found 'id)) nil t)
-      (setq org-timeblock-prev-selected-block-color (match-string-no-properties 1))
+      (re-search-forward
+       (format "id=\"%s\" fill=\"\\([^\"]+\\)\"" (dom-attr found 'id))
+       nil t)
+      (setq org-timeblock-prev-selected-block-color
+	    (match-string-no-properties 1))
       (replace-match org-timeblock-sel-block-color nil nil nil 1))
-    (setq org-timeblock-current-column (1+ (/ (car pos) (/ window-width org-timeblock-n-days-view))))
+    (setq org-timeblock-current-column
+	  (1+ (/ (car pos) (/ window-width org-timeblock-n-days-view))))
     (org-timeblock-redisplay)
     (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))))
 
@@ -1673,8 +1864,10 @@ If EVENTP is non-nil the entry is considered as an event."
   "Unselect selected block.  Return t on success.
 Modifies the match data.  First group is a fill property."
   (goto-char (point-min))
-  (when (re-search-forward (format " fill=\"\\(%s\\)\"" org-timeblock-sel-block-color) nil t)
-    (replace-match (or org-timeblock-prev-selected-block-color "#ffffff") nil nil nil 1)
+  (when (re-search-forward
+	 (format " fill=\"\\(%s\\)\"" org-timeblock-sel-block-color) nil t)
+    (replace-match (or org-timeblock-prev-selected-block-color "#ffffff")
+		   nil nil nil 1)
     t))
 
 (defun org-timeblock-forward-rect ()
@@ -1714,14 +1907,16 @@ Modifies the match data.  First match group a fill property."
   (interactive)
   (funcall-interactively 'next-line)
   (org-timeblock-select-block-for-current-entry)
-  (org-timeblock-show-olp-maybe (get-text-property (line-beginning-position) 'marker)))
+  (org-timeblock-show-olp-maybe
+   (get-text-property (line-beginning-position) 'marker)))
 
 (defun org-timeblock-list-previous-line ()
   "Move cursor to the previous line."
   (interactive)
   (funcall-interactively 'previous-line)
   (org-timeblock-select-block-for-current-entry)
-  (org-timeblock-show-olp-maybe (get-text-property (line-beginning-position) 'marker)))
+  (org-timeblock-show-olp-maybe
+   (get-text-property (line-beginning-position) 'marker)))
 
 (defun org-timeblock-mark-block ()
   "Mark selected block."
@@ -1729,12 +1924,15 @@ Modifies the match data.  First match group a fill property."
   (let ((inhibit-read-only t))
     (goto-char (point-min))
     (when (org-timeblock-goto-selected-rect)
-      (let ((id (car (save-match-data (split-string (match-string-no-properties 1) "_")))))
+      (let ((id (car (save-match-data
+		       (split-string (match-string-no-properties 1) "_")))))
 	(replace-match org-timeblock-marked-block-color nil nil nil 2)
-	(cl-pushnew (cons id org-timeblock-prev-selected-block-color) org-timeblock-mark-data
+	(cl-pushnew (cons id org-timeblock-prev-selected-block-color)
+		    org-timeblock-mark-data
 		    :test (lambda (x y) (string= (car y) (car x)))))
       (when (org-timeblock-forward-rect)
-	(setq org-timeblock-prev-selected-block-color (match-string-no-properties 1))
+	(setq org-timeblock-prev-selected-block-color
+	      (match-string-no-properties 1))
 	(replace-match org-timeblock-sel-block-color nil nil nil 1)
 	(org-timeblock-redisplay)
 	(org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
@@ -1746,16 +1944,19 @@ Modifies the match data.  First match group a fill property."
   (let ((inhibit-read-only t))
     (goto-char (point-min))
     (when (org-timeblock-goto-selected-rect)
-      (if-let ((id (car (save-match-data (split-string (match-string-no-properties 1) "_"))))
+      (if-let ((id (car (save-match-data
+			  (split-string (match-string-no-properties 1) "_"))))
 	       (blk (assoc id org-timeblock-mark-data)))
 	  (progn
 	    (replace-match (cdr blk) nil nil nil 2)
 	    (setq org-timeblock-mark-data (remove blk org-timeblock-mark-data))
 	    (when (org-timeblock-forward-rect)
-	      (setq org-timeblock-prev-selected-block-color (match-string-no-properties 1))
+	      (setq org-timeblock-prev-selected-block-color
+		    (match-string-no-properties 1))
 	      (replace-match org-timeblock-sel-block-color nil nil nil 1)
 	      (org-timeblock-redisplay)
-	      (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
+	      (org-timeblock-show-olp-maybe
+	       (org-timeblock-selected-block-marker))
 	      t))
 	(org-timeblock-forward-block)))))
 
@@ -1769,7 +1970,8 @@ Modifies the match data.  First match group a fill property."
 			" fill=\"" (group "%s") "\"")
 		    org-timeblock-marked-block-color)
 	    nil t)
-      (when-let ((id (car (save-match-data (split-string (match-string-no-properties 1) "_"))))
+      (when-let ((id (car (save-match-data
+			    (split-string (match-string-no-properties 1) "_"))))
 		 (blk (assoc id org-timeblock-mark-data)))
 	(replace-match (cdr blk) nil nil nil 2)
 	(setq org-timeblock-mark-data (remove blk org-timeblock-mark-data))))
@@ -1783,7 +1985,8 @@ Return t on success, otherwise - nil."
   (let ((inhibit-read-only t))
     (org-timeblock-unselect-block)
     (when (org-timeblock-forward-rect)
-      (setq org-timeblock-prev-selected-block-color (match-string-no-properties 1))
+      (setq org-timeblock-prev-selected-block-color
+	    (match-string-no-properties 1))
       (replace-match org-timeblock-sel-block-color nil nil nil 1)
       (org-timeblock-redisplay)
       (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
@@ -1822,7 +2025,8 @@ Return t on success, otherwise - nil."
   (let ((inhibit-read-only t))
     (org-timeblock-unselect-block)
     (when (org-timeblock-backward-rect)
-      (setq org-timeblock-prev-selected-block-color (match-string-no-properties 1))
+      (setq org-timeblock-prev-selected-block-color
+	    (match-string-no-properties 1))
       (replace-match org-timeblock-sel-block-color nil nil nil 1)
       (org-timeblock-redisplay)
       (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
@@ -1833,7 +2037,8 @@ Return t on success, otherwise - nil."
   (interactive)
   (setq org-timeblock-daterange
 	(cons (ts-inc 'day 1 (car org-timeblock-daterange))
-	      (and (cdr org-timeblock-daterange) (ts-inc 'day 1 (cdr org-timeblock-daterange)))))
+	      (and (cdr org-timeblock-daterange)
+		   (ts-inc 'day 1 (cdr org-timeblock-daterange)))))
   (unless (= org-timeblock-current-column 1)
     (org-timeblock-backward-column))
   (org-timeblock-redraw-buffers))
@@ -1844,8 +2049,11 @@ Return t on success, otherwise - nil."
 When called interactively, prompt for the date.
 When called from Lisp, DATE should be a date as returned by
 `org-read-date'"
-  (interactive (list (ts-parse (org-read-date nil nil nil nil
-					      (ts-internal (nth (1- org-timeblock-current-column) (org-timeblock-get-dates)))))))
+  (interactive (list (ts-parse (org-read-date
+				nil nil nil nil
+				(ts-internal
+				 (nth (1- org-timeblock-current-column)
+				      (org-timeblock-get-dates)))))))
   (when date
     (setq org-timeblock-daterange
 	  (cons date
@@ -1857,7 +2065,8 @@ When called from Lisp, DATE should be a date as returned by
   (interactive)
   (setq org-timeblock-daterange
 	(cons (ts-dec 'day 1 (car org-timeblock-daterange))
-	      (and (cdr org-timeblock-daterange) (ts-dec 'day 1 (cdr org-timeblock-daterange)))))
+	      (and (cdr org-timeblock-daterange)
+		   (ts-dec 'day 1 (cdr org-timeblock-daterange)))))
   (unless (= org-timeblock-current-column org-timeblock-n-days-view)
     (org-timeblock-forward-column))
   (org-timeblock-redraw-buffers))
@@ -1924,15 +2133,17 @@ Available view options:
 2. Hide hours in the past (if there are no timeblocks).
 3. Hide all free hours before the first timeblock."
   (interactive)
-  (let* ((choices '(("Hide hours in the past (if there are no timeblocks)." ?c t)
-		    ("Do not hide anything.  All 24 hours will be displayed." ?a nil)
-		    ("Hide all free hours before the first timeblock." ?h hide-all)
-		    ("Display specified range of hours [earliest; latest]." ?v user)))
+  (let* ((choices
+	  '(("Hide hours in the past (if there are no timeblocks)." ?c t)
+	    ("Do not hide anything.  All 24 hours will be displayed." ?a nil)
+	    ("Hide all free hours before the first timeblock." ?h hide-all)
+	    ("Display specified range of hours [earliest; latest]." ?v user)))
 	 (answer
 	  (read-char-from-minibuffer
 	   (mapconcat
-	    (lambda (x) (concat (propertize (char-to-string (cadr x)) 'face 'error)
-				" " (car x) "\n"))
+	    (lambda (x)
+	      (concat (propertize (char-to-string (cadr x)) 'face 'error)
+		      " " (car x) "\n"))
 	    choices)
 	   (mapcar #'cadr choices))))
     (message "")
@@ -1948,8 +2159,11 @@ Available view options:
 (defun org-timeblock-switch-view ()
   "Switch current view to 1-7-days view."
   (interactive)
-  (let ((cur-date (nth (1- org-timeblock-current-column) (org-timeblock-get-dates)))
-	(span (- (read-char-from-minibuffer "Span span [1-7]: " '(?1 ?2 ?3 ?4 ?5 ?6 ?7)) 48)))
+  (let ((cur-date (nth (1- org-timeblock-current-column)
+		       (org-timeblock-get-dates)))
+	(span (- (read-char-from-minibuffer
+		  "Span span [1-7]: " '(?1 ?2 ?3 ?4 ?5 ?6 ?7))
+		 48)))
     (setq org-timeblock-daterange
 	  (if (= span 1)
 	      (list cur-date)
@@ -1993,30 +2207,39 @@ Available view options:
 		  (`org-timeblock-sched-or-event< "SCHEDULED")
 		  ((pred symbolp) (symbol-name org-timeblock-sort-function))))))
       (dolist (date dates)
-	(let ((entries (seq-filter (lambda (x)
-				     (let* ((timestamp (org-timeblock-get-sched-or-event x))
-					    (start-ts (org-timeblock--parse-org-element-ts timestamp)))
-				       (or
-					(and
-					 (member (org-element-property :repeater-type timestamp) '(restart catch-up))
-					 (org-timeblock-ts-date<= start-ts date))
-					(and (eq (org-element-property :repeater-type timestamp) 'cumulate)
-					     (when-let ((start start-ts)
-							(value (org-element-property :repeater-value timestamp))
-							(unit (pcase (org-element-property :repeater-unit timestamp)
-								(`week
-								 (setq value (* value 7))
-								 'day)
-								((and _ u) u))))
-					       ;; TODO rewrite
-					       (while (org-timeblock-ts-date< start date)
-						 (setq start (ts-inc unit value start)))
-					       (org-timeblock-ts-date= start date)))
-					(org-timeblock-ts-date= start-ts date)
-					(when-let ((end-ts (org-timeblock--parse-org-element-ts timestamp t)))
-					  (and (org-timeblock-ts-date< start-ts date)
-					       (org-timeblock-ts-date<= date end-ts))))))
-				   entries))
+	(let ((entries
+	       (seq-filter
+		(lambda (x)
+		  (let* ((timestamp (org-timeblock-get-sched-or-event x))
+			 (start-ts (org-timeblock--parse-org-element-ts
+				    timestamp)))
+		    (or
+		     (and
+		      (member (org-element-property :repeater-type timestamp)
+			      '(restart catch-up))
+		      (org-timeblock-ts-date<= start-ts date))
+		     (and (eq (org-element-property :repeater-type timestamp)
+			      'cumulate)
+			  (when-let ((start start-ts)
+				     (value (org-element-property
+					     :repeater-value timestamp))
+				     (unit
+				      (pcase (org-element-property
+					      :repeater-unit timestamp)
+					(`week
+					 (setq value (* value 7))
+					 'day)
+					((and _ u) u))))
+			    ;; TODO rewrite
+			    (while (org-timeblock-ts-date< start date)
+			      (setq start (ts-inc unit value start)))
+			    (org-timeblock-ts-date= start date)))
+		     (org-timeblock-ts-date= start-ts date)
+		     (when-let ((end-ts (org-timeblock--parse-org-element-ts
+					 timestamp t)))
+		       (and (org-timeblock-ts-date< start-ts date)
+			    (org-timeblock-ts-date<= date end-ts))))))
+		entries))
 	      (date-beg (point)))
 	  (insert
 	   (propertize
@@ -2026,16 +2249,23 @@ Available view options:
 	    'face 'org-timeblock-list-header))
 	  (insert "\n")
 	  (dolist (entry entries)
-	    (let ((colors (org-timeblock-get-colors (get-text-property 0 'tags entry))))
+	    (let ((colors (org-timeblock-get-colors
+			   (get-text-property 0 'tags entry))))
 	      (insert (propertize
 		       (concat entry "\n")
 		       'face
-		       `(:extend t ,@(and (car colors) (list :background (car colors))) ,@(and (cadr colors) (list :foreground (cadr colors))))))))
+		       `(:extend t ,@(and (car colors)
+					  (list :background (car colors)))
+				 ,@(and (cadr colors)
+					(list :foreground (cadr colors))))))))
 	  (when (eq org-timeblock-sort-function #'org-timeblock-order<)
 	    (goto-char date-beg)
 	    (forward-line
-	     (alist-get (ts-format "%Y-%m-%d" date) org-timeblock-list-sortline-pos nil nil #'equal))
-	    (insert (propertize (format "% 37s" "^^^ SORTED ^^^\n") 'sort-ind t 'face org-timeblock-list-sortline-face)))
+	     (alist-get (ts-format "%Y-%m-%d" date)
+			org-timeblock-list-sortline-pos nil nil #'equal))
+	    (insert (propertize (format "% 37s" "^^^ SORTED ^^^\n")
+				'sort-ind t
+				'face org-timeblock-list-sortline-face)))
 	  (goto-char (point-max))))
       (goto-char (point-min))
       (when (get-buffer-window org-timeblock-buffer)
@@ -2052,12 +2282,14 @@ SVG image (.svg), PDF (.pdf) is produced."
   (if (or (not (file-writable-p file))
 	  (and (file-exists-p file)
 	       (if (called-interactively-p 'any)
-		   (not (y-or-n-p (format "Overwrite existing file %s? " file))))))
+		   (not (y-or-n-p
+			 (format "Overwrite existing file %s? " file))))))
       (user-error "Cannot write agenda to file %s" file))
   (let ((file (expand-file-name file)))
     (with-temp-buffer
       (let* ((dates (org-timeblock-get-dates))
-	     (max-length (/ (+ (/ org-timeblock-svg-width (default-font-width))) (length dates)))
+	     (max-length (/ (+ (/ org-timeblock-svg-width (default-font-width)))
+			    (length dates)))
 	     (date-format
 	      (pcase max-length
 		((pred (< 15)) "[%Y-%m-%d %a]")
@@ -2085,14 +2317,16 @@ SVG image (.svg), PDF (.pdf) is produced."
 	((or "pdf" "png")
 	 (unless (executable-find "inkscape")
 	   (user-error "Inkscape executable not found"))
-	 (call-process-region (point-min) (point-max) "inkscape" nil nil nil "--pipe"
+	 (call-process-region (point-min) (point-max)
+			      "inkscape" nil nil nil "--pipe"
 			      (concat "--export-filename=" file)))
 	((or "svg" `nil) (write-region nil nil file)))
       (org-timeblock-redraw-timeblocks))))
 
 ;;;; Predicates
 
-(org-ql-defpred org-timeblock-active-ts (from to &key exclude-dateranges with-time)
+(org-ql-defpred org-timeblock-active-ts
+  (from to &key exclude-dateranges with-time)
   "Search for entries with TIMESTAMP/SCHEDULED property in [FROM;TO] daterange.
 
 When EXCLUDE-DATERANGES is non-nil, exclude entries with daterange and no time.
@@ -2103,9 +2337,11 @@ with time (timerange or just start time)."
   ((`(org-timeblock-active-ts . ,rest)
     (list :query query :regexp org-ts-regexp)))
   :body
-  (when-let ((timestamp (or (org-element-property :scheduled (org-element-at-point))
-			    (org-timeblock-get-event-timestamp)))
-	     ((not (and exclude-dateranges (org-timeblock--daterangep timestamp))))
+  (when-let ((timestamp
+	      (or (org-element-property :scheduled (org-element-at-point))
+		  (org-timeblock-get-event-timestamp)))
+	     ((not (and exclude-dateranges
+			(org-timeblock--daterangep timestamp))))
 	     ((or (not with-time) (org-element-property :hour-start timestamp)))
 	     (start-ts (org-timeblock--parse-org-element-ts timestamp)))
     (or
@@ -2119,7 +2355,8 @@ with time (timerange or just start time)."
        (and (org-timeblock-ts-date<= from end-ts)
 	    (org-timeblock-ts-date<= end-ts to))))))
 
-(org-ql-defpred org-timeblock-active-ts-on (on &key exclude-dateranges with-time)
+(org-ql-defpred org-timeblock-active-ts-on
+  (on &key exclude-dateranges with-time)
   "Search for entries that have TIMESTAMP/SCHEDULED property set to ON.
 
 When EXCLUDE-DATERANGES is non-nil, exclude entries with daterange and no time.
@@ -2130,9 +2367,11 @@ with time (timerange or just start time)."
   ((`(org-timeblock-active-ts-on . ,rest)
     (list :query query :regexp org-ts-regexp)))
   :body
-  (when-let ((timestamp (or (org-element-property :scheduled (org-element-at-point))
-			    (org-timeblock-get-event-timestamp)))
-	     ((not (and exclude-dateranges (org-timeblock--daterangep timestamp))))
+  (when-let ((timestamp
+	      (or (org-element-property :scheduled (org-element-at-point))
+		  (org-timeblock-get-event-timestamp)))
+	     ((not (and exclude-dateranges
+			(org-timeblock--daterangep timestamp))))
 	     ((or (not with-time) (org-element-property :hour-start timestamp)))
 	     (start-ts (org-timeblock--parse-org-element-ts timestamp)))
     (or
