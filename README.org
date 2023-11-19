@@ -4,6 +4,8 @@ Schedule your days visually, using [[https://en.wikipedia.org/wiki/Timeblocking]
 
 * Contents
 
+#+html: <img align=right src='./logo.svg'>
+
 - [[#screenshots][Screenshots]]
 - [[#screencast][Screencast]]
 - [[#description][Description]]
