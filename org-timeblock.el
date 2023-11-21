@@ -116,21 +116,6 @@ When set to the symbol `next' only the first future repeat is shown."
 		(integer :tag "Min Hour")
 		(integer :tag "Max Hour"))))
 
-(defcustom org-timeblock-fast-todo-commands
-  '(("TODO" . "1")
-    ("DONE" . "5"))
-  "Fast TODO keyword selection with single keys.
-
-Alist where each cons is an orgmode todo state and a key.  For
-each car a command is created (\"TODO\" -> `org-timeblock-fast-todo')
-and then bound inside `org-timeblock-list-mode-map' and
-`org-timeblock-mode-map' respectively to a key in cdr.
-
-Keys should be a string in the format returned by commands such
-as `describe-key'."
-  :group 'org-timeblock
-  :type 'alist)
-
 (defcustom org-timeblock-current-time-indicator t
   "Whether to show current time indicator in the `org-timeblock-list' buffer."
   :group 'org-timeblock
@@ -262,24 +247,6 @@ tasks and those tasks that have not been sorted yet.")
   "t" #'org-timeblock-todo
   "v" #'org-timeblock-switch-scaling
   "V" #'org-timeblock-switch-view)
-
-;; Generate todo commands and bind them to a corresponding key
-(dolist (elem org-timeblock-fast-todo-commands)
-  (let ((command-name (intern (format "%s%s" 'org-timeblock-fast-
-				      (downcase (car elem))))))
-    (defalias command-name
-      (lambda ()
-	"Todo command generated based on `org-timeblock-fast-todo-commands'."
-	(interactive)
-	(when-let ((m (pcase major-mode
-			(`org-timeblock-list-mode
-			 (get-text-property (line-beginning-position) 'marker))
-			(`org-timeblock-mode
-			 (org-timeblock-selected-block-marker)))))
-	  (org-timeblock--set-todo m (car elem))
-	  (org-timeblock-redraw-buffers))))
-    (define-key org-timeblock-list-mode-map (kbd (cdr elem)) command-name)
-    (define-key org-timeblock-mode-map (kbd (cdr elem)) command-name)))
 
 ;;;; Modes
 
@@ -1505,14 +1472,6 @@ ARG."
     (org-with-point-at marker
       (call-interactively #'org-todo))
     (org-timeblock-redraw-buffers)))
-
-(defun org-timeblock--set-todo (marker todo)
-  "Set TODO state to the entry at MARKER."
-  (when (and marker todo)
-    (with-current-buffer (marker-buffer marker)
-      (goto-char marker)
-      (org-timeblock-show-context)
-      (org-todo todo))))
 
 (defun org-timeblock-list-drag-line-forward (&optional backward)
   "Drag an agenda line forward by ARG lines.
