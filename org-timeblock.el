@@ -2038,12 +2038,12 @@ Return t on success, otherwise - nil."
 When called interactively, prompt for the date.
 When called from Lisp, DATE should be a date as returned by
 `org-read-date'"
-  (interactive (list (ts-parse (org-read-date
-				nil nil nil nil
-				(ts-internal
-				 (nth (1- org-timeblock-current-column)
-				      (org-timeblock-get-dates)))))))
-  (when date
+  (interactive (list (org-read-date
+		      nil nil nil nil
+		      (ts-internal
+		       (nth (1- org-timeblock-current-column)
+			    (org-timeblock-get-dates))))))
+  (when-let ((date (ts-parse date)))
     (setq org-timeblock-daterange
 	  (cons date
 		(ts-inc 'day (1- org-timeblock-n-days-view) date)))
