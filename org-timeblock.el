@@ -1900,7 +1900,7 @@ Modifies the match data.  First match group a fill property."
 	t))))
 
 (defun org-timeblock-mark-by-regexp (regexp)
-  "Mark blocks by regexp."
+  "Mark blocks by REGEXP."
   (interactive "sMark entries matching regexp: ")
   (let ((inhibit-read-only t))
     (dolist (entry
@@ -1918,7 +1918,7 @@ Modifies the match data.  First match group a fill property."
     (org-timeblock-redisplay)))
 
 (defun org-timeblock-goto-rect-with-id (id)
-  "Move point to selected rect."
+  "Move point to rectangle with id ID."
   (goto-char (point-min))
   (re-search-forward
    (format (rx "<rect " (*? any)
@@ -1950,6 +1950,7 @@ Modifies the match data.  First match group a fill property."
 	(org-timeblock-forward-block)))))
 
 (defun org-timeblock-unmark-all-blocks ()
+  "Unmark all marked blocks."
   (interactive)
   (let ((inhibit-read-only t))
     (goto-char (point-min))
