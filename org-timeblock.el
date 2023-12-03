@@ -620,7 +620,8 @@ Default background color is used when BASE-COLOR is nil."
 				 (and (org-timeblock-ts-date< start-ts date)
 				      (org-timeblock-ts-date<= date end-ts)))))))
 			 entries)))
-		  (let* ((min-hour
+		  (let* ((order -1)
+			 (min-hour
 			  (pcase org-timeblock-scale-options
 			    ((pred consp) (car org-timeblock-scale-options))
 			    (`nil 0)
@@ -865,6 +866,7 @@ Default background color is used when BASE-COLOR is nil."
 				       "#5b0103" "#cdcdcd")
 			   :stroke-width (if (org-timeblock-get-event entry) 2 1)
 			   :opacity "0.7"
+			   :order (cl-incf order)
 			   :fill (or (car colors)
 				     (funcall get-color title))
 			   :id (format
@@ -914,7 +916,7 @@ Default background color is used when BASE-COLOR is nil."
 			    :fill (face-attribute 'default :foreground)
 			    :font-size
 			    (aref (font-info (face-font 'default)) 2)))))
-	    (svg-print org-timeblock-svg-obj))
+	    (svg-insert-image org-timeblock-svg-obj))
 	(let* ((window (get-buffer-window org-timeblock-buffer))
 	       (window-height (window-body-height window t))
 	       (window-width (window-body-width window t))
@@ -926,14 +928,15 @@ Default background color is used when BASE-COLOR is nil."
 	   :x (- (/ window-width 2)
 		 (/ (* (default-font-width) (length message)) 2))
 	   :fill (face-attribute 'default :foreground))
-	  (svg-print org-timeblock-svg-obj)))
+	  (svg-insert-image org-timeblock-svg-obj)))
       (setq org-timeblock-mark-data nil)
       (org-timeblock-redisplay))))
 
 (defun org-timeblock-redisplay ()
   "Redisplay *org-timeblock* buffer."
-  (let((inhibit-message t))
-    (org-timeblock-mode)))
+  (let ((inhibit-message t))
+    ;; HERE
+    ))
 
 (defun org-timeblock-show-timeblocks ()
   "Switch to *org-timeblock* buffer in another window."
@@ -1822,14 +1825,18 @@ If EVENTP is non-nil the entry is considered as an event."
     (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))))
 
 (defun org-timeblock-unselect-block ()
-  "Unselect selected block.  Return t on success.
-Modifies the match data.  First group is a fill property."
-  (goto-char (point-min))
-  (when (re-search-forward
-	 (format " fill=\"\\(%s\\)\"" org-timeblock-sel-block-color) nil t)
-    (replace-match (or org-timeblock-prev-selected-block-color "#ffffff")
-		   nil nil nil 1)
-    t))
+  "Unselect selected block.
+Return the numerical order of theunselected block on success.
+Otherwise, return nil."
+  (when-let ((node (car (dom-search
+			 org-timeblock-svg-obj
+			 (lambda (node)
+			   (string= (dom-attr node 'fill)
+				    org-timeblock-sel-block-color))))))
+    (dom-set-attribute
+     node
+     'fill (or (dom-attr node 'prev-fill) "#ffffff"))
+    (dom-attr node 'order)))
 
 (defun org-timeblock-forward-rect ()
   "Move point to next or first rectangle.
@@ -1846,22 +1853,6 @@ Modifies the match data.  First group is a fill property."
 	 (goto-char (point-min))
 	 (re-search-forward rect-cur-column nil t)
 	 (re-search-backward rect nil t)))))
-
-(defun org-timeblock-backward-rect ()
-  "Move point to previous or last rectangle.
-Modifies the match data.  First match group a fill property."
-  (let ((rect (rx "<rect " (*? any)
-		  " id=\"" (+ (not "\"")) "\""
-		  " fill=\"" (group (+ (not "\""))) "\""))
-	(rect-cur-column
-	 (format "<rect .+? column=\"%d\""
-		 org-timeblock-current-column)))
-    (or (and (re-search-backward rect-cur-column nil t)
-	     (re-search-forward rect nil t))
-	(and
-	 (goto-char (point-max))
-	 (re-search-backward rect-cur-column nil t)
-	 (re-search-forward rect nil t)))))
 
 (defun org-timeblock-list-next-line ()
   "Move cursor to the next line."
@@ -1969,18 +1960,25 @@ Modifies the match data.  First match group a fill property."
     (org-timeblock-backward-block)))
 
 (defun org-timeblock-forward-block ()
-  "Select the next timeblock in *org-timeblock* buffer.
-Return t on success, otherwise - nil."
+  "Select the next timeblock in *org-timeblock* buffer."
   (interactive)
-  (let ((inhibit-read-only t))
-    (org-timeblock-unselect-block)
-    (when (org-timeblock-forward-rect)
-      (setq org-timeblock-prev-selected-block-color
-	    (match-string-no-properties 1))
-      (replace-match org-timeblock-sel-block-color nil nil nil 1)
-      (org-timeblock-redisplay)
-      (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
-      t)))
+  (let* ((inhibit-read-only t)
+	 (unsel-order (or (org-timeblock-unselect-block) 0))
+	 (node (car (or (dom-search org-timeblock-svg-obj
+				    (lambda (node)
+				      (and (dom-attr node 'order)
+					   (= (dom-attr node 'order)
+					      (1+ unsel-order)))))
+			(dom-search org-timeblock-svg-obj
+				    (lambda (node)
+				      (and (dom-attr node 'order)
+					   (= (dom-attr node 'order) 0)))))))
+	 (prev-fill (dom-attr node 'fill)))
+    (dom-set-attribute node 'fill org-timeblock-sel-block-color)
+    (dom-set-attribute node 'prev-fill prev-fill)
+    (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
+    (svg-possibly-update-image org-timeblock-svg-obj)
+    t))
 
 (defun org-timeblock-forward-column ()
   "Select the next column in *org-timeblock* buffer."
@@ -2012,15 +2010,28 @@ heading at MARKER in the echo area."
   "Select the previous timeblock in *org-timeblock* buffer.
 Return t on success, otherwise - nil."
   (interactive)
-  (let ((inhibit-read-only t))
-    (org-timeblock-unselect-block)
-    (when (org-timeblock-backward-rect)
-      (setq org-timeblock-prev-selected-block-color
-	    (match-string-no-properties 1))
-      (replace-match org-timeblock-sel-block-color nil nil nil 1)
-      (org-timeblock-redisplay)
-      (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
-      t)))
+  (let* ((inhibit-read-only t)
+	 (unsel-order (or (org-timeblock-unselect-block) 0))
+	 (node (car (or (dom-search org-timeblock-svg-obj
+				    (lambda (node)
+				      (and (dom-attr node 'order)
+					   (= (dom-attr node 'order)
+					      (1- unsel-order)))))
+			(let ((len (length
+				    (dom-by-tag
+				     org-timeblock-svg-obj
+				     'rect))))
+			  (dom-search
+			   org-timeblock-svg-obj
+			   (lambda (node)
+			     (and (dom-attr node 'order)
+				  (= (dom-attr node 'order) (1- len)))))))))
+	 (prev-fill (dom-attr node 'fill)))
+    (dom-set-attribute node 'fill org-timeblock-sel-block-color)
+    (dom-set-attribute node 'prev-fill prev-fill)
+    (org-timeblock-show-olp-maybe (dom-attr node 'marker))
+    (svg-possibly-update-image org-timeblock-svg-obj)
+    t))
 
 (defun org-timeblock-day-later ()
   "Go forward in time by one day in `org-timeblock-mode'."
