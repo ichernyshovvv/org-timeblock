@@ -143,7 +143,7 @@ are tagged with a tag in car."
 
 (defvar org-timeblock-marked-block-color "#7b435c")
 
-(defvar org-timeblock-mark-data nil)
+(defvar org-timeblock-mark-count 0)
 
 (defvar org-timeblock-sel-block-color-light "#f3d000")
 
@@ -252,38 +252,43 @@ tasks and those tasks that have not been sorted yet.")
 
 (defvar image-transform-resize)
 (define-derived-mode org-timeblock-mode
-  image-mode "Org-Timeblock" :interactive nil
+  special-mode "Org-Timeblock" :interactive nil
   (if-let ((window (get-buffer-window org-timeblock-buffer))
 	   ((or (< (window-body-height window t) org-timeblock-svg-height)
 		(< (window-body-width window t) org-timeblock-svg-width))))
       (org-timeblock-redraw-timeblocks)
-    (setq image-transform-resize nil
-	  header-line-format
-	  (let* ((dates (org-timeblock-get-dates))
-		 (left-fringe (/ (car (window-fringes window))
-				 (default-font-width)))
-		 (max-length (/ (+ (/ (window-body-width window t)
-				      (default-font-width))
-				   left-fringe)
-				(length dates)))
-		 (date-format
-		  (pcase max-length
-		    ((pred (< 15)) "[%Y-%m-%d %a]")
-		    ((pred (< 11)) "[%Y-%m-%d]")
-		    ((pred (< 6)) "[%m-%d]")
-		    ((pred (< 3)) "[%d]")))
-		 (right-margin (format "%% -%ds" max-length))
-		 (result (make-string left-fringe ? )))
-	    (dotimes (iter (length dates))
-	      (cl-callf concat result
-		(propertize
-		 (format right-margin
-			 (ts-format date-format (nth iter dates)))
-		 'face
-		 (and (= org-timeblock-current-column (1+ iter))
-		      `(:background ,org-timeblock-sel-block-color)))))
-	    result)
-	  buffer-read-only t)))
+    (setq
+     org-timeblock-daterange
+     (cons (ts-now)
+	   (ts-inc 'day (1- org-timeblock-n-days-view) (ts-now)))
+     image-transform-resize nil
+     header-line-format
+     (let* ((dates (org-timeblock-get-dates))
+	    (left-fringe (/ (car (window-fringes window))
+			    (default-font-width)))
+	    (max-length (/ (+ (/ (window-body-width window t)
+				 (default-font-width))
+			      left-fringe)
+			   (length dates)))
+	    (date-format
+	     (pcase max-length
+	       ((pred (< 15)) "[%Y-%m-%d %a]")
+	       ((pred (< 11)) "[%Y-%m-%d]")
+	       ((pred (< 6)) "[%m-%d]")
+	       ((pred (< 3)) "[%d]")))
+	    (right-margin (format "%% -%ds" max-length))
+	    (result (make-string left-fringe ? )))
+       (dotimes (iter (length dates))
+	 (cl-callf concat result
+	   (propertize
+	    (format right-margin
+		    (ts-format date-format (nth iter dates)))
+	    'face
+	    (and (= org-timeblock-current-column (1+ iter))
+		 `(:background ,org-timeblock-sel-block-color)))))
+       result)
+     cursor-type nil
+     buffer-read-only t)))
 
 (define-derived-mode org-timeblock-list-mode
   special-mode "Org-Timeblock-List" :interactive nil
@@ -343,10 +348,11 @@ Mouse position is of the form (X . Y)."
       (cons (- (car mouse-pos) (car pos))
 	    (- (cdr mouse-pos) (cadr pos))))))
 
+;; DONE
 (defun org-timeblock-selected-block-marker ()
   "Return a marker pointing to the org entry of selected timeblock."
-  (when-let ((id (org-timeblock-selected-block-id)))
-    (cadr (seq-find (lambda (x) (string= (car x) id)) org-timeblock-data))))
+  (when-let ((found (org-timeblock-selected-block)))
+    (dom-attr found 'marker)))
 
 (defun org-timeblock-get-marker-by-id (id)
   "Return a marker of entry with ID."
@@ -365,22 +371,18 @@ Mouse position is of the form (X . Y)."
 	    (org-timeblock-ts-date<= start-date (cdr org-timeblock-daterange))))
     (nreverse dates)))
 
-(defun org-timeblock-goto-selected-rect ()
-  "Move point to selected rect."
-  (re-search-forward
-   (format (rx "<rect " (*? any)
-	       " id=\"" (group (+ (not "\""))) "\""
-	       " fill=\"" (group "%s") "\"")
-	   org-timeblock-sel-block-color)
-   nil t))
+(defun org-timeblock-selected-block ()
+  "Return an id of the entry of selected timeblock.
+id is constructed via `org-timeblock-construct-id'"
+  (car (dom-search
+	org-timeblock-svg-obj
+	(lambda (node) (dom-attr node 'select)))))
 
 (defun org-timeblock-selected-block-id ()
   "Return an id of the entry of selected timeblock.
 id is constructed via `org-timeblock-construct-id'"
-  (goto-char (point-min))
-  (and
-   (org-timeblock-goto-selected-rect)
-   (car (split-string (match-string-no-properties 1) "_"))))
+  (when-let ((found (org-timeblock-selected-block)))
+    (dom-attr found 'id)))
 
 (defmacro org-timeblock-on (accessor op lhs rhs)
   "Run OP on ACCESSOR's return values from LHS and RHS."
@@ -929,14 +931,13 @@ Default background color is used when BASE-COLOR is nil."
 		 (/ (* (default-font-width) (length message)) 2))
 	   :fill (face-attribute 'default :foreground))
 	  (svg-insert-image org-timeblock-svg-obj)))
-      (setq org-timeblock-mark-data nil)
+      (setq org-timeblock-mark-count 0)
       (org-timeblock-redisplay))))
 
 (defun org-timeblock-redisplay ()
   "Redisplay *org-timeblock* buffer."
   (let ((inhibit-message t))
-    ;; HERE
-    ))
+    (svg-possibly-update-image org-timeblock-svg-obj)))
 
 (defun org-timeblock-show-timeblocks ()
   "Switch to *org-timeblock* buffer in another window."
@@ -1520,9 +1521,7 @@ When BACKWARD is non-nil, move backward."
   "Enter `org-timeblock-mode'."
   (interactive)
   (switch-to-buffer org-timeblock-buffer)
-  (setq org-timeblock-daterange
-	(cons (ts-now)
-	      (ts-inc 'day (1- org-timeblock-n-days-view) (ts-now))))
+  (org-timeblock-mode)
   (org-timeblock-redraw-buffers))
 
 ;;;; Planning commands
@@ -1628,8 +1627,9 @@ The blocks may be events or tasks with SCHEDULED property."
   (interactive)
   (let ((date (nth (1- org-timeblock-current-column)
 		   (org-timeblock-get-dates))))
-    (if org-timeblock-mark-data
+    (if (/= org-timeblock-mark-count 0)
 	(let* ((mark-data
+		;; TODO
 		(sort org-timeblock-mark-data
 		      (lambda (x y)
 			(cl-macrolet
@@ -1802,7 +1802,7 @@ If EVENTP is non-nil the entry is considered as an event."
 	     (window (get-buffer-window org-timeblock-buffer))
 	     (window-width (window-body-width window t)))
     (org-timeblock-unselect-block)
-    (when-let ((found (car (dom-search
+    (when-let ((node (car (dom-search
 			    org-timeblock-svg-obj
 			    (lambda (node)
 			      (let ((x (dom-attr node 'x))
@@ -1811,19 +1811,18 @@ If EVENTP is non-nil the entry is considered as an event."
 				     (> (car pos) x)
 				     (<= (car pos) (+ x (dom-attr node 'width)))
 				     (<= (cdr pos) (+ y (dom-attr node 'height)))
-				     (> (cdr pos) y))))))))
-      (goto-char (point-min))
-      (re-search-forward
-       (format "id=\"%s\" fill=\"\\([^\"]+\\)\"" (dom-attr found 'id))
-       nil t)
-      (setq org-timeblock-prev-selected-block-color
-	    (match-string-no-properties 1))
-      (replace-match org-timeblock-sel-block-color nil nil nil 1))
+				     (> (cdr pos) y)))))))
+	       (prev-fill (dom-attr node 'fill)))
+      (dom-set-attribute node 'fill org-timeblock-sel-block-color)
+      (dom-set-attribute node 'orig-fill prev-fill)
+      (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
+      (svg-possibly-update-image org-timeblock-svg-obj))
     (setq org-timeblock-current-column
 	  (1+ (/ (car pos) (/ window-width org-timeblock-n-days-view))))
     (org-timeblock-redisplay)
     (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))))
 
+;; DONE
 (defun org-timeblock-unselect-block ()
   "Unselect selected block.
 Return the numerical order of theunselected block on success.
@@ -1831,28 +1830,14 @@ Otherwise, return nil."
   (when-let ((node (car (dom-search
 			 org-timeblock-svg-obj
 			 (lambda (node)
-			   (string= (dom-attr node 'fill)
-				    org-timeblock-sel-block-color))))))
+			   (dom-attr node 'select))))))
     (dom-set-attribute
      node
-     'fill (or (dom-attr node 'prev-fill) "#ffffff"))
+     'fill (if (dom-attr node 'mark)
+	       org-timeblock-marked-block-color
+	     (or (dom-attr node 'orig-fill) "#ffffff")))
+    (dom-remove-attribute node 'select)
     (dom-attr node 'order)))
-
-(defun org-timeblock-forward-rect ()
-  "Move point to next or first rectangle.
-Modifies the match data.  First group is a fill property."
-  (let ((rect (rx "<rect " (*? any)
-		  " id=\"" (+ (not "\"")) "\""
-		  " fill=\"" (group (+ (not "\""))) "\""))
-	(rect-cur-column
-	 (format "<rect .+? column=\"%d\""
-		 org-timeblock-current-column)))
-    (or (and (re-search-forward rect-cur-column nil t)
-	     (re-search-backward rect nil t))
-	(and
-	 (goto-char (point-min))
-	 (re-search-forward rect-cur-column nil t)
-	 (re-search-backward rect nil t)))))
 
 (defun org-timeblock-list-next-line ()
   "Move cursor to the next line."
@@ -1873,22 +1858,25 @@ Modifies the match data.  First group is a fill property."
 (defun org-timeblock-mark-block ()
   "Mark selected block."
   (interactive)
-  (let ((inhibit-read-only t))
-    (goto-char (point-min))
-    (when (org-timeblock-goto-selected-rect)
-      (let ((id (car (save-match-data
-		       (split-string (match-string-no-properties 1) "_")))))
-	(replace-match org-timeblock-marked-block-color nil nil nil 2)
-	(cl-pushnew (cons id org-timeblock-prev-selected-block-color)
-		    org-timeblock-mark-data
-		    :test (lambda (x y) (string= (car y) (car x)))))
-      (when (org-timeblock-forward-rect)
-	(setq org-timeblock-prev-selected-block-color
-	      (match-string-no-properties 1))
-	(replace-match org-timeblock-sel-block-color nil nil nil 1)
-	(org-timeblock-redisplay)
-	(org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
-	t))))
+  (when-let ((node (org-timeblock-selected-block))
+	     ((not (dom-attr node 'mark)))
+	     (inhibit-read-only t))
+    (dom-set-attribute node 'fill org-timeblock-marked-block-color)
+    (dom-set-attribute node 'mark t)
+    (cl-incf org-timeblock-mark-count))
+  (org-timeblock-forward-block))
+
+(defun org-timeblock-mark-block-by-id (id)
+  "Mark selected block."
+  (interactive)
+  (when-let ((inhibit-read-only t)
+	     (node (car (dom-by-id org-timeblock-svg-obj id)))
+	     (prev-fill (dom-attr node 'fill)))
+    (dom-set-attribute node 'fill org-timeblock-marked-block-color)
+    (dom-set-attribute node 'orig-fill prev-fill)
+    (dom-set-attribute node 'mark t)
+    (cl-incf org-timeblock-mark-count))
+  (org-timeblock-forward-block))
 
 (defun org-timeblock-mark-by-regexp (regexp)
   "Mark blocks by REGEXP."
@@ -1900,65 +1888,38 @@ Modifies the match data.  First group is a fill property."
 	      (org-timeblock-get-entries
 	       :sort-func #'org-timeblock-sched-or-event<
 	       :exclude-dateranges t :with-time t)))
-      (when-let ((id (get-text-property 0 'id entry))
-		 ((org-timeblock-goto-rect-with-id id)))
-	(replace-match org-timeblock-marked-block-color nil nil nil 1)
-	(cl-pushnew (cons id org-timeblock-prev-selected-block-color)
-		    org-timeblock-mark-data
-		    :test (lambda (x y) (string= (car y) (car x))))))
+      (when-let ((id (get-text-property 0 'id entry)))
+	(org-timeblock-mark-block-by-id id)
+	(cl-incf org-timeblock-mark-count)))
     (org-timeblock-redisplay)))
-
-(defun org-timeblock-goto-rect-with-id (id)
-  "Move point to rectangle with id ID."
-  (goto-char (point-min))
-  (re-search-forward
-   (format (rx "<rect " (*? any)
-	       " id=\"" "%s" "_" (one-or-more num) "\""
-	       " fill=\"" (group (+ (not "\""))) "\"")
-	   id)
-   nil t))
 
 (defun org-timeblock-unmark-block ()
   "Unmark selected block."
   (interactive)
-  (let ((inhibit-read-only t))
-    (goto-char (point-min))
-    (when (org-timeblock-goto-selected-rect)
-      (if-let ((id (car (save-match-data
-			  (split-string (match-string-no-properties 1) "_"))))
-	       (blk (assoc id org-timeblock-mark-data)))
-	  (progn
-	    (replace-match (cdr blk) nil nil nil 2)
-	    (setq org-timeblock-mark-data (remove blk org-timeblock-mark-data))
-	    (when (org-timeblock-forward-rect)
-	      (setq org-timeblock-prev-selected-block-color
-		    (match-string-no-properties 1))
-	      (replace-match org-timeblock-sel-block-color nil nil nil 1)
-	      (org-timeblock-redisplay)
-	      (org-timeblock-show-olp-maybe
-	       (org-timeblock-selected-block-marker))
-	      t))
-	(org-timeblock-forward-block)))))
+  (when-let ((node (org-timeblock-selected-block))
+	     ((dom-attr node 'mark))
+	     (inhibit-read-only t))
+    (dom-remove-attribute node 'mark)
+    (dom-set-attribute node 'fill (dom-attr node 'orig-fill))
+    (cl-decf org-timeblock-mark-count))
+  (org-timeblock-forward-block))
 
 (defun org-timeblock-unmark-all-blocks ()
   "Unmark all marked blocks."
   (interactive)
-  (let ((inhibit-read-only t))
-    (goto-char (point-min))
-    (while (re-search-forward
-	    (format (rx "<rect " (*? any)
-			" id=\"" (group (+ (not "\""))) "\""
-			" fill=\"" (group "%s") "\"")
-		    org-timeblock-marked-block-color)
-	    nil t)
-      (when-let ((id (car (save-match-data
-			    (split-string (match-string-no-properties 1) "_"))))
-		 (blk (assoc id org-timeblock-mark-data)))
-	(replace-match (cdr blk) nil nil nil 2)
-	(setq org-timeblock-mark-data (remove blk org-timeblock-mark-data))))
-    (org-timeblock-unmark-block)
-    (org-timeblock-backward-block)))
+  (when-let ((marked-blocks
+	      (dom-search org-timeblock-svg-obj
+			  (lambda (node)
+			    (dom-attr node 'mark))))
+	     (inhibit-read-only t))
+    (dolist (node marked-blocks)
+      (dom-remove-attribute node 'mark)
+      (unless (dom-attr node 'select)
+	(dom-set-attribute node 'fill (dom-attr node 'orig-fill))))
+    (setq org-timeblock-mark-count 0)
+    (org-timeblock-redisplay)))
 
+;; DONE?
 (defun org-timeblock-forward-block ()
   "Select the next timeblock in *org-timeblock* buffer."
   (interactive)
@@ -1972,13 +1933,13 @@ Modifies the match data.  First group is a fill property."
 			(dom-search org-timeblock-svg-obj
 				    (lambda (node)
 				      (and (dom-attr node 'order)
-					   (= (dom-attr node 'order) 0)))))))
-	 (prev-fill (dom-attr node 'fill)))
+					   (= (dom-attr node 'order) 0))))))))
+    (unless (dom-attr node 'mark)
+      (dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
     (dom-set-attribute node 'fill org-timeblock-sel-block-color)
-    (dom-set-attribute node 'prev-fill prev-fill)
+    (dom-set-attribute node 'select t)
     (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
-    (svg-possibly-update-image org-timeblock-svg-obj)
-    t))
+    (org-timeblock-redisplay)))
 
 (defun org-timeblock-forward-column ()
   "Select the next column in *org-timeblock* buffer."
@@ -2025,13 +1986,13 @@ Return t on success, otherwise - nil."
 			   org-timeblock-svg-obj
 			   (lambda (node)
 			     (and (dom-attr node 'order)
-				  (= (dom-attr node 'order) (1- len)))))))))
-	 (prev-fill (dom-attr node 'fill)))
+				  (= (dom-attr node 'order) (1- len))))))))))
+    (unless (dom-attr node 'mark)
+      (dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
     (dom-set-attribute node 'fill org-timeblock-sel-block-color)
-    (dom-set-attribute node 'prev-fill prev-fill)
+    (dom-set-attribute node 'select t)
     (org-timeblock-show-olp-maybe (dom-attr node 'marker))
-    (svg-possibly-update-image org-timeblock-svg-obj)
-    t))
+    (svg-possibly-update-image org-timeblock-svg-obj)))
 
 (defun org-timeblock-day-later ()
   "Go forward in time by one day in `org-timeblock-mode'."
