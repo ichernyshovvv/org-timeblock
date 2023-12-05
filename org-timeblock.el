@@ -156,7 +156,8 @@ are tagged with a tag in car."
 (defvar org-timeblock-colors nil)
 
 (defvar org-timeblock-data nil)
-(defvar org-timeblock-current-column 1)
+(defvar org-timeblock-column 1
+  "Currently selected column.")
 
 (defvar org-timeblock-svg nil)
 (defvar org-timeblock-svg-width 0)
@@ -455,7 +456,7 @@ A and B are ts.el ts objects."
 	(setq org-timeblock-prev-selected-block-color (match-string 1))
 	(replace-match org-timeblock-sel-block-color nil nil nil 1)
 	(re-search-forward " column=\"\\([^\"]+\\)\"" nil t)
-	(setq org-timeblock-current-column (string-to-number (match-string 1)))
+	(setq org-timeblock-column (string-to-number (match-string 1)))
 	(org-timeblock-redisplay)))))
 
 (defun org-timeblock-intersect-p (entry1 entry2)
@@ -932,7 +933,7 @@ Default background color is used when BASE-COLOR is nil."
 		     (format right-margin
 			     (ts-format date-format (nth iter dates)))
 		     'face
-		     (and (= org-timeblock-current-column (1+ iter))
+		     (and (= org-timeblock-column (1+ iter))
 			  `(:background ,org-timeblock-sel-block-color)))))
 		result))))
     (svg-possibly-update-image org-timeblock-svg)))
@@ -1560,7 +1561,7 @@ SELECT prefix argument provides."
 (cl-defun org-timeblock-new-task
     (&optional (date (pcase major-mode
 		       (`org-timeblock-mode
-			(nth (1- org-timeblock-current-column)
+			(nth (1- org-timeblock-column)
 			     (org-timeblock-get-dates)))
 		       (`org-timeblock-list-mode
 			(org-timeblock-list-get-current-date)))))
@@ -1623,7 +1624,7 @@ Duration format:
   "Change the timestamp for selected block or all marked blocks.
 The blocks may be events or tasks with SCHEDULED property."
   (interactive)
-  (let ((date (nth (1- org-timeblock-current-column)
+  (let ((date (nth (1- org-timeblock-column)
 		   (org-timeblock-get-dates))))
     (if (> org-timeblock-mark-count 0)
 	(let* ((mark-data
@@ -1815,7 +1816,7 @@ If EVENTP is non-nil the entry is considered as an event."
       (dom-set-attribute node 'select t)
       (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
       (svg-possibly-update-image org-timeblock-svg))
-    (setq org-timeblock-current-column
+    (setq org-timeblock-column
 	  (1+ (/ (car pos) (/ window-width org-timeblock-n-days-view))))
     (org-timeblock-redisplay)
     (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))))
@@ -1927,7 +1928,7 @@ Otherwise, return nil."
 				      (and
 				       (dom-attr node 'order)
 				       (= (dom-attr node 'column)
-					  org-timeblock-current-column)
+					  org-timeblock-column)
 				       (= (dom-attr node 'order)
 					  (1+ unsel-order)))))
 			(dom-search org-timeblock-svg
@@ -1935,7 +1936,7 @@ Otherwise, return nil."
 				      (and
 				       (dom-attr node 'order)
 				       (= (dom-attr node 'column)
-					  org-timeblock-current-column)
+					  org-timeblock-column)
 				       (= (dom-attr node 'order) 0))))))))
     (unless (dom-attr node 'mark)
       (dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
@@ -1947,18 +1948,18 @@ Otherwise, return nil."
 (defun org-timeblock-forward-column ()
   "Select the next column in *org-timeblock* buffer."
   (interactive)
-  (if (= org-timeblock-current-column org-timeblock-n-days-view)
-      (setq org-timeblock-current-column 1)
-    (cl-incf org-timeblock-current-column))
+  (if (= org-timeblock-column org-timeblock-n-days-view)
+      (setq org-timeblock-column 1)
+    (cl-incf org-timeblock-column))
   (unless (org-timeblock-forward-block)
     (org-timeblock-redisplay)))
 
 (defun org-timeblock-backward-column ()
   "Select the next column in *org-timeblock* buffer."
   (interactive)
-  (if (= org-timeblock-current-column 1)
-      (setq org-timeblock-current-column org-timeblock-n-days-view)
-    (cl-decf org-timeblock-current-column))
+  (if (= org-timeblock-column 1)
+      (setq org-timeblock-column org-timeblock-n-days-view)
+    (cl-decf org-timeblock-column))
   (unless (org-timeblock-forward-block)
     (org-timeblock-redisplay)))
 
@@ -1981,24 +1982,22 @@ Return t on success, otherwise - nil."
 				      (and
 				       (dom-attr node 'order)
 				       (= (dom-attr node 'column)
-					  org-timeblock-current-column)
+					  org-timeblock-column)
 				       (= (dom-attr node 'order)
 					  (1- unsel-order)))))
 			(let ((len (length
 				    (seq-filter
 				     (lambda (x)
 				       (= (dom-attr x 'column)
-					  org-timeblock-current-column))
-				     (dom-by-tag
-				      org-timeblock-svg
-				      'rect)))))
+					  org-timeblock-column))
+				     (dom-by-tag org-timeblock-svg 'rect)))))
 			  (dom-search
 			   org-timeblock-svg
 			   (lambda (node)
 			     (and
 			      (dom-attr node 'order)
 			      (= (dom-attr node 'column)
-				 org-timeblock-current-column)
+				 org-timeblock-column)
 			      (= (dom-attr node 'order) (1- len))))))))))
     (unless (dom-attr node 'mark)
       (dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
@@ -2014,7 +2013,7 @@ Return t on success, otherwise - nil."
 	(cons (ts-inc 'day 1 (car org-timeblock-daterange))
 	      (and (cdr org-timeblock-daterange)
 		   (ts-inc 'day 1 (cdr org-timeblock-daterange)))))
-  (unless (= org-timeblock-current-column 1)
+  (unless (= org-timeblock-column 1)
     (org-timeblock-backward-column))
   (org-timeblock-redraw-buffers))
 
@@ -2027,7 +2026,7 @@ When called from Lisp, DATE should be a date as returned by
   (interactive (list (org-read-date
 		      nil nil nil nil
 		      (ts-internal
-		       (nth (1- org-timeblock-current-column)
+		       (nth (1- org-timeblock-column)
 			    (org-timeblock-get-dates))))))
   (when-let ((date (ts-parse date)))
     (setq org-timeblock-daterange
@@ -2042,7 +2041,7 @@ When called from Lisp, DATE should be a date as returned by
 	(cons (ts-dec 'day 1 (car org-timeblock-daterange))
 	      (and (cdr org-timeblock-daterange)
 		   (ts-dec 'day 1 (cdr org-timeblock-daterange)))))
-  (unless (= org-timeblock-current-column org-timeblock-n-days-view)
+  (unless (= org-timeblock-column org-timeblock-n-days-view)
     (org-timeblock-forward-column))
   (org-timeblock-redraw-buffers))
 
@@ -2142,7 +2141,7 @@ Available view options:
 (defun org-timeblock-switch-view ()
   "Switch current view to 1-7-days view."
   (interactive)
-  (let ((cur-date (nth (1- org-timeblock-current-column)
+  (let ((cur-date (nth (1- org-timeblock-column)
 		       (org-timeblock-get-dates)))
 	(span (- (read-char-from-minibuffer
 		  "Span span [1-7]: " '(?1 ?2 ?3 ?4 ?5 ?6 ?7))
@@ -2152,7 +2151,7 @@ Available view options:
 	      (list cur-date)
 	    (cons cur-date (ts-inc 'day (1- span) cur-date)))
 	  org-timeblock-n-days-view span
-	  org-timeblock-current-column 1))
+	  org-timeblock-column 1))
   (org-timeblock-redraw-buffers))
 
 (defun org-timeblock-list-toggle-timeblock ()
