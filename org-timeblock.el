@@ -141,15 +141,15 @@ are tagged with a tag in car."
 
 ;;;; Variables
 
-(defvar org-timeblock-marked-block-color "#7b435c")
+(defvar org-timeblock-mark-color "#7b435c")
 
 (defvar org-timeblock-mark-count 0)
 
-(defvar org-timeblock-sel-block-color-light "#f3d000")
+(defvar org-timeblock-select-color-light "#f3d000")
 
-(defvar org-timeblock-sel-block-color-dark "#3f1651")
+(defvar org-timeblock-select-color-dark "#3f1651")
 
-(defvar org-timeblock-sel-block-color org-timeblock-sel-block-color-light)
+(defvar org-timeblock-select-color org-timeblock-select-color-light)
 
 (defvar org-timeblock-background-color (face-attribute 'default :background))
 
@@ -167,8 +167,6 @@ are tagged with a tag in car."
   "Saved positions for entries in `org-timeblock-list-mode'.
 Nested alist of saved positions of the entries for each date that
 a user have previously opened in `org-timeblock-list-mode'.")
-
-(defvar org-timeblock-prev-selected-block-color nil)
 
 (defvar org-timeblock-sort-function #'org-timeblock-order<)
 
@@ -457,7 +455,7 @@ A and B are ts.el ts objects."
   (interactive)
   (when-let ((node (car (dom-by-id org-timeblock-svg id))))
     (dom-set-attribute node 'orig-fill (dom-attr node 'fill))
-    (dom-set-attribute node 'fill org-timeblock-sel-block-color)
+    (dom-set-attribute node 'fill org-timeblock-select-color)
     (dom-set-attribute node 'select t)
     (setq org-timeblock-column (dom-attr node 'column))))
 
@@ -630,14 +628,14 @@ Default background color is used when BASE-COLOR is nil."
 				    (alist-get title org-timeblock-colors nil nil #'equal)))
 			    (setq org-timeblock-background-color
 				  (face-attribute 'default :background))
-			    (setq org-timeblock-sel-block-color
+			    (setq org-timeblock-select-color
 				  (if (> (setq bg-rgb-sum
 					       (apply #'+
 						      (org-timeblock--parse-hex-color
 						       org-timeblock-background-color)))
 					 550)
-				      org-timeblock-sel-block-color-light
-				    org-timeblock-sel-block-color-dark))
+				      org-timeblock-select-color-light
+				    org-timeblock-select-color-dark))
 			    (lambda (title)
 			      (setf (alist-get title org-timeblock-colors
 					       nil nil #'equal)
@@ -936,7 +934,7 @@ Default background color is used when BASE-COLOR is nil."
 			     (ts-format date-format (nth iter dates)))
 		     'face
 		     (and (= org-timeblock-column (1+ iter))
-			  `(:background ,org-timeblock-sel-block-color)))))
+			  `(:background ,org-timeblock-select-color)))))
 		result))))
     (svg-possibly-update-image org-timeblock-svg)))
 
@@ -1813,7 +1811,7 @@ If EVENTP is non-nil the entry is considered as an event."
 				    (> (cdr pos) y))))))))
       (unless (dom-attr node 'mark)
 	(dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
-      (dom-set-attribute node 'fill org-timeblock-sel-block-color)
+      (dom-set-attribute node 'fill org-timeblock-select-color)
       (dom-set-attribute node 'select t))
     (setq org-timeblock-column
 	  (1+ (/ (car pos) (/ window-width org-timeblock-n-days-view))))
@@ -1831,7 +1829,7 @@ Otherwise, return nil."
     (dom-set-attribute
      node
      'fill (if (dom-attr node 'mark)
-	       org-timeblock-marked-block-color
+	       org-timeblock-mark-color
 	     (or (dom-attr node 'orig-fill) "#ffffff")))
     (dom-remove-attribute node 'select)
     (dom-attr node 'order)))
@@ -1857,7 +1855,7 @@ Otherwise, return nil."
   (interactive)
   (when-let ((node (org-timeblock-selected-block))
 	     ((not (dom-attr node 'mark))))
-    (dom-set-attribute node 'fill org-timeblock-marked-block-color)
+    (dom-set-attribute node 'fill org-timeblock-mark-color)
     (dom-set-attribute node 'mark t)
     (cl-incf org-timeblock-mark-count))
   (org-timeblock-forward-block))
@@ -1867,7 +1865,7 @@ Otherwise, return nil."
   (interactive)
   (when-let ((node (car (dom-by-id org-timeblock-svg id))))
     (dom-set-attribute node 'orig-fill (dom-attr node 'fill))
-    (dom-set-attribute node 'fill org-timeblock-marked-block-color)
+    (dom-set-attribute node 'fill org-timeblock-mark-color)
     (dom-set-attribute node 'mark t)
     (cl-incf org-timeblock-mark-count)))
 
@@ -1931,7 +1929,7 @@ Otherwise, return nil."
 					   (= (dom-attr node 'order) 0))))))))
     (unless (dom-attr node 'mark)
       (dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
-    (dom-set-attribute node 'fill org-timeblock-sel-block-color)
+    (dom-set-attribute node 'fill org-timeblock-select-color)
     (dom-set-attribute node 'select t)
     (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
     (org-timeblock-redisplay) t))
@@ -1991,7 +1989,7 @@ Return t on success, otherwise - nil."
 				  (= (dom-attr node 'order) (1- len))))))))))
     (unless (dom-attr node 'mark)
       (dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
-    (dom-set-attribute node 'fill org-timeblock-sel-block-color)
+    (dom-set-attribute node 'fill org-timeblock-select-color)
     (dom-set-attribute node 'select t)
     (org-timeblock-show-olp-maybe (dom-attr node 'marker))
     (org-timeblock-redisplay) t))
