@@ -1796,7 +1796,6 @@ If EVENTP is non-nil the entry is considered as an event."
   "Select timeblock under current position of mouse cursor."
   (interactive)
   (when-let ((pos (org-timeblock-mouse-pixel-pos))
-	     (inhibit-read-only t)
 	     (window (get-buffer-window org-timeblock-buffer))
 	     (window-width (window-body-width window t)))
     (org-timeblock-unselect-block)
@@ -1813,15 +1812,12 @@ If EVENTP is non-nil the entry is considered as an event."
       (unless (dom-attr node 'mark)
 	(dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
       (dom-set-attribute node 'fill org-timeblock-sel-block-color)
-      (dom-set-attribute node 'select t)
-      (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
-      (svg-possibly-update-image org-timeblock-svg))
+      (dom-set-attribute node 'select t))
     (setq org-timeblock-column
 	  (1+ (/ (car pos) (/ window-width org-timeblock-n-days-view))))
     (org-timeblock-redisplay)
     (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))))
 
-;; DONE
 (defun org-timeblock-unselect-block ()
   "Unselect selected block.
 Return the numerical order of theunselected block on success.
@@ -1858,46 +1854,40 @@ Otherwise, return nil."
   "Mark selected block."
   (interactive)
   (when-let ((node (org-timeblock-selected-block))
-	     ((not (dom-attr node 'mark)))
-	     (inhibit-read-only t))
+	     ((not (dom-attr node 'mark))))
     (dom-set-attribute node 'fill org-timeblock-marked-block-color)
     (dom-set-attribute node 'mark t)
     (cl-incf org-timeblock-mark-count))
   (org-timeblock-forward-block))
 
 (defun org-timeblock-mark-block-by-id (id)
-  "Mark selected block."
+  "Mark block with id ID."
   (interactive)
-  (when-let ((inhibit-read-only t)
-	     (node (car (dom-by-id org-timeblock-svg id)))
-	     (prev-fill (dom-attr node 'fill)))
+  (when-let ((node (car (dom-by-id org-timeblock-svg id))))
+    (dom-set-attribute node 'orig-fill (dom-attr node 'fill))
     (dom-set-attribute node 'fill org-timeblock-marked-block-color)
-    (dom-set-attribute node 'orig-fill prev-fill)
     (dom-set-attribute node 'mark t)
-    (cl-incf org-timeblock-mark-count))
-  (org-timeblock-forward-block))
+    (cl-incf org-timeblock-mark-count)))
 
 (defun org-timeblock-mark-by-regexp (regexp)
   "Mark blocks by REGEXP."
   (interactive "sMark entries matching regexp: ")
-  (let ((inhibit-read-only t))
-    (dolist (entry
-	     (seq-filter
-	      (lambda (x) (string-match regexp x))
-	      (org-timeblock-get-entries
-	       :sort-func #'org-timeblock-sched-or-event<
-	       :exclude-dateranges t :with-time t)))
-      (when-let ((id (get-text-property 0 'id entry)))
-	(org-timeblock-mark-block-by-id id)
-	(cl-incf org-timeblock-mark-count)))
-    (org-timeblock-redisplay)))
+  (dolist (entry
+	   (seq-filter
+	    (lambda (x) (string-match regexp x))
+	    (org-timeblock-get-entries
+	     :sort-func #'org-timeblock-sched-or-event<
+	     :exclude-dateranges t :with-time t)))
+    (when-let ((id (get-text-property 0 'id entry)))
+      (org-timeblock-mark-block-by-id id)
+      (cl-incf org-timeblock-mark-count)))
+    (org-timeblock-redisplay))
 
 (defun org-timeblock-unmark-block ()
   "Unmark selected block."
   (interactive)
   (when-let ((node (org-timeblock-selected-block))
-	     ((dom-attr node 'mark))
-	     (inhibit-read-only t))
+	     ((dom-attr node 'mark)))
     (dom-remove-attribute node 'mark)
     (dom-set-attribute node 'fill (dom-attr node 'orig-fill))
     (cl-decf org-timeblock-mark-count))
@@ -1909,8 +1899,7 @@ Otherwise, return nil."
   (when-let ((marked-blocks
 	      (dom-search org-timeblock-svg
 			  (lambda (node)
-			    (dom-attr node 'mark))))
-	     (inhibit-read-only t))
+			    (dom-attr node 'mark)))))
     (dolist (node marked-blocks)
       (dom-remove-attribute node 'mark)
       (unless (dom-attr node 'select)
@@ -1921,29 +1910,29 @@ Otherwise, return nil."
 (defun org-timeblock-forward-block ()
   "Select the next timeblock in *org-timeblock* buffer."
   (interactive)
-  (let* ((inhibit-read-only t)
-	 (unsel-order (or (org-timeblock-unselect-block) 0))
-	 (node (car (or (dom-search org-timeblock-svg
-				    (lambda (node)
-				      (and
-				       (dom-attr node 'order)
-				       (= (dom-attr node 'column)
-					  org-timeblock-column)
-				       (= (dom-attr node 'order)
-					  (1+ unsel-order)))))
-			(dom-search org-timeblock-svg
-				    (lambda (node)
-				      (and
-				       (dom-attr node 'order)
-				       (= (dom-attr node 'column)
-					  org-timeblock-column)
-				       (= (dom-attr node 'order) 0))))))))
+  (when-let ((inhibit-read-only t)
+	     (unsel-order (or (org-timeblock-unselect-block) 0))
+	     (node (car (or (dom-search org-timeblock-svg
+					(lambda (node)
+					  (and
+					   (dom-attr node 'order)
+					   (= (dom-attr node 'column)
+					      org-timeblock-column)
+					   (= (dom-attr node 'order)
+					      (1+ unsel-order)))))
+			    (dom-search org-timeblock-svg
+					(lambda (node)
+					  (and
+					   (dom-attr node 'order)
+					   (= (dom-attr node 'column)
+					      org-timeblock-column)
+					   (= (dom-attr node 'order) 0))))))))
     (unless (dom-attr node 'mark)
       (dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
     (dom-set-attribute node 'fill org-timeblock-sel-block-color)
     (dom-set-attribute node 'select t)
     (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
-    (org-timeblock-redisplay)))
+    (org-timeblock-redisplay) t))
 
 (defun org-timeblock-forward-column ()
   "Select the next column in *org-timeblock* buffer."
@@ -1975,36 +1964,35 @@ heading at MARKER in the echo area."
   "Select the previous timeblock in *org-timeblock* buffer.
 Return t on success, otherwise - nil."
   (interactive)
-  (let* ((inhibit-read-only t)
-	 (unsel-order (or (org-timeblock-unselect-block) 0))
-	 (node (car (or (dom-search org-timeblock-svg
-				    (lambda (node)
-				      (and
-				       (dom-attr node 'order)
-				       (= (dom-attr node 'column)
-					  org-timeblock-column)
-				       (= (dom-attr node 'order)
-					  (1- unsel-order)))))
-			(let ((len (length
-				    (seq-filter
-				     (lambda (x)
-				       (= (dom-attr x 'column)
-					  org-timeblock-column))
-				     (dom-by-tag org-timeblock-svg 'rect)))))
-			  (dom-search
-			   org-timeblock-svg
-			   (lambda (node)
-			     (and
-			      (dom-attr node 'order)
-			      (= (dom-attr node 'column)
-				 org-timeblock-column)
-			      (= (dom-attr node 'order) (1- len))))))))))
+  (when-let ((unsel-order (or (org-timeblock-unselect-block) 0))
+	     (node (car (or (dom-search org-timeblock-svg
+					(lambda (node)
+					  (and
+					   (dom-attr node 'order)
+					   (= (dom-attr node 'column)
+					      org-timeblock-column)
+					   (= (dom-attr node 'order)
+					      (1- unsel-order)))))
+			    (let ((len (length
+					(seq-filter
+					 (lambda (x)
+					   (= (dom-attr x 'column)
+					      org-timeblock-column))
+					 (dom-by-tag org-timeblock-svg 'rect)))))
+			      (dom-search
+			       org-timeblock-svg
+			       (lambda (node)
+				 (and
+				  (dom-attr node 'order)
+				  (= (dom-attr node 'column)
+				     org-timeblock-column)
+				  (= (dom-attr node 'order) (1- len))))))))))
     (unless (dom-attr node 'mark)
       (dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
     (dom-set-attribute node 'fill org-timeblock-sel-block-color)
     (dom-set-attribute node 'select t)
     (org-timeblock-show-olp-maybe (dom-attr node 'marker))
-    (svg-possibly-update-image org-timeblock-svg)))
+    (org-timeblock-redisplay) t))
 
 (defun org-timeblock-day-later ()
   "Go forward in time by one day in `org-timeblock-mode'."
@@ -2077,11 +2065,11 @@ When called from Lisp, DATE should be a date as returned by
   (interactive)
   (unless (eq major-mode 'org-timeblock-mode)
     (user-error "Not in *org-timeblock* buffer"))
-  (goto-char (point-min))
-  (when-let ((m (org-timeblock-selected-block-marker))
-	     (inhibit-read-only t))
-    (switch-to-buffer-other-window (marker-buffer m))
-    (goto-char (marker-position m))
+  (when-let ((marker (org-timeblock-selected-block-marker)))
+    (unless (marker-buffer marker)
+      (user-error "Non-existent marker's buffer"))
+    (switch-to-buffer-other-window (marker-buffer marker))
+    (goto-char (marker-position marker))
     (org-timeblock-show-context)
     (recenter)))
 
