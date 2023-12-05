@@ -447,17 +447,19 @@ A and B are ts.el ts objects."
 		    (forward-line -1))
 		  count)))
 	     (inhibit-read-only t))
+    (org-timeblock-unselect-block)
+    (org-timeblock-select-block-by-id id)
     (with-current-buffer org-timeblock-buffer
-      (org-timeblock-unselect-block)
-      (when (re-search-forward (format
-				" id=\"%s\" fill=\"\\([^\"]+\\)\""
-				(format "%s_%d" id column-number))
-			       nil t)
-	(setq org-timeblock-prev-selected-block-color (match-string 1))
-	(replace-match org-timeblock-sel-block-color nil nil nil 1)
-	(re-search-forward " column=\"\\([^\"]+\\)\"" nil t)
-	(setq org-timeblock-column (string-to-number (match-string 1)))
-	(org-timeblock-redisplay)))))
+      (org-timeblock-redisplay))))
+
+(defun org-timeblock-select-block-by-id (id)
+  "Select block with id ID."
+  (interactive)
+  (when-let ((node (car (dom-by-id org-timeblock-svg id))))
+    (dom-set-attribute node 'orig-fill (dom-attr node 'fill))
+    (dom-set-attribute node 'fill org-timeblock-sel-block-color)
+    (dom-set-attribute node 'select t)
+    (setq org-timeblock-column (dom-attr node 'column))))
 
 (defun org-timeblock-intersect-p (entry1 entry2)
   "Return t, if two entries intersect each other.
