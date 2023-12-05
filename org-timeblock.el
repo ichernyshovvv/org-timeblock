@@ -351,8 +351,8 @@ Mouse position is of the form (X . Y)."
 ;; DONE
 (defun org-timeblock-selected-block-marker ()
   "Return a marker pointing to the org entry of selected timeblock."
-  (when-let ((found (org-timeblock-selected-block)))
-    (dom-attr found 'marker)))
+  (when-let ((id (org-timeblock-selected-block-id)))
+    (org-timeblock-get-marker-by-id id)))
 
 (defun org-timeblock-get-marker-by-id (id)
   "Return a marker of entry with ID."
@@ -871,10 +871,9 @@ Default background color is used when BASE-COLOR is nil."
 			   :order (cl-incf order)
 			   :fill (or (car colors)
 				     (funcall get-color title))
-			   :id (format
-				"%s_%d"
-				(get-text-property 0 'id entry)
-				(1+ iter)))
+			   :id (get-text-property 0 'id entry)
+			   :type (cond ((org-timeblock-get-event entry) 'event)
+				       (t 'sched)))
 			  ;; Setting the title of current entry
 			  (let ((y (- y 5)))
 			    (dolist (heading-part heading-list)
@@ -1629,18 +1628,19 @@ The blocks may be events or tasks with SCHEDULED property."
 		   (org-timeblock-get-dates))))
     (if (> org-timeblock-mark-count 0)
 	(let* ((mark-data
-		;; TODO
-		(sort org-timeblock-mark-data
+		(sort (dom-search
+		       org-timeblock-svg
+		       (lambda (node) (dom-attr node 'mark)))
 		      (lambda (x y)
 			(cl-macrolet
 			    ((get-ts (x)
 			       `(org-with-point-at
-				    (org-timeblock-get-marker-by-id (car ,x))
+				    (org-timeblock-get-marker-by-id (dom-attr ,x 'id))
 				  (org-timeblock--parse-org-element-ts
 				   (org-timeblock-get-timestamp
-				    (org-timeblock-block-eventp (car ,x)))))))
+				    (eq (dom-attr ,x 'type) 'event))))))
 			  (ts<= (get-ts x) (get-ts y))))))
-	       (id (caar mark-data))
+	       (id (dom-attr (car mark-data) 'id))
 	       (marker (org-timeblock-get-marker-by-id id))
 	       (interval
 		(let* ((choices '(("side-by-side (0 mins between blocks)" ?s 0)
@@ -1660,7 +1660,7 @@ The blocks may be events or tasks with SCHEDULED property."
 			  (seq-find (lambda (x) (eq (cadr x) answer)) choices))
 		    (`user-input (read-number "Interval (minutes): "))
 		    ((and n _) n))))
-	       (eventp (org-timeblock-block-eventp id))
+	       (eventp (eq (dom-attr (car mark-data) 'type) 'event))
 	       (prev-timestamp
 		(org-with-point-at marker
 		  (org-timeblock-get-timestamp eventp)))
@@ -1675,7 +1675,7 @@ The blocks may be events or tasks with SCHEDULED property."
 	  (pcase interval
 	    ((pred integerp)
 	     (dolist (block mark-data)
-	       (let* ((id (car block))
+	       (let* ((id (dom-attr block 'id))
 		      (marker (org-timeblock-get-marker-by-id id)))
 		 (org-with-point-at marker
 		   (let* ((eventp (org-timeblock-block-eventp id))
@@ -1696,7 +1696,7 @@ The blocks may be events or tasks with SCHEDULED property."
 			   (or new-end-ts new-start-ts)))))))
 	    (`savetime
 	     (dolist (block mark-data)
-	       (let* ((id (car block))
+	       (let* ((id (dom-attr block 'id))
 		      (marker (org-timeblock-get-marker-by-id id)))
 		 (org-with-point-at marker
 		   (let* ((eventp (org-timeblock-block-eventp id))
@@ -1722,8 +1722,7 @@ The blocks may be events or tasks with SCHEDULED property."
 		 (marker (org-timeblock-selected-block-marker)))
 	(org-timeblock--schedule-time
 	 date marker (org-timeblock-block-eventp id))))
-    (org-timeblock-redraw-buffers)
-    (org-timeblock-redisplay)))
+    (org-timeblock-redraw-buffers)))
 
 (defun org-timeblock-set-duration ()
   "Interactively change SCHEDULED duration of the selected block.
