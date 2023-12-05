@@ -1803,18 +1803,19 @@ If EVENTP is non-nil the entry is considered as an event."
 	     (window-width (window-body-width window t)))
     (org-timeblock-unselect-block)
     (when-let ((node (car (dom-search
-			    org-timeblock-svg-obj
-			    (lambda (node)
-			      (let ((x (dom-attr node 'x))
-				    (y (dom-attr node 'y)))
-				(and (eq (dom-tag node) 'rect)
-				     (> (car pos) x)
-				     (<= (car pos) (+ x (dom-attr node 'width)))
-				     (<= (cdr pos) (+ y (dom-attr node 'height)))
-				     (> (cdr pos) y)))))))
-	       (prev-fill (dom-attr node 'fill)))
+			   org-timeblock-svg-obj
+			   (lambda (node)
+			     (let ((x (dom-attr node 'x))
+				   (y (dom-attr node 'y)))
+			       (and (eq (dom-tag node) 'rect)
+				    (> (car pos) x)
+				    (<= (car pos) (+ x (dom-attr node 'width)))
+				    (<= (cdr pos) (+ y (dom-attr node 'height)))
+				    (> (cdr pos) y))))))))
+      (unless (dom-attr node 'mark)
+	(dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
       (dom-set-attribute node 'fill org-timeblock-sel-block-color)
-      (dom-set-attribute node 'orig-fill prev-fill)
+      (dom-set-attribute node 'select t)
       (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
       (svg-possibly-update-image org-timeblock-svg-obj))
     (setq org-timeblock-current-column
@@ -1919,7 +1920,6 @@ Otherwise, return nil."
     (setq org-timeblock-mark-count 0)
     (org-timeblock-redisplay)))
 
-;; DONE?
 (defun org-timeblock-forward-block ()
   "Select the next timeblock in *org-timeblock* buffer."
   (interactive)
