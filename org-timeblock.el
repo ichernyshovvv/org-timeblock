@@ -199,7 +199,7 @@ tasks and those tasks that have not been sorted yet.")
 
 (defvar-keymap org-timeblock-mode-map
   "+" #'org-timeblock-new-task
-  "<mouse-1>" #'org-timeblock-select-block-under-mouse
+  "<mouse-1>" #'org-timeblock-select-block-with-cursor
   "<down>" #'org-timeblock-forward-block
   "<right>" #'org-timeblock-forward-column
   "<left>" #'org-timeblock-backward-column
@@ -306,18 +306,18 @@ Returned value is org-element timestamp object."
       (org-timeblock-get-event-timestamp)
     (org-element-property :scheduled (org-element-at-point))))
 
-(defun org-timeblock-mouse-pixel-pos ()
-  "Return current mouse position in the window of the *org-timeblock* buffer.
-If mouse position is outside of the window, return nil.
+(defun org-timeblock-cursor-pos ()
+  "Return cursor position in the window of the *org-timeblock* buffer.
+If cursor position is outside of the window, return nil.
 
-Mouse position is of the form (X . Y)."
-  (when-let ((mouse-pos (cdr (mouse-pixel-position)))
+Cursor position is of the form (X . Y)."
+  (when-let ((cursor-pos (cdr (mouse-pixel-position)))
 	     (window (get-buffer-window org-timeblock-buffer))
 	     (pos (window-edges window t nil t)))
-    (when (and (> (- (car mouse-pos) (car pos)) 0)
-	       (> (- (cdr mouse-pos) (cadr pos)) 0))
-      (cons (- (car mouse-pos) (car pos))
-	    (- (cdr mouse-pos) (cadr pos))))))
+    (when (and (> (- (car cursor-pos) (car pos)) 0)
+	       (> (- (cdr cursor-pos) (cadr pos)) 0))
+      (cons (- (car cursor-pos) (car pos))
+	    (- (cdr cursor-pos) (cadr pos))))))
 
 ;; DONE
 (defun org-timeblock-selected-block-marker ()
@@ -1792,10 +1792,10 @@ If EVENTP is non-nil the entry is considered as an event."
 
 ;;;; Navigation commands
 
-(defun org-timeblock-select-block-under-mouse ()
-  "Select timeblock under current position of mouse cursor."
+(defun org-timeblock-select-block-with-cursor ()
+  "Select the block under current position of the cursor."
   (interactive)
-  (when-let ((pos (org-timeblock-mouse-pixel-pos))
+  (when-let ((pos (org-timeblock-cursor-pos))
 	     (window (get-buffer-window org-timeblock-buffer))
 	     (window-width (window-body-width window t)))
     (org-timeblock-unselect-block)
