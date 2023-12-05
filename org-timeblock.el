@@ -158,9 +158,9 @@ are tagged with a tag in car."
 (defvar org-timeblock-data nil)
 (defvar org-timeblock-current-column 1)
 
+(defvar org-timeblock-svg nil)
 (defvar org-timeblock-svg-width 0)
 (defvar org-timeblock-svg-height 0)
-(defvar org-timeblock-svg-obj nil)
 
 (persist-defvar org-timeblock-list-entries-pos nil
   "Saved positions for entries in `org-timeblock-list-mode'.
@@ -375,7 +375,7 @@ Mouse position is of the form (X . Y)."
   "Return an id of the entry of selected timeblock.
 id is constructed via `org-timeblock-construct-id'"
   (car (dom-search
-	org-timeblock-svg-obj
+	org-timeblock-svg
 	(lambda (node) (dom-attr node 'select)))))
 
 (defun org-timeblock-selected-block-id ()
@@ -574,7 +574,7 @@ Default background color is used when BASE-COLOR is nil."
 				 (1+ (cdr org-timeblock-scale-options)))
 			     24))
 		 (cur-time (ts-now)))
-	    (setq org-timeblock-svg-obj (svg-create org-timeblock-svg-width org-timeblock-svg-height))
+	    (setq org-timeblock-svg (svg-create org-timeblock-svg-width org-timeblock-svg-height))
 	    (dotimes (iter (length dates))
 	      (if-let ((entries
 			(seq-filter
@@ -772,7 +772,7 @@ Default background color is used when BASE-COLOR is nil."
 		      (while (< (cl-incf lines-iter) max-hour)
 			(setq y (round (* scale (- lines-iter min-hour) 60)))
 			(svg-line
-			 org-timeblock-svg-obj
+			 org-timeblock-svg
 			 (+ timeline-left-padding (* column-width iter))
 			 y
 			 (+ column-width (* column-width iter))
@@ -780,7 +780,7 @@ Default background color is used when BASE-COLOR is nil."
 			 :stroke-dasharray "4"
 			 :stroke hour-lines-color)
 			(svg-text
-			 org-timeblock-svg-obj (format "%d" lines-iter)
+			 org-timeblock-svg (format "%d" lines-iter)
 			 :y (+ y 5)
 			 :x (* column-width iter)
 			 :fill (face-attribute 'default :foreground))))
@@ -862,7 +862,7 @@ Default background color is used when BASE-COLOR is nil."
 				org-timeblock-data)
 			  ;; Appending generated rectangle for current entry
 			  (svg-rectangle
-			   org-timeblock-svg-obj x y block-width block-height
+			   org-timeblock-svg x y block-width block-height
 			   :column (1+ iter)
 			   :stroke (if (org-timeblock-get-event entry)
 				       "#5b0103" "#cdcdcd")
@@ -878,7 +878,7 @@ Default background color is used when BASE-COLOR is nil."
 			  ;; Setting the title of current entry
 			  (let ((y (- y 5)))
 			    (dolist (heading-part heading-list)
-			      (svg-text org-timeblock-svg-obj heading-part
+			      (svg-text org-timeblock-svg heading-part
 					:x x
 					:y (cl-incf y (default-font-height))
 					:fill (or (cadr colors)
@@ -886,7 +886,7 @@ Default background color is used when BASE-COLOR is nil."
 					:font-size
 					(aref (font-info (face-font 'default)) 2))))
 			  (when time-string
-			    (svg-text org-timeblock-svg-obj time-string
+			    (svg-text org-timeblock-svg time-string
 				      :x (- (+ x block-width)
 					    (* (length time-string)
 					       (default-font-width)))
@@ -898,7 +898,7 @@ Default background color is used when BASE-COLOR is nil."
 		    (and org-timeblock-current-time-indicator
 			 (org-timeblock-ts-date= (nth iter dates) cur-time)
 			 (svg-polygon
-			  org-timeblock-svg-obj
+			  org-timeblock-svg
 			  (list
 			   (cons (+ (* column-width iter) (- block-max-width 5))
 				 cur-time-indicator)
@@ -908,7 +908,7 @@ Default background color is used when BASE-COLOR is nil."
 				 (+ cur-time-indicator 5)))
 			  :fill-color "red")))
 		(let ((message "No data."))
-		  (svg-text org-timeblock-svg-obj message
+		  (svg-text org-timeblock-svg message
 			    :y (/ org-timeblock-svg-height 2)
 			    :x (+ (- (/ column-width 2)
 				     (/ (* (default-font-width)
@@ -918,26 +918,26 @@ Default background color is used when BASE-COLOR is nil."
 			    :fill (face-attribute 'default :foreground)
 			    :font-size
 			    (aref (font-info (face-font 'default)) 2)))))
-	    (svg-insert-image org-timeblock-svg-obj))
+	    (svg-insert-image org-timeblock-svg))
 	(let* ((window (get-buffer-window org-timeblock-buffer))
 	       (window-height (window-body-height window t))
 	       (window-width (window-body-width window t))
 	       (message "No data."))
-	  (setq org-timeblock-svg-obj (svg-create window-width window-height))
+	  (setq org-timeblock-svg (svg-create window-width window-height))
 	  (svg-text
-	   org-timeblock-svg-obj message
+	   org-timeblock-svg message
 	   :y (/ window-height 2)
 	   :x (- (/ window-width 2)
 		 (/ (* (default-font-width) (length message)) 2))
 	   :fill (face-attribute 'default :foreground))
-	  (svg-insert-image org-timeblock-svg-obj)))
+	  (svg-insert-image org-timeblock-svg)))
       (setq org-timeblock-mark-count 0)
       (org-timeblock-redisplay))))
 
 (defun org-timeblock-redisplay ()
   "Redisplay *org-timeblock* buffer."
   (let ((inhibit-message t))
-    (svg-possibly-update-image org-timeblock-svg-obj)))
+    (svg-possibly-update-image org-timeblock-svg)))
 
 (defun org-timeblock-show-timeblocks ()
   "Switch to *org-timeblock* buffer in another window."
@@ -1627,7 +1627,7 @@ The blocks may be events or tasks with SCHEDULED property."
   (interactive)
   (let ((date (nth (1- org-timeblock-current-column)
 		   (org-timeblock-get-dates))))
-    (if (/= org-timeblock-mark-count 0)
+    (if (> org-timeblock-mark-count 0)
 	(let* ((mark-data
 		;; TODO
 		(sort org-timeblock-mark-data
@@ -1803,7 +1803,7 @@ If EVENTP is non-nil the entry is considered as an event."
 	     (window-width (window-body-width window t)))
     (org-timeblock-unselect-block)
     (when-let ((node (car (dom-search
-			   org-timeblock-svg-obj
+			   org-timeblock-svg
 			   (lambda (node)
 			     (let ((x (dom-attr node 'x))
 				   (y (dom-attr node 'y)))
@@ -1817,7 +1817,7 @@ If EVENTP is non-nil the entry is considered as an event."
       (dom-set-attribute node 'fill org-timeblock-sel-block-color)
       (dom-set-attribute node 'select t)
       (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
-      (svg-possibly-update-image org-timeblock-svg-obj))
+      (svg-possibly-update-image org-timeblock-svg))
     (setq org-timeblock-current-column
 	  (1+ (/ (car pos) (/ window-width org-timeblock-n-days-view))))
     (org-timeblock-redisplay)
@@ -1829,7 +1829,7 @@ If EVENTP is non-nil the entry is considered as an event."
 Return the numerical order of theunselected block on success.
 Otherwise, return nil."
   (when-let ((node (car (dom-search
-			 org-timeblock-svg-obj
+			 org-timeblock-svg
 			 (lambda (node)
 			   (dom-attr node 'select))))))
     (dom-set-attribute
@@ -1871,7 +1871,7 @@ Otherwise, return nil."
   "Mark selected block."
   (interactive)
   (when-let ((inhibit-read-only t)
-	     (node (car (dom-by-id org-timeblock-svg-obj id)))
+	     (node (car (dom-by-id org-timeblock-svg id)))
 	     (prev-fill (dom-attr node 'fill)))
     (dom-set-attribute node 'fill org-timeblock-marked-block-color)
     (dom-set-attribute node 'orig-fill prev-fill)
@@ -1909,7 +1909,7 @@ Otherwise, return nil."
   "Unmark all marked blocks."
   (interactive)
   (when-let ((marked-blocks
-	      (dom-search org-timeblock-svg-obj
+	      (dom-search org-timeblock-svg
 			  (lambda (node)
 			    (dom-attr node 'mark))))
 	     (inhibit-read-only t))
@@ -1925,12 +1925,12 @@ Otherwise, return nil."
   (interactive)
   (let* ((inhibit-read-only t)
 	 (unsel-order (or (org-timeblock-unselect-block) 0))
-	 (node (car (or (dom-search org-timeblock-svg-obj
+	 (node (car (or (dom-search org-timeblock-svg
 				    (lambda (node)
 				      (and (dom-attr node 'order)
 					   (= (dom-attr node 'order)
 					      (1+ unsel-order)))))
-			(dom-search org-timeblock-svg-obj
+			(dom-search org-timeblock-svg
 				    (lambda (node)
 				      (and (dom-attr node 'order)
 					   (= (dom-attr node 'order) 0))))))))
@@ -1973,17 +1973,17 @@ Return t on success, otherwise - nil."
   (interactive)
   (let* ((inhibit-read-only t)
 	 (unsel-order (or (org-timeblock-unselect-block) 0))
-	 (node (car (or (dom-search org-timeblock-svg-obj
+	 (node (car (or (dom-search org-timeblock-svg
 				    (lambda (node)
 				      (and (dom-attr node 'order)
 					   (= (dom-attr node 'order)
 					      (1- unsel-order)))))
 			(let ((len (length
 				    (dom-by-tag
-				     org-timeblock-svg-obj
+				     org-timeblock-svg
 				     'rect))))
 			  (dom-search
-			   org-timeblock-svg-obj
+			   org-timeblock-svg
 			   (lambda (node)
 			     (and (dom-attr node 'order)
 				  (= (dom-attr node 'order) (1- len))))))))))
@@ -1992,7 +1992,7 @@ Return t on success, otherwise - nil."
     (dom-set-attribute node 'fill org-timeblock-sel-block-color)
     (dom-set-attribute node 'select t)
     (org-timeblock-show-olp-maybe (dom-attr node 'marker))
-    (svg-possibly-update-image org-timeblock-svg-obj)))
+    (svg-possibly-update-image org-timeblock-svg)))
 
 (defun org-timeblock-day-later ()
   "Go forward in time by one day in `org-timeblock-mode'."
@@ -2267,7 +2267,7 @@ SVG image (.svg), PDF (.pdf) is produced."
 		((pred (< 6)) "[%m-%d]")
 		((pred (< 3)) "[%d]"))))
 	(dom-add-child-before
-	 org-timeblock-svg-obj
+	 org-timeblock-svg
 	 (dom-node
 	  'rect
 	  (list
@@ -2278,11 +2278,11 @@ SVG image (.svg), PDF (.pdf) is produced."
 	   (cons 'fill (face-attribute 'default :background)))))
 	(dotimes (iter (length dates))
 	  (svg-text
-	   org-timeblock-svg-obj (ts-format date-format (nth iter dates))
+	   org-timeblock-svg (ts-format date-format (nth iter dates))
 	   :y org-timeblock-svg-height
 	   :x (+ 5 (* (/ org-timeblock-svg-width (length dates)) iter))
 	   :fill (face-attribute 'default :foreground)))
-	(svg-print org-timeblock-svg-obj))
+	(svg-print org-timeblock-svg))
       (pcase (file-name-extension file)
 	((or "pdf" "png")
 	 (unless (executable-find "inkscape")
