@@ -31,7 +31,7 @@ customizable variable ~org-timeblock-tag-colors~:
 
 [[file:screenshots/org-timeblock-with-list-mode.png]]
 
-You can switch to a multi-day view using ~ot-switch-view [V]~:
+You can switch to a multi-day view using ~org-timeblock-switch-view [V]~:
 
 [[file:screenshots/multi-day-view.png]]
 
