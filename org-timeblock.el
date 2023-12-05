@@ -250,45 +250,15 @@ tasks and those tasks that have not been sorted yet.")
 
 ;;;; Modes
 
-(defvar image-transform-resize)
 (define-derived-mode org-timeblock-mode
   special-mode "Org-Timeblock" :interactive nil
-  (if-let ((window (get-buffer-window org-timeblock-buffer))
-	   ((or (< (window-body-height window t) org-timeblock-svg-height)
-		(< (window-body-width window t) org-timeblock-svg-width))))
-      (org-timeblock-redraw-timeblocks)
-    (setq
-     org-timeblock-daterange
-     (cons (ts-now)
-	   (ts-inc 'day (1- org-timeblock-n-days-view) (ts-now)))
-     image-transform-resize nil
-     header-line-format
-     (let* ((dates (org-timeblock-get-dates))
-	    (left-fringe (/ (car (window-fringes window))
-			    (default-font-width)))
-	    (max-length (/ (+ (/ (window-body-width window t)
-				 (default-font-width))
-			      left-fringe)
-			   (length dates)))
-	    (date-format
-	     (pcase max-length
-	       ((pred (< 15)) "[%Y-%m-%d %a]")
-	       ((pred (< 11)) "[%Y-%m-%d]")
-	       ((pred (< 6)) "[%m-%d]")
-	       ((pred (< 3)) "[%d]")))
-	    (right-margin (format "%% -%ds" max-length))
-	    (result (make-string left-fringe ? )))
-       (dotimes (iter (length dates))
-	 (cl-callf concat result
-	   (propertize
-	    (format right-margin
-		    (ts-format date-format (nth iter dates)))
-	    'face
-	    (and (= org-timeblock-current-column (1+ iter))
-		 `(:background ,org-timeblock-sel-block-color)))))
-       result)
-     cursor-type nil
-     buffer-read-only t)))
+  (setq
+   org-timeblock-daterange
+   (cons (ts-now)
+	 (ts-inc 'day (1- org-timeblock-n-days-view) (ts-now)))
+   cursor-type nil
+   buffer-read-only t)
+  (org-timeblock-redisplay))
 
 (define-derived-mode org-timeblock-list-mode
   special-mode "Org-Timeblock-List" :interactive nil
@@ -935,7 +905,36 @@ Default background color is used when BASE-COLOR is nil."
 
 (defun org-timeblock-redisplay ()
   "Redisplay *org-timeblock* buffer."
-  (let ((inhibit-message t))
+  (let ((inhibit-read-only t))
+    (when-let ((window (get-buffer-window org-timeblock-buffer)))
+      (if (or (< (window-body-height window t) org-timeblock-svg-height)
+	      (< (window-body-width window t) org-timeblock-svg-width))
+	  (org-timeblock-redraw-timeblocks)
+	(setq header-line-format
+	      (let* ((dates (org-timeblock-get-dates))
+		     (left-fringe (/ (car (window-fringes window))
+				     (default-font-width)))
+		     (max-length (/ (+ (/ (window-body-width window t)
+					  (default-font-width))
+				       left-fringe)
+				    (length dates)))
+		     (date-format
+		      (pcase max-length
+			((pred (< 15)) "[%Y-%m-%d %a]")
+			((pred (< 11)) "[%Y-%m-%d]")
+			((pred (< 6)) "[%m-%d]")
+			((pred (< 3)) "[%d]")))
+		     (right-margin (format "%% -%ds" max-length))
+		     (result (make-string left-fringe ? )))
+		(dotimes (iter (length dates))
+		  (cl-callf concat result
+		    (propertize
+		     (format right-margin
+			     (ts-format date-format (nth iter dates)))
+		     'face
+		     (and (= org-timeblock-current-column (1+ iter))
+			  `(:background ,org-timeblock-sel-block-color)))))
+		result))))
     (svg-possibly-update-image org-timeblock-svg)))
 
 (defun org-timeblock-show-timeblocks ()
@@ -1740,8 +1739,7 @@ Duration format:
 	     (id (org-timeblock-selected-block-id))
 	     (duration (org-timeblock-read-duration)))
     (org-timeblock--duration duration marker (org-timeblock-block-eventp id))
-    (org-timeblock-redraw-buffers)
-    (org-timeblock-redisplay)))
+    (org-timeblock-redraw-buffers)))
 
 (defun org-timeblock-list-schedule ()
   "Reschedule the entry at point in *org-timeblock-list* buffer.
@@ -1926,13 +1924,19 @@ Otherwise, return nil."
 	 (unsel-order (or (org-timeblock-unselect-block) 0))
 	 (node (car (or (dom-search org-timeblock-svg
 				    (lambda (node)
-				      (and (dom-attr node 'order)
-					   (= (dom-attr node 'order)
-					      (1+ unsel-order)))))
+				      (and
+				       (dom-attr node 'order)
+				       (= (dom-attr node 'column)
+					  org-timeblock-current-column)
+				       (= (dom-attr node 'order)
+					  (1+ unsel-order)))))
 			(dom-search org-timeblock-svg
 				    (lambda (node)
-				      (and (dom-attr node 'order)
-					   (= (dom-attr node 'order) 0))))))))
+				      (and
+				       (dom-attr node 'order)
+				       (= (dom-attr node 'column)
+					  org-timeblock-current-column)
+				       (= (dom-attr node 'order) 0))))))))
     (unless (dom-attr node 'mark)
       (dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
     (dom-set-attribute node 'fill org-timeblock-sel-block-color)
@@ -1974,18 +1978,28 @@ Return t on success, otherwise - nil."
 	 (unsel-order (or (org-timeblock-unselect-block) 0))
 	 (node (car (or (dom-search org-timeblock-svg
 				    (lambda (node)
-				      (and (dom-attr node 'order)
-					   (= (dom-attr node 'order)
-					      (1- unsel-order)))))
+				      (and
+				       (dom-attr node 'order)
+				       (= (dom-attr node 'column)
+					  org-timeblock-current-column)
+				       (= (dom-attr node 'order)
+					  (1- unsel-order)))))
 			(let ((len (length
-				    (dom-by-tag
-				     org-timeblock-svg
-				     'rect))))
+				    (seq-filter
+				     (lambda (x)
+				       (= (dom-attr x 'column)
+					  org-timeblock-current-column))
+				     (dom-by-tag
+				      org-timeblock-svg
+				      'rect)))))
 			  (dom-search
 			   org-timeblock-svg
 			   (lambda (node)
-			     (and (dom-attr node 'order)
-				  (= (dom-attr node 'order) (1- len))))))))))
+			     (and
+			      (dom-attr node 'order)
+			      (= (dom-attr node 'column)
+				 org-timeblock-current-column)
+			      (= (dom-attr node 'order) (1- len))))))))))
     (unless (dom-attr node 'mark)
       (dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
     (dom-set-attribute node 'fill org-timeblock-sel-block-color)
