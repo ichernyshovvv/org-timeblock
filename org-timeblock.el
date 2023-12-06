@@ -1459,7 +1459,7 @@ ARG."
 		       (`org-timeblock-mode
 			(org-timeblock-selected-block-marker)))))
     (org-with-point-at marker
-      (call-interactively #'org-todo))
+      (funcall-interactively #'org-todo arg))
     (org-timeblock-redraw-buffers)))
 
 (defun org-timeblock-list-drag-line-forward (&optional backward)
