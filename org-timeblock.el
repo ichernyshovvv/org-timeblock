@@ -317,19 +317,16 @@ Cursor position is of the form (X . Y)."
       (cons (- (car cursor-pos) (car pos))
 	    (- (cdr cursor-pos) (cadr pos))))))
 
-;; DONE
 (defun org-timeblock-selected-block-marker ()
   "Return a marker pointing to the org entry of selected timeblock."
-  (when-let ((id (org-timeblock-selected-block-id)))
-    (org-timeblock-get-marker-by-id id)))
+  (when-let ((node (org-timeblock-selected-block))
+	     (id (dom-attr node 'id)))
+    (org-timeblock-get-marker-by-id
+     (car (split-string id "_")))))
 
 (defun org-timeblock-get-marker-by-id (id)
   "Return a marker of entry with ID."
   (cadr (seq-find (lambda (x) (string= (car x) id)) org-timeblock-data)))
-
-(defun org-timeblock-block-eventp (id)
-  "Return t if block with ID is an event."
-  (caddr (seq-find (lambda (x) (string= (car x) id)) org-timeblock-data)))
 
 (defun org-timeblock-get-dates ()
   "Return a list of ts.el struct dates between org-timeblock-daterange."
@@ -346,12 +343,6 @@ id is constructed via `org-timeblock-construct-id'"
   (car (dom-search
 	org-timeblock-svg
 	(lambda (node) (dom-attr node 'select)))))
-
-(defun org-timeblock-selected-block-id ()
-  "Return an id of the entry of selected timeblock.
-id is constructed via `org-timeblock-construct-id'"
-  (when-let ((found (org-timeblock-selected-block)))
-    (dom-attr found 'id)))
 
 (defmacro org-timeblock-on (accessor op lhs rhs)
   "Run OP on ACCESSOR's return values from LHS and RHS."
@@ -446,18 +437,13 @@ A and B are ts.el ts objects."
 		  count)))
 	     (inhibit-read-only t))
     (org-timeblock-unselect-block)
-    (org-timeblock-select-block-by-id id)
+    (when-let ((node (car (dom-by-id org-timeblock-svg id))))
+      (dom-set-attribute node 'orig-fill (dom-attr node 'fill))
+      (dom-set-attribute node 'fill org-timeblock-select-color)
+      (dom-set-attribute node 'select t)
+      (setq org-timeblock-column (dom-attr node 'column)))
     (with-current-buffer org-timeblock-buffer
       (org-timeblock-redisplay))))
-
-(defun org-timeblock-select-block-by-id (id)
-  "Select block with id ID."
-  (interactive)
-  (when-let ((node (car (dom-by-id org-timeblock-svg id))))
-    (dom-set-attribute node 'orig-fill (dom-attr node 'fill))
-    (dom-set-attribute node 'fill org-timeblock-select-color)
-    (dom-set-attribute node 'select t)
-    (setq org-timeblock-column (dom-attr node 'column))))
 
 (defun org-timeblock-intersect-p (entry1 entry2)
   "Return t, if two entries intersect each other.
@@ -828,8 +814,7 @@ Default background color is used when BASE-COLOR is nil."
 				    x))
 				(car (last heading-list))))
 			  (push (list (get-text-property 0 'id entry)
-				      (get-text-property 0 'marker entry)
-				      (org-timeblock-get-event entry))
+				      (get-text-property 0 'marker entry))
 				org-timeblock-data)
 			  ;; Appending generated rectangle for current entry
 			  (svg-rectangle
@@ -840,9 +825,10 @@ Default background color is used when BASE-COLOR is nil."
 			   :stroke-width (if (org-timeblock-get-event entry) 2 1)
 			   :opacity "0.7"
 			   :order (cl-incf order)
-			   :fill (or (car colors)
-				     (funcall get-color title))
-			   :id (get-text-property 0 'id entry)
+			   :fill (or (car colors) (funcall get-color title))
+			   :id (format "%s_%d"
+				       (get-text-property 0 'id entry)
+				       (1+ iter))
 			   :type (cond ((org-timeblock-get-event entry) 'event)
 				       (t 'sched)))
 			  ;; Setting the title of current entry
@@ -1635,12 +1621,12 @@ The blocks may be events or tasks with SCHEDULED property."
 			(cl-macrolet
 			    ((get-ts (x)
 			       `(org-with-point-at
-				    (org-timeblock-get-marker-by-id (dom-attr ,x 'id))
+				    (org-timeblock-get-marker-by-id (car (split-string (dom-attr ,x 'id) "_")))
 				  (org-timeblock--parse-org-element-ts
 				   (org-timeblock-get-timestamp
 				    (eq (dom-attr ,x 'type) 'event))))))
 			  (ts<= (get-ts x) (get-ts y))))))
-	       (id (dom-attr (car mark-data) 'id))
+	       (id (car (split-string (dom-attr (car mark-data) 'id) "_")))
 	       (marker (org-timeblock-get-marker-by-id id))
 	       (interval
 		(let* ((choices '(("side-by-side (0 mins between blocks)" ?s 0)
@@ -1675,10 +1661,10 @@ The blocks may be events or tasks with SCHEDULED property."
 	  (pcase interval
 	    ((pred integerp)
 	     (dolist (block mark-data)
-	       (let* ((id (dom-attr block 'id))
+	       (let* ((id (car (split-string (dom-attr block 'id) "_")))
 		      (marker (org-timeblock-get-marker-by-id id)))
 		 (org-with-point-at marker
-		   (let* ((eventp (org-timeblock-block-eventp id))
+		   (let* ((eventp (eq (dom-attr block 'type) 'event))
 			  (timestamp (org-timeblock-get-timestamp eventp))
 			  (start-ts
 			   (org-timeblock--parse-org-element-ts timestamp))
@@ -1696,10 +1682,10 @@ The blocks may be events or tasks with SCHEDULED property."
 			   (or new-end-ts new-start-ts)))))))
 	    (`savetime
 	     (dolist (block mark-data)
-	       (let* ((id (dom-attr block 'id))
+	       (let* ((id (car (split-string (dom-attr block 'id) "_")))
 		      (marker (org-timeblock-get-marker-by-id id)))
 		 (org-with-point-at marker
-		   (let* ((eventp (org-timeblock-block-eventp id))
+		   (let* ((eventp (eq (dom-attr block 'type) 'event))
 			  (timestamp (org-timeblock-get-timestamp eventp))
 			  (start-ts (org-timeblock--parse-org-element-ts
 				     timestamp))
@@ -1718,10 +1704,10 @@ The blocks may be events or tasks with SCHEDULED property."
 		     (org-timeblock--schedule new-start-ts new-end-ts eventp)
 		     (setq new-end-or-start-ts (or new-end-ts new-start-ts))
 		     (setq prev-end-or-start-ts (or end-ts start-ts)))))))))
-      (when-let ((id (org-timeblock-selected-block-id))
+      (when-let ((block (org-timeblock-selected-block))
 		 (marker (org-timeblock-selected-block-marker)))
 	(org-timeblock--schedule-time
-	 date marker (org-timeblock-block-eventp id))))
+	 date marker (eq (dom-attr block 'type) 'event))))
     (org-timeblock-redraw-buffers)))
 
 (defun org-timeblock-set-duration ()
@@ -1737,9 +1723,10 @@ Duration format:
 45"
   (interactive)
   (when-let ((marker (org-timeblock-selected-block-marker))
-	     (id (org-timeblock-selected-block-id))
+	     (block (org-timeblock-selected-block))
 	     (duration (org-timeblock-read-duration)))
-    (org-timeblock--duration duration marker (org-timeblock-block-eventp id))
+    (org-timeblock--duration duration marker
+			     (eq (dom-attr block 'type) 'event))
     (org-timeblock-redraw-buffers)))
 
 (defun org-timeblock-list-schedule ()
@@ -1832,7 +1819,8 @@ Otherwise, return nil."
 	       org-timeblock-mark-color
 	     (or (dom-attr node 'orig-fill) "#ffffff")))
     (dom-remove-attribute node 'select)
-    (dom-attr node 'order)))
+    (cons (dom-attr node 'order)
+	  (dom-attr node 'column))))
 
 (defun org-timeblock-list-next-line ()
   "Move cursor to the next line."
@@ -1860,15 +1848,6 @@ Otherwise, return nil."
     (cl-incf org-timeblock-mark-count))
   (org-timeblock-forward-block))
 
-(defun org-timeblock-mark-block-by-id (id)
-  "Mark block with id ID."
-  (interactive)
-  (when-let ((node (car (dom-by-id org-timeblock-svg id))))
-    (dom-set-attribute node 'orig-fill (dom-attr node 'fill))
-    (dom-set-attribute node 'fill org-timeblock-mark-color)
-    (dom-set-attribute node 'mark t)
-    (cl-incf org-timeblock-mark-count)))
-
 (defun org-timeblock-mark-by-regexp (regexp)
   "Mark blocks by REGEXP."
   (interactive "sMark entries matching regexp: ")
@@ -1878,8 +1857,11 @@ Otherwise, return nil."
 	    (org-timeblock-get-entries
 	     :sort-func #'org-timeblock-sched-or-event<
 	     :exclude-dateranges t :with-time t)))
-    (when-let ((id (get-text-property 0 'id entry)))
-      (org-timeblock-mark-block-by-id id)
+    (when-let ((id (get-text-property 0 'id entry))
+	       (node (car (dom-by-id org-timeblock-svg id))))
+      (dom-set-attribute node 'orig-fill (dom-attr node 'fill))
+      (dom-set-attribute node 'fill org-timeblock-mark-color)
+      (dom-set-attribute node 'mark t)
       (cl-incf org-timeblock-mark-count)))
     (org-timeblock-redisplay))
 
@@ -1910,8 +1892,12 @@ Otherwise, return nil."
 (defun org-timeblock-forward-block ()
   "Select the next timeblock in *org-timeblock* buffer."
   (interactive)
-  (when-let ((inhibit-read-only t)
-	     (unsel-order (or (org-timeblock-unselect-block) 0))
+  (when-let ((unsel-order (let ((unselected-info (org-timeblock-unselect-block)))
+			    (or (and unselected-info
+				     (= (cdr unselected-info)
+					org-timeblock-column)
+				     (car unselected-info))
+				-1)))
 	     (node (car (or (dom-search org-timeblock-svg
 					(lambda (node)
 					  (and
@@ -1940,8 +1926,8 @@ Otherwise, return nil."
   (if (= org-timeblock-column org-timeblock-n-days-view)
       (setq org-timeblock-column 1)
     (cl-incf org-timeblock-column))
-  (unless (org-timeblock-forward-block)
-    (org-timeblock-redisplay)))
+  (org-timeblock-forward-block)
+  (org-timeblock-redisplay))
 
 (defun org-timeblock-backward-column ()
   "Select the next column in *org-timeblock* buffer."
@@ -1949,8 +1935,8 @@ Otherwise, return nil."
   (if (= org-timeblock-column 1)
       (setq org-timeblock-column org-timeblock-n-days-view)
     (cl-decf org-timeblock-column))
-  (unless (org-timeblock-forward-block)
-    (org-timeblock-redisplay)))
+  (org-timeblock-forward-block)
+  (org-timeblock-redisplay))
 
 (defun org-timeblock-show-olp-maybe (marker)
   "Show outline path in echo area for the selected item.
@@ -1964,7 +1950,12 @@ heading at MARKER in the echo area."
   "Select the previous timeblock in *org-timeblock* buffer.
 Return t on success, otherwise - nil."
   (interactive)
-  (when-let ((unsel-order (or (org-timeblock-unselect-block) 0))
+  (when-let ((unsel-order (let ((unselected-info (org-timeblock-unselect-block)))
+			    (or (and unselected-info
+				     (= (cdr unselected-info)
+					org-timeblock-column)
+				     (car unselected-info))
+				0)))
 	     (node (car (or (dom-search org-timeblock-svg
 					(lambda (node)
 					  (and
