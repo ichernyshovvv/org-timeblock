@@ -1208,8 +1208,7 @@ with time (timerange or just start time)."
 			       :scheduled (org-element-at-point)))
 		       (event (org-timeblock-get-event-timestamp))
 		       (marker (copy-marker (point) t))
-		       (tags (mapcar #'substring-no-properties
-				     (org-get-tags (org-element-at-point)))))
+		       (tags (mapcar #'substring-no-properties (org-get-tags))))
 		   (cons
 		    (when event
 		      (propertize
@@ -1758,8 +1757,7 @@ If EVENTP is non-nil the entry is considered as an event."
 	   (org-with-point-at marker
 	     (let ((timestamp (org-timeblock-get-timestamp eventp))
 		   (title (org-get-heading t nil t t))
-		   (tags (mapcar #'substring-no-properties
-				 (org-get-tags (org-element-at-point)))))
+		   (tags (mapcar #'substring-no-properties (org-get-tags))))
 	       (setq colors (org-timeblock-get-colors tags))
 	       (propertize
 		(concat (org-timeblock--construct-entry-prefix timestamp eventp)
