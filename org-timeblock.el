@@ -349,57 +349,83 @@ id is constructed via `org-timeblock-construct-id'"
   "Run OP on ACCESSOR's return values from LHS and RHS."
   `(,op (,accessor ,lhs) (,accessor ,rhs)))
 
-(defun org-timeblock-ts-date= (a b)
-  "Return t if dates of ts.el ts objects A and B are equal."
+(defun org-timeblock-date= (a b)
+  "Return non-nil if dates of A and B time values are equal."
   (cond
    ((and (null a) (null b)))
    ((and a b)
-    (and (org-timeblock-on ts-year  = a b)
-         (org-timeblock-on ts-month = a b)
-         (org-timeblock-on ts-day   = a b)))))
+    (and (org-timeblock-on decoded-time-year  = a b)
+         (org-timeblock-on decoded-time-month = a b)
+         (org-timeblock-on decoded-time-day   = a b)))))
 
-(defun org-timeblock-ts-date< (a b)
-  "Return t, if A's date is earlier then B's date.
-A and B are ts.el ts objects."
+(defun org-timeblock-date< (a b)
+  "Return non-nil if A's date is less than B's date."
   (cond
    ;; nil is less than non-nil
    ((null b) nil)
    ((null a) t)
    (t
-    (or (org-timeblock-on ts-year < a b)
+    (or (org-timeblock-on decoded-time-year < a b)
 	(and
-	 (org-timeblock-on ts-year = a b)
-	 (or (org-timeblock-on ts-month < a b)
-	     (and (org-timeblock-on ts-month = a b)
-		  (org-timeblock-on ts-day < a b))))))))
+	 (org-timeblock-on decoded-time-year = a b)
+	 (or (org-timeblock-on decoded-time-month < a b)
+	     (and (org-timeblock-on decoded-time-month = a b)
+		  (org-timeblock-on decoded-time-day < a b))))))))
 
-(defun org-timeblock-ts-time< (a b)
-  "Return t, if A's date is earlier then B's date.
-A and B are ts.el ts objects."
+(defun org-timeblock-time-diff (a b)
+  "Return difference between times A and B in minutes."
+  (when-let ((encoded-a (encode-time a))
+	     (encoded-b (encode-time b)))
+    (/ (time-convert (time-subtract a b) 'integer) 60)))
+
+(defun org-timeblock-decoded< (a b)
+  "Return non-nil if A is earlier then B."
   (cond
    ;; nil is less than non-nil
    ((null b) nil)
    ((null a) t)
    (t
-    (or (org-timeblock-on ts-hour < a b)
-	(and
-	 (org-timeblock-on ts-hour = a b)
-	 (org-timeblock-on ts-minute < a b))))))
+    (time-less-p
+     (encode-time a)
+     (encode-time b)))))
 
-(defun org-timeblock-ts-date<= (a b)
-  "Return t, if A's date is earlier then B's date.
-A and B are ts.el ts objects."
+(defun org-timeblock-decoded= (a b)
+  "Return non-nil if A is earlier then B."
   (cond
    ;; nil is less than non-nil
    ((null b) nil)
    ((null a) t)
    (t
-    (or (org-timeblock-on ts-year < a b)
+    (time-equal-p
+     (encode-time a)
+     (encode-time b)))))
+
+(defun org-timeblock-time< (a b)
+  "Return non-nil if A's time is earlier then B's time.
+Compare only hours and minutes."
+  (cond
+   ;; nil is less than non-nil
+   ((null b) nil)
+   ((null a) t)
+   (t
+    (or (org-timeblock-on decoded-time-hour < a b)
 	(and
-	 (org-timeblock-on ts-year = a b)
-	 (or (org-timeblock-on ts-month < a b)
-	     (and (org-timeblock-on ts-month = a b)
-		  (org-timeblock-on ts-day <= a b))))))))
+	 (org-timeblock-on decoded-time-hour = a b)
+	 (org-timeblock-on decoded-time-minute < a b))))))
+
+(defun org-timeblock-date<= (a b)
+  "Return non-nil if A's date is <= B's date."
+  (cond
+   ;; nil is less than non-nil
+   ((null b) nil)
+   ((null a) t)
+   (t
+    (or (org-timeblock-on decoded-time-year < a b)
+	(and
+	 (org-timeblock-on decoded-time-year = a b)
+	 (or (org-timeblock-on decoded-time-month < a b)
+	     (and (org-timeblock-on decoded-time-month = a b)
+		  (org-timeblock-on decoded-time-day <= a b))))))))
 
 (defsubst org-timeblock-get-order (item)
   "Return ITEM's \\='order text property or return 1."
@@ -415,8 +441,8 @@ A and B are ts.el ts objects."
 
 (defun org-timeblock-sched-or-event< (a b)
   "Return t, if A's \\='sched or \\='event is less then B's.
-\\='sched or \\='event are transformed to ts.el objects."
-  (org-timeblock-on org-timeblock-get-ts org-timeblock-ts-time< a b))
+\\='sched or \\='event are transformed Emacs decoded time values."
+  (org-timeblock-on org-timeblock-get-ts org-timeblock-time< a b))
 
 (defun org-timeblock-select-block-for-current-entry ()
   "Select block for the entry at point in `org-timeblock-list-mode'."
@@ -555,7 +581,7 @@ Default background color is used when BASE-COLOR is nil."
 					   (org-element-property :hour-end timestamp)
 					   (cdr org-timeblock-scale-options)))))
 			      (or
-			       (org-timeblock-ts-date= start-ts date)
+			       (org-timeblock-date= start-ts date)
 			       (when-let ((org-timeblock-show-future-repeats)
 					  (value (org-element-property :repeater-value timestamp))
 					  (unit (org-element-property :repeater-unit timestamp))
@@ -638,9 +664,9 @@ Default background color is used when BASE-COLOR is nil."
 					timestamp))
 			     (end-ts (org-timeblock--parse-org-element-ts
 				      timestamp t))
-			     (start-date-earlier-p (org-timeblock-ts-date<
+			     (start-date-earlier-p (org-timeblock-date<
 						    start-ts (nth iter dates)))
-			     (end-date-later-p (org-timeblock-ts-date<
+			     (end-date-later-p (org-timeblock-date<
 						(nth iter dates) end-ts)))
 			(add-text-properties
 			 0 (length entry)
@@ -854,7 +880,7 @@ Default background color is used when BASE-COLOR is nil."
 				      (aref (font-info (face-font 'default)) 2))))))
 		    ;; Drawing current time indicator
 		    (and org-timeblock-current-time-indicator
-			 (org-timeblock-ts-date= (nth iter dates) cur-time)
+			 (org-timeblock-date= (nth iter dates) cur-time)
 			 (svg-polygon
 			  org-timeblock-svg
 			  (list
@@ -1018,9 +1044,9 @@ Time format is \"HHMM\""
 		    date (ts-parse
 			  (org-read-date nil nil nil nil (ts-internal date))))
 	      (unless (or
-		       (org-timeblock-ts-date<=
+		       (org-timeblock-date<=
 			date (cdr org-timeblock-daterange))
-		       (org-timeblock-ts-date<=
+		       (org-timeblock-date<=
 			(car org-timeblock-daterange) date))
 		(org-timeblock-jump-to-day date)))))
       (let* ((timestamp (org-timeblock-get-timestamp eventp))
@@ -1036,9 +1062,9 @@ Time format is \"HHMM\""
 				'minute duration new-start-ts)))))
 	(when (and prev-date
 		   (not (or
-			 (org-timeblock-ts-date<=
+			 (org-timeblock-date<=
 			  date (cdr org-timeblock-daterange))
-			 (org-timeblock-ts-date<=
+			 (org-timeblock-date<=
 			  (car org-timeblock-daterange) date))))
 	  (org-timeblock-jump-to-day prev-date))
 	  (org-timeblock--schedule new-start-ts new-end-ts eventp)))))
@@ -1301,7 +1327,7 @@ Return new org-element timestamp object."
 	       (and val (number-to-string val)))
 	     (pcase (org-element-property :warning-unit timestamp)
 	       (`hour "h") (`day "d") (`week "w") (`month "m") (`year "y"))))
-	   (dates-equal-p (org-timeblock-ts-date= start-ts end-ts)))
+	   (dates-equal-p (org-timeblock-date= start-ts end-ts)))
       (cond
        ((or (not end-ts) dates-equal-p)
 	(org-schedule nil (org-timeblock-ts-to-org-timerange start-ts end-ts)))
@@ -1638,7 +1664,9 @@ The blocks may be events or tasks with SCHEDULED property."
 				  (org-timeblock--parse-org-element-ts
 				   (org-timeblock-get-timestamp
 				    (eq (dom-attr ,x 'type) 'event))))))
-			  (ts<= (get-ts x) (get-ts y))))))
+			  (or
+			   (org-timeblock-decoded< (get-ts x) (get-ts y))
+			   (org-timeblock-decoded= (get-ts x) (get-ts y)))))))
 	       (id (car (split-string (dom-attr (car mark-data) 'id) "_")))
 	       (marker (org-timeblock-get-marker-by-id id))
 	       (interval
@@ -2198,7 +2226,7 @@ Available view options:
 		     (and
 		      (member (org-element-property :repeater-type timestamp)
 			      '(restart catch-up))
-		      (org-timeblock-ts-date<= start-ts date))
+		      (org-timeblock-date<= start-ts date))
 		     (and (eq (org-element-property :repeater-type timestamp)
 			      'cumulate)
 			  (when-let ((start start-ts)
