@@ -1063,8 +1063,7 @@ Time format is \"HHMM\""
 	  (?r (setq ts-type 'timerange))
 	  (?s (setq ts-type 'timestamp))
 	  (?d (setq prev-date date
-		    date (ts-parse
-			  (org-read-date nil nil nil nil (ts-internal date))))
+		    date (decode-time (org-read-date nil t nil nil date)))
 	      (unless (or
 		       (org-timeblock-date<=
 			date (cdr org-timeblock-daterange))
@@ -1606,8 +1605,8 @@ SELECT prefix argument provides."
     (while (not (eq (get-text-property (point) 'face)
 		    'org-timeblock-list-header))
       (forward-line -1))
-    (ts-parse (buffer-substring
-	       (line-beginning-position) (line-end-position)))))
+    (parse-time-string (buffer-substring
+			(line-beginning-position) (line-end-position)))))
 
 (cl-defun org-timeblock-new-task
     (&optional (date (pcase major-mode
