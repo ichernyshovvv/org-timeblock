@@ -543,7 +543,8 @@ Default background color is used when BASE-COLOR is nil."
     (let ((inhibit-read-only t))
       (erase-buffer)
       (if-let ((entries (org-timeblock-get-entries
-			 :sort-func #'org-timeblock-sched-or-event<
+			 (car org-timeblock-daterange)
+			 (cdr org-timeblock-daterange)
 			 :exclude-dateranges t :with-time t))
 	       (dates (org-timeblock-get-dates))
 	       (window (get-buffer-window org-timeblock-buffer))
@@ -1103,7 +1104,7 @@ Time format is \"HHMM\""
      (null (org-element-property :hour-start timestamp))
      (null (org-element-property :hour-end timestamp)))))
 
-(defun org-timeblock--construct-entry-prefix (timestamp &optional eventp)
+(defun org-timeblock--construct-prefix (timestamp &optional eventp)
   "Construct an entry prefix for *org-timeblock-list* buffer.
 
 TIMESTAMP is org-element timestamp object which is used to
@@ -1141,7 +1142,7 @@ insert \"EVENT\" in the prefix."
      'prefix t)))
 
 (cl-defun org-timeblock-read-ts (ts &optional (prompt "TIME:"))
-  "Read a time in \"HHMM\" format and apply it to ts.el struct TS.
+  "Read a time in \"HHMM\" format and apply it to TS.
 Return the changed time struct.
 
 PROMPT can overwrite the default prompt."
@@ -1195,94 +1196,71 @@ If EVENTP is non-nil, use entry's TIMESTAMP property."
       (org-element-timestamp-parser))))
 
 (cl-defun org-timeblock-get-entries
-    (&key sort-func exclude-dateranges with-time)
-  "Return entries relevant to `org-timeblock-date'.
+    (from to &key exclude-dateranges with-time)
+  "Return scheduled tasks or events in [FROM;TO] timerange.
+FROM and TO are decoded-time values.
 
-SORT-FUNC is either nil, in which case items are sorted via
-`org-timeblock-sort-function'; or a function that accepts two items as
-arguments and returns nil or non-nil.
-
-When EXCLUDE-DATERANGES is non-nil, exclude scheduled entries or
+When EXCLUDE-DATERANGES is non-nil, exclude timestamp entries or
 events with a daterange with no times.
 
 When WITH-TIME is non-nil, each entry must contain a timestamp
 with time (timerange or just start time)."
-  (when-let ((files (org-agenda-files)))
-    (sort
-     (mapcar
-      (lambda (entry)
-	;; setting 'order property not inside of `org-ql-select' call
-	;; because when buffers have not been changed, org-ql uses
-	;; cached results and therefore does not update 'order property,
-	;; which is the only property that's not stored in org buffers
-	(let ((timestamp (org-timeblock-get-sched-or-event entry)))
-	  (dolist (date (org-timeblock-get-dates))
-	    (when (and (org-timeblock-ts-date<=
-			(org-timeblock--parse-org-element-ts timestamp)
-			date)
-		       (org-timeblock-ts-date<=
-			date
-			(org-timeblock--parse-org-element-ts timestamp t)))
-	      (put-text-property
-	       0 (length entry)
-	       'order (alist-get
-		       (get-text-property 0 'id entry)
-		       (alist-get
-			(ts-format "%Y-%m-%d" date)
-			org-timeblock-list-entries-pos
-			nil nil #'equal)
-		       nil nil #'equal)
-	       entry))))
-	entry)
-      (let ((result
-	     (org-ql-select
-	       files
-	       (if (cdr org-timeblock-daterange)
-		   `(and (not (done))
-			 (org-timeblock-active-ts
-			  ,(car org-timeblock-daterange)
-			  ,(cdr org-timeblock-daterange)
-			  :exclude-dateranges ,exclude-dateranges
-			  :with-time ,with-time))
-		 `(and (not (done))
-		       (org-timeblock-active-ts-on
-			,(car org-timeblock-daterange)
-			:exclude-dateranges ,exclude-dateranges
-			:with-time ,with-time)))
-	       :action
-	       (lambda ()
-		 (let ((title (org-get-heading t nil t t))
-		       (sched (org-element-property
-			       :scheduled (org-element-at-point)))
-		       (event (org-timeblock-get-event-timestamp))
-		       (marker (copy-marker (point) t))
-		       (tags (mapcar #'substring-no-properties (org-get-tags))))
-		   (cons
-		    (when event
-		      (propertize
-		       (concat
-			(org-timeblock--construct-entry-prefix event t)
-			title)
-		       'event event
-		       'marker marker
-		       'tags tags
-		       'id (org-timeblock-construct-id nil t)
-		       'title title))
-		    (when sched
-		      (propertize
-		       (concat
-			(org-timeblock--construct-entry-prefix sched)
-			title)
-		       'sched sched
-		       'marker marker
-		       'tags tags
-		       'id (org-timeblock-construct-id)
-		       'title title)))))))
-	    flattened)
-	(dolist (el result flattened)
-	  (and (car el) (push (car el) flattened))
-	  (and (cdr el) (push (cdr el) flattened)))))
-     (or sort-func org-timeblock-sort-function))))
+  (let (entries)
+    (dolist (file (org-agenda-files)
+		  (sort entries #'org-timeblock-sched-or-event<))
+      (with-current-buffer (find-file-noselect file)
+	(org-with-wide-buffer
+	 (goto-char (point-min))
+	 (while (re-search-forward org-ts-regexp nil t)
+	   (let (title marker tags (element (org-element-at-point)))
+	     (if (or (org-in-archived-heading-p t element)
+		     (org-entry-is-done-p))
+		 (org-get-next-sibling)
+	       (cl-macrolet
+		   ((check (func &optional eventp)
+		      `(when-let
+			   ((timestamp ,func)
+			    ((not (and exclude-dateranges
+				       (org-timeblock--daterangep timestamp))))
+			    ((or (not with-time)
+				 (org-element-property :hour-start timestamp)))
+			    (start-ts (org-timeblock-timestamp-to-time
+				       timestamp))
+			    ((or
+			      (and
+			       (org-element-property
+				:repeater-type timestamp)
+			       (org-timeblock-date<= start-ts from))
+			      (and
+			       (org-timeblock-date<= from start-ts)
+			       (org-timeblock-date<= start-ts to))
+			      (let ((end-ts
+				     (org-timeblock-timestamp-to-time
+				      timestamp t)))
+				(and
+				 end-ts
+				 (org-timeblock-date<= from end-ts)
+				 (org-timeblock-date<= end-ts to))))))
+			 (unless marker
+			   (setq title (org-get-heading t nil t t)
+				 marker (save-excursion
+					  (org-back-to-heading-or-point-min t)
+					  (copy-marker (point) t))
+				 tags (mapcar #'substring-no-properties
+					      (org-get-tags))))
+			 (push
+			  (propertize
+			   (concat
+			    (org-timeblock--construct-prefix timestamp ,eventp)
+			    title)
+			   ',(if eventp 'event 'sched) timestamp
+			   'marker marker
+			   'tags tags
+			   'id (org-timeblock-construct-id)
+			   'title title)
+			  entries))))
+		 (check (org-element-property :scheduled element))
+		 (check (org-timeblock-get-event-timestamp) t))))))))))
 
 (defun org-timeblock-get-colors (tags)
   "Return the colors for TAGS.
@@ -1861,7 +1839,7 @@ If EVENTP is non-nil the entry is considered as an event."
 		   (tags (mapcar #'substring-no-properties (org-get-tags))))
 	       (setq colors (org-timeblock-get-colors tags))
 	       (propertize
-		(concat (org-timeblock--construct-entry-prefix timestamp eventp)
+		(concat (org-timeblock--construct-prefix timestamp eventp)
 			title)
 		(if eventp 'event 'sched) timestamp
 		'marker marker
@@ -1955,7 +1933,8 @@ Otherwise, return nil."
 	   (seq-filter
 	    (lambda (x) (string-match regexp x))
 	    (org-timeblock-get-entries
-	     :sort-func #'org-timeblock-sched-or-event<
+	     (car org-timeblock-daterange)
+	     (cdr org-timeblock-daterange)
 	     :exclude-dateranges t :with-time t)))
     (when-let ((id (get-text-property 0 'id entry))
 	       (node (car (dom-by-id org-timeblock-svg id))))
@@ -2259,7 +2238,9 @@ Available view options:
   (interactive)
   (with-current-buffer (get-buffer-create org-timeblock-list-buffer)
     (let ((inhibit-read-only t)
-	  (entries (org-timeblock-get-entries))
+	  (entries (org-timeblock-get-entries
+		    (car org-timeblock-daterange)
+		    (cdr org-timeblock-daterange)))
 	  (dates (org-timeblock-get-dates)))
       (erase-buffer)
       (org-timeblock-list-mode)
