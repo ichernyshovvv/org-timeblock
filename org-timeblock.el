@@ -1885,16 +1885,17 @@ If EVENTP is non-nil the entry is considered as an event."
 	     (window (get-buffer-window org-timeblock-buffer))
 	     (window-width (window-body-width window t)))
     (org-timeblock-unselect-block)
-    (when-let ((node (car (dom-search
-			   org-timeblock-svg
-			   (lambda (node)
-			     (let ((x (dom-attr node 'x))
-				   (y (dom-attr node 'y)))
-			       (and (eq (dom-tag node) 'rect)
-				    (> (car pos) x)
-				    (<= (car pos) (+ x (dom-attr node 'width)))
-				    (<= (cdr pos) (+ y (dom-attr node 'height)))
-				    (> (cdr pos) y))))))))
+    (when-let ((node
+		(car (dom-search
+		      org-timeblock-svg
+		      (lambda (node)
+			(let ((x (dom-attr node 'x))
+			      (y (dom-attr node 'y)))
+			  (and (eq (dom-tag node) 'rect)
+			       (> (car pos) x)
+			       (<= (car pos) (+ x (dom-attr node 'width)))
+			       (<= (cdr pos) (+ y (dom-attr node 'height)))
+			       (> (cdr pos) y))))))))
       (unless (dom-attr node 'mark)
 	(dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
       (dom-set-attribute node 'fill org-timeblock-select-color)
@@ -2049,34 +2050,36 @@ heading at MARKER in the echo area."
   "Select the previous timeblock in *org-timeblock* buffer.
 Return t on success, otherwise - nil."
   (interactive)
-  (when-let ((unsel-order (let ((unselected-info (org-timeblock-unselect-block)))
-			    (or (and unselected-info
-				     (= (cdr unselected-info)
-					org-timeblock-column)
-				     (car unselected-info))
-				0)))
-	     (node (car (or (dom-search org-timeblock-svg
-					(lambda (node)
-					  (and
-					   (dom-attr node 'order)
-					   (= (dom-attr node 'column)
-					      org-timeblock-column)
-					   (= (dom-attr node 'order)
-					      (1- unsel-order)))))
-			    (let ((len (length
-					(seq-filter
-					 (lambda (x)
-					   (= (dom-attr x 'column)
-					      org-timeblock-column))
-					 (dom-by-tag org-timeblock-svg 'rect)))))
-			      (dom-search
-			       org-timeblock-svg
-			       (lambda (node)
-				 (and
-				  (dom-attr node 'order)
-				  (= (dom-attr node 'column)
-				     org-timeblock-column)
-				  (= (dom-attr node 'order) (1- len))))))))))
+  (when-let ((unsel-order
+	      (let ((unselected-info (org-timeblock-unselect-block)))
+		(or (and unselected-info
+			 (= (cdr unselected-info)
+			    org-timeblock-column)
+			 (car unselected-info))
+		    0)))
+	     (node (car (or
+			 (dom-search org-timeblock-svg
+				     (lambda (node)
+				       (and
+					(dom-attr node 'order)
+					(= (dom-attr node 'column)
+					   org-timeblock-column)
+					(= (dom-attr node 'order)
+					   (1- unsel-order)))))
+			 (let ((len (length
+				     (seq-filter
+				      (lambda (x)
+					(= (dom-attr x 'column)
+					   org-timeblock-column))
+				      (dom-by-tag org-timeblock-svg 'rect)))))
+			   (dom-search
+			    org-timeblock-svg
+			    (lambda (node)
+			      (and
+			       (dom-attr node 'order)
+			       (= (dom-attr node 'column)
+				  org-timeblock-column)
+			       (= (dom-attr node 'order) (1- len))))))))))
     (unless (dom-attr node 'mark)
       (dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
     (dom-set-attribute node 'fill org-timeblock-select-color)
