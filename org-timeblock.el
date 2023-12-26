@@ -693,31 +693,52 @@ Default background color is used when BASE-COLOR is nil."
 				    (max
 				     (default-font-height)
 				     (round
-				      (* (/ (ts-diff
-					     (if (or (and end-date-later-p (not repeated))
-						     (ts<
-						      (ts-apply :hour (1- max-hour) :minute 59 :second 0 (nth iter dates))
-						      (ts-apply :hour (ts-hour end-ts)
-								:minute (ts-minute end-ts) (nth iter dates))))
-						 (ts-apply :hour (1- max-hour) :minute 59 :second 0 (nth iter dates))
-					       end-ts)
-					     (if (or (and start-date-earlier-p (not repeated))
-						     (ts<
-						      (ts-apply :hour (ts-hour start-ts)
-								:minute (ts-minute start-ts) (nth iter dates))
-						      (ts-apply :hour min-hour :minute 0 :second 0 (nth iter dates))))
-						 (ts-apply :hour min-hour :minute 0 :second 0 (nth iter dates))
-					       start-ts))
-					    60)
+				      (* (org-timeblock-time-diff
+					  (if (or (and end-date-later-p (not repeated))
+						  (org-timeblock-decoded<
+						   (org-timeblock-time-apply
+						    (nth iter dates)
+						    :hour (1- max-hour)
+						    :minute 59 :second 0)
+						   (org-timeblock-time-apply
+						    (nth iter dates)
+						    :hour (decoded-time-hour end-ts)
+						    :minute (decoded-time-minute end-ts))))
+					      (org-timeblock-time-apply
+					       (nth iter dates)
+					       :hour (1- max-hour)
+					       :minute 59
+					       :second 0)
+					    end-ts)
+					  (if (or (and start-date-earlier-p (not repeated))
+						  (org-timeblock-decoded<
+						   (org-timeblock-time-apply
+						    (nth iter dates)
+						    :hour (decoded-time-hour start-ts)
+						    :minute (decoded-time-minute start-ts))
+						   (org-timeblock-time-apply
+						    (nth iter dates)
+						    :hour min-hour :minute 0
+						    :second 0)))
+					      (org-timeblock-time-apply
+					       (nth iter dates)
+					       :hour min-hour :minute 0
+					       :second 0)
+					    start-ts))
 					 scale)))
 				  (default-font-height))
 				(if (org-timeblock-get-event entry) 2 1))
 			    y
 			    ,(if-let ((value (+ (round (* (if (or (and start-date-earlier-p (not repeated))
-								  (ts<
-								   (ts-apply :hour (ts-hour start-ts)
-									     :minute (ts-minute start-ts) (nth iter dates))
-								   (ts-apply :hour min-hour :minute 0 :second 0 (nth iter dates))))
+								  (org-timeblock-decoded<
+								   (org-timeblock-time-apply
+								    (nth iter dates)
+								    :hour (decoded-time-hour start-ts)
+								    :minute (decoded-time-minute start-ts))
+								   (org-timeblock-time-apply
+								    (nth iter dates)
+								    :hour min-hour :minute 0
+								    :second 0)))
 							      0
 							    (- (+ (* 60 (org-element-property :hour-start timestamp))
 								  (org-element-property :minute-start timestamp))
@@ -1144,12 +1165,10 @@ PROMPT can overwrite the default prompt."
 	    (pop time))
 	   (t (ding))))))
     (cl-macrolet ((pop-digit () '(- (pop time) 48)))
-      (ts-apply
-       :minute
-       (+ (pop-digit) (* 10 (pop-digit)))
-       :hour
-       (+ (pop-digit) (* 10 (pop-digit)))
-       ts))))
+      (org-timeblock-time-apply
+       ts
+       :minute (+ (pop-digit) (* 10 (pop-digit)))
+       :hour (+ (pop-digit) (* 10 (pop-digit)))))))
 
 (defun org-timeblock-construct-id (&optional marker eventp)
   "Construct identifier for the org entry at MARKER.
@@ -1634,6 +1653,24 @@ SLOT should be specified as a plain symbol, not a keyword."
     (decoded-time-add
      time
      (make-decoded-time (intern (format ":%s" slot)) value))))
+
+(cl-defun org-timeblock-time-apply (time &key second minute hour
+					 day month year)
+  "Return new timestamp based on TIME with new slot values from keys."
+  (let ((time (copy-sequence time)))
+    (when second
+      (setf (decoded-time-second time) second))
+    (when minute
+      (setf (decoded-time-minute time) minute))
+    (when hour
+      (setf (decoded-time-hour time) hour))
+    (when day
+      (setf (decoded-time-day time) day))
+    (when month
+      (setf (decoded-time-month time) month))
+    (when year
+      (setf (decoded-time-year time) year))
+    time))
 
 (defun org-timeblock-list-set-duration ()
   "Interactively change SCHEDULED duration for the task at point.
