@@ -4,7 +4,7 @@
 
 ;; Author: Ilya Chernyshov <ichernyshovvv@gmail.com>
 ;; Version: 0.2-pre
-;; Package-Requires: ((emacs "28.1") (compat "29.1.4.1") (org-ql "0.7") (org "9.0") (svg "1.1") (persist "0.5"))
+;; Package-Requires: ((emacs "28.1") (compat "29.1.4.1") (org "9.0") (svg "1.1") (persist "0.5"))
 ;; Keywords: org, calendar, timeblocking, agenda
 ;; URL: https://github.com/ichernyshovvv/org-timeblock
 
@@ -37,8 +37,6 @@
 (require 'svg)
 (require 'color)
 (require 'seq)
-(require 'org-ql)
-(require 'text-property-search)
 (require 'persist)
 (require 'compat)
 (require 'compat-macs)
@@ -2369,66 +2367,6 @@ SVG image (.svg), PDF (.pdf) is produced."
 			      (concat "--export-filename=" file)))
 	((or "svg" `nil) (write-region nil nil file)))
       (org-timeblock-redraw-timeblocks))))
-
-;;;; Predicates
-
-(org-ql-defpred org-timeblock-active-ts
-  (from to &key exclude-dateranges with-time)
-  "Search for entries with TIMESTAMP/SCHEDULED property in [FROM;TO] daterange.
-
-When EXCLUDE-DATERANGES is non-nil, exclude entries with daterange and no time.
-
-When WITH-TIME is non-nil, each entry must contain a timestamp
-with time (timerange or just start time)."
-  :preambles
-  ((`(org-timeblock-active-ts . ,rest)
-    (list :query query :regexp org-ts-regexp)))
-  :body
-  (when-let ((timestamp
-	      (or (org-element-property :scheduled (org-element-at-point))
-		  (org-timeblock-get-event-timestamp)))
-	     ((not (and exclude-dateranges
-			(org-timeblock--daterangep timestamp))))
-	     ((or (not with-time) (org-element-property :hour-start timestamp)))
-	     (start-ts (org-timeblock--parse-org-element-ts timestamp)))
-    (or
-     (and
-      (org-element-property :repeater-type timestamp)
-      (org-timeblock-ts-date<= start-ts from))
-     (and
-      (org-timeblock-ts-date<= from start-ts)
-      (org-timeblock-ts-date<= start-ts to))
-     (when-let ((end-ts (org-timeblock--parse-org-element-ts timestamp t)))
-       (and (org-timeblock-ts-date<= from end-ts)
-	    (org-timeblock-ts-date<= end-ts to))))))
-
-(org-ql-defpred org-timeblock-active-ts-on
-  (on &key exclude-dateranges with-time)
-  "Search for entries that have TIMESTAMP/SCHEDULED property set to ON.
-
-When EXCLUDE-DATERANGES is non-nil, exclude entries with daterange and no time.
-
-When WITH-TIME is non-nil, each entry must contain a timestamp
-with time (timerange or just start time)."
-  :preambles
-  ((`(org-timeblock-active-ts-on . ,rest)
-    (list :query query :regexp org-ts-regexp)))
-  :body
-  (when-let ((timestamp
-	      (or (org-element-property :scheduled (org-element-at-point))
-		  (org-timeblock-get-event-timestamp)))
-	     ((not (and exclude-dateranges
-			(org-timeblock--daterangep timestamp))))
-	     ((or (not with-time) (org-element-property :hour-start timestamp)))
-	     (start-ts (org-timeblock--parse-org-element-ts timestamp)))
-    (or
-     (org-timeblock-ts-date= start-ts on)
-     (and
-      (org-element-property :repeater-type timestamp)
-      (org-timeblock-ts-date<= start-ts on))
-     (when-let ((end-ts (org-timeblock--parse-org-element-ts timestamp t)))
-       (and (org-timeblock-ts-date< start-ts on)
-	    (org-timeblock-ts-date<= on end-ts))))))
 
 ;;;; Footer
 
