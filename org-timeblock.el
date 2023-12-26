@@ -374,8 +374,8 @@ id is constructed via `org-timeblock-construct-id'"
 
 (defun org-timeblock-time-diff (a b)
   "Return difference between times A and B in minutes."
-  (when-let ((encoded-a (encode-time a))
-	     (encoded-b (encode-time b)))
+  (when-let ((a (encode-time a))
+	     (b (encode-time b)))
     (/ (time-convert (time-subtract a b) 'integer) 60)))
 
 (defun org-timeblock-decoded< (a b)
@@ -1054,7 +1054,7 @@ Time format is \"HHMM\""
 	     (start-ts (org-timeblock--parse-org-element-ts timestamp))
 	     (end-ts (org-timeblock--parse-org-element-ts timestamp t))
 	     (duration (when (and start-ts end-ts)
-			 (/ (round (ts-diff end-ts start-ts)) 60)))
+			 (org-timeblock-time-diff end-ts start-ts)))
 	     (new-start-ts (org-timeblock-read-ts date "START-TIME: "))
 	     (new-end-ts
 	      (if (eq ts-type 'timerange)
@@ -1750,11 +1750,11 @@ The blocks may be events or tasks with SCHEDULED property."
 				     timestamp))
 			  (end-ts (org-timeblock--parse-org-element-ts
 				   timestamp t))
-			  (duration (when (and start-ts end-ts)
-				      (/ (round (ts-diff end-ts start-ts)) 60)))
-			  (int (/
-				(round (ts-diff start-ts prev-end-or-start-ts))
-				60))
+			  (duration
+			   (when (and start-ts end-ts)
+			     (org-timeblock-time-diff end-ts start-ts)))
+			  (int (org-timeblock-time-diff
+				start-ts prev-end-or-start-ts))
 			  (new-start-ts
 			   (org-timeblock-time-inc
 			    'minute int new-end-or-start-ts))
