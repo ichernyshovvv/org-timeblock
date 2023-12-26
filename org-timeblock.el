@@ -253,8 +253,9 @@ tasks and those tasks that have not been sorted yet.")
   special-mode "Org-Timeblock" :interactive nil
   (setq
    org-timeblock-daterange
-   (cons (ts-now)
-	 (ts-inc 'day (1- org-timeblock-n-days-view) (ts-now)))
+   (cons (decode-time)
+	 (org-timeblock-time-inc 'day (1- org-timeblock-n-days-view)
+				 (decode-time)))
    cursor-type nil
    buffer-read-only t)
   (org-timeblock-redisplay))
@@ -329,12 +330,12 @@ Cursor position is of the form (X . Y)."
   (cadr (seq-find (lambda (x) (string= (car x) id)) org-timeblock-data)))
 
 (defun org-timeblock-get-dates ()
-  "Return a list of ts.el struct dates between org-timeblock-daterange."
+  "Return a list of time values between org-timeblock-daterange."
   (let (dates (start-date (car org-timeblock-daterange)))
     (while (and
 	    (push start-date dates)
-	    (setq start-date (ts-inc 'day 1 start-date))
-	    (org-timeblock-ts-date<= start-date (cdr org-timeblock-daterange))))
+	    (setq start-date (org-timeblock-time-inc 'day 1 start-date))
+	    (org-timeblock-date<= start-date (cdr org-timeblock-daterange))))
     (nreverse dates)))
 
 (defun org-timeblock-selected-block ()
@@ -530,7 +531,7 @@ Default background color is used when BASE-COLOR is nil."
 				   24
 				 (1+ (cdr org-timeblock-scale-options)))
 			     24))
-		 (cur-time (ts-now)))
+		 (cur-time (decode-time)))
 	    (setq org-timeblock-svg (svg-create org-timeblock-svg-width org-timeblock-svg-height))
 	    (dotimes (iter (length dates))
 	      (if-let ((entries
@@ -563,21 +564,21 @@ Default background color is used when BASE-COLOR is nil."
 				  (and (eq unit 'day)
 				       (= value 1)
 				       (if (eq org-timeblock-show-future-repeats 'next)
-					   (org-timeblock-ts-date= (ts-inc 'day 1 start) date)
+					   (org-timeblock-date= (org-timeblock-time-inc 'day 1 start) date)
 					 (and org-timeblock-show-future-repeats
-					      (org-timeblock-ts-date<= start date))))
+					      (org-timeblock-date<= start date))))
 				  (progn
 				    (when (eq 'week unit)
 				      (setq value (* value 7)
 					    unit 'day))
 				    (if (eq org-timeblock-show-future-repeats 'next)
-					(setq start (ts-inc unit value start))
-				      (while (org-timeblock-ts-date< start date)
-					(setq start (ts-inc unit value start))))
-				    (org-timeblock-ts-date= start date))))
-			       (when-let ((end-ts (org-timeblock--parse-org-element-ts timestamp t)))
-				 (and (org-timeblock-ts-date< start-ts date)
-				      (org-timeblock-ts-date<= date end-ts)))))))
+					(setq start (org-timeblock-time-inc unit value start))
+				      (while (org-timeblock-date< start date)
+					(setq start (org-timeblock-time-inc unit value start))))
+				    (org-timeblock-date= start date))))
+			       (when-let ((end-ts (org-timeblock-timestamp-to-time timestamp t)))
+				 (and (org-timeblock-date< start-ts date)
+				      (org-timeblock-date<= date end-ts)))))))
 			 entries)))
 		  (let* ((order -1)
 			 (min-hour
@@ -587,7 +588,7 @@ Default background color is used when BASE-COLOR is nil."
 			    (_ (apply #'min (remove
 					     nil
 					     (append
-					      (list (unless (eq org-timeblock-scale-options 'hide-all) (ts-hour (ts-now))))
+					      (list (unless (eq org-timeblock-scale-options 'hide-all) (decoded-time-hour (decode-time))))
 					      (mapcar
 					       (lambda (entry)
 						 (let ((s-or-e (org-timeblock-get-sched-or-event entry)))
@@ -600,7 +601,8 @@ Default background color is used when BASE-COLOR is nil."
 			 (cur-time-indicator
 			  (* scale
 			     (-
-			      (+ (* (ts-hour cur-time) 60) (ts-minute cur-time)) ;; minutes
+			      (+ (* (decoded-time-hour cur-time) 60)
+				 (decoded-time-minute cur-time)) ;; minutes
 			      (* min-hour 60))))
 			 (columns
 			  (mapcar (lambda (x) (cons (get-text-property 0 'id x) 1)) entries))
@@ -1030,7 +1032,8 @@ Time format is \"HHMM\""
 	     (new-end-ts
 	      (if (eq ts-type 'timerange)
 		  (org-timeblock-read-ts date "END-TIME: ")
-		(when duration (ts-inc 'minute duration new-start-ts)))))
+		(when duration (org-timeblock-time-inc
+				'minute duration new-start-ts)))))
 	(when (and prev-date
 		   (not (or
 			 (org-timeblock-ts-date<=
@@ -1434,8 +1437,9 @@ If EVENTP is non-nil, use entry's timestamp."
   (org-with-point-at marker
     (org-timeblock-show-context)
     (let* ((timestamp (org-timeblock-get-timestamp eventp))
-	   (start-ts (ts-parse-org-element timestamp))
-	   (new-end-ts (when duration (ts-inc 'minute duration start-ts))))
+	   (start-ts (decode-time (org-timestamp-to-time timestamp)))
+	   (new-end-ts (when duration (org-timeblock-time-inc
+				       'minute duration start-ts))))
       (unless (and (org-element-property :hour-start timestamp)
 		   (org-element-property :minute-start timestamp))
 	(user-error "No scheduled time specified for this entry"))
@@ -1496,8 +1500,9 @@ When BACKWARD is non-nil, move backward."
   (interactive)
   (switch-to-buffer org-timeblock-list-buffer)
   (setq org-timeblock-daterange
-	(cons (ts-now)
-	      (ts-inc 'day (1- org-timeblock-n-days-view) (ts-now))))
+	(cons (decode-time)
+	      (org-timeblock-time-inc 'day (1- org-timeblock-n-days-view)
+				      (decode-time))))
   (org-timeblock-redraw-buffers))
 
 ;;;###autoload
@@ -1578,6 +1583,15 @@ The new task is created in `org-timeblock-inbox-file'"
 	(_ (user-error "Invalid custom variable value")))
       (save-buffer)))
   (org-timeblock-redraw-buffers))
+
+(defun org-timeblock-time-inc (slot value time)
+  "Return a new time object based on TIME with its SLOT incremented by VALUE.
+
+SLOT should be specified as a plain symbol, not a keyword."
+  (let ((time (copy-sequence time)))
+    (decoded-time-add
+     time
+     (make-decoded-time (intern (format ":%s" slot)) value))))
 
 (defun org-timeblock-list-set-duration ()
   "Interactively change SCHEDULED duration for the task at point.
@@ -1672,10 +1686,13 @@ The blocks may be events or tasks with SCHEDULED property."
 			  (duration (when (and start-ts end-ts)
 				      (/ (round (ts-diff end-ts start-ts)) 60)))
 			  (new-start-ts
-			   (ts-inc 'minute interval new-end-or-start-ts))
+			   (org-timeblock-time-inc
+			    'minute
+			    interval new-end-or-start-ts))
 			  (new-end-ts
 			   (when duration
-			     (ts-inc 'minute duration new-start-ts))))
+			     (org-timeblock-time-inc
+			      'minute duration new-start-ts))))
 		     (org-timeblock--schedule new-start-ts new-end-ts eventp)
 		     (setq new-end-or-start-ts
 			   (or new-end-ts new-start-ts)))))))
@@ -1696,10 +1713,12 @@ The blocks may be events or tasks with SCHEDULED property."
 				(round (ts-diff start-ts prev-end-or-start-ts))
 				60))
 			  (new-start-ts
-			   (ts-inc 'minute int new-end-or-start-ts))
+			   (org-timeblock-time-inc
+			    'minute int new-end-or-start-ts))
 			  (new-end-ts
 			   (when duration
-			     (ts-inc 'minute duration new-start-ts))))
+			     (org-timeblock-time-inc
+			      'minute duration new-start-ts))))
 		     (org-timeblock--schedule new-start-ts new-end-ts eventp)
 		     (setq new-end-or-start-ts (or new-end-ts new-start-ts))
 		     (setq prev-end-or-start-ts (or end-ts start-ts)))))))))
@@ -1987,9 +2006,10 @@ Return t on success, otherwise - nil."
   "Go forward in time by one day in `org-timeblock-mode'."
   (interactive)
   (setq org-timeblock-daterange
-	(cons (ts-inc 'day 1 (car org-timeblock-daterange))
+	(cons (org-timeblock-time-inc 'day 1 (car org-timeblock-daterange))
 	      (and (cdr org-timeblock-daterange)
-		   (ts-inc 'day 1 (cdr org-timeblock-daterange)))))
+		   (org-timeblock-time-inc
+		    'day 1 (cdr org-timeblock-daterange)))))
   (unless (= org-timeblock-column 1)
     (org-timeblock-backward-column))
   (org-timeblock-redraw-buffers))
@@ -2008,16 +2028,18 @@ When called from Lisp, DATE should be a date as returned by
   (when-let ((date (ts-parse date)))
     (setq org-timeblock-daterange
 	  (cons date
-		(ts-inc 'day (1- org-timeblock-n-days-view) date)))
+		(org-timeblock-time-inc
+		 'day (1- org-timeblock-n-days-view) date)))
     (org-timeblock-redraw-buffers)))
 
 (defun org-timeblock-day-earlier ()
   "Go backward in time by one day in `org-timeblock-mode'."
   (interactive)
   (setq org-timeblock-daterange
-	(cons (ts-dec 'day 1 (car org-timeblock-daterange))
-	      (and (cdr org-timeblock-daterange)
-		   (ts-dec 'day 1 (cdr org-timeblock-daterange)))))
+	(cons
+	 (org-timeblock-time-inc 'day -1 (car org-timeblock-daterange))
+	 (and (cdr org-timeblock-daterange)
+	      (org-timeblock-time-inc 'day -1 (cdr org-timeblock-daterange)))))
   (unless (= org-timeblock-column org-timeblock-n-days-view)
     (org-timeblock-forward-column))
   (org-timeblock-redraw-buffers))
@@ -2126,7 +2148,7 @@ Available view options:
     (setq org-timeblock-daterange
 	  (if (= span 1)
 	      (list cur-date)
-	    (cons cur-date (ts-inc 'day (1- span) cur-date)))
+	    (cons cur-date (org-timeblock-time-inc 'day (1- span) cur-date)))
 	  org-timeblock-n-days-view span
 	  org-timeblock-column 1))
   (org-timeblock-redraw-buffers))
@@ -2347,7 +2369,7 @@ with time (timerange or just start time)."
 (provide 'org-timeblock)
 
 ;; Local Variables:
-;;   outline-regexp: "^\\(;\\{3,\\} \\)"
+;;   outline-regexp: "\\(;\\{3,\\} \\)"
 ;; End:
 
 ;;; org-timeblock.el ends here
