@@ -677,8 +677,8 @@ Default background color is used when BASE-COLOR is nil."
 					    (or end-date-later-p
 						start-date-earlier-p)))
 			      (concat
-			       (ts-format " %H:%M" start-ts)
-			       (and end-ts (ts-format "-%H:%M" end-ts))
+			       (org-timeblock-format-time " %H:%M" start-ts)
+			       (and end-ts (org-timeblock-format-time "-%H:%M" end-ts))
 			       (and repeated
 				    (concat
 				     " "
@@ -945,7 +945,7 @@ Default background color is used when BASE-COLOR is nil."
 		  (cl-callf concat result
 		    (propertize
 		     (format right-margin
-			     (ts-format date-format (nth iter dates)))
+			     (org-timeblock-format-time date-format (nth iter dates)))
 		     'face
 		     (and (= org-timeblock-column (1+ iter))
 			  `(:background ,org-timeblock-select-color)))))
@@ -999,13 +999,14 @@ commands"
 			    (id (org-timeblock-construct-id
 				 m (org-timeblock-get-event
 				    nil (line-beginning-position)))))
-		   (setf (alist-get id (alist-get (ts-format "%Y-%m-%d" date)
-						  org-timeblock-list-entries-pos
-						  nil nil #'equal)
+		   (setf (alist-get id (alist-get
+					(org-timeblock-format-time "%Y-%m-%d" date)
+					org-timeblock-list-entries-pos
+					nil nil #'equal)
 				    nil nil #'equal)
 			 (cl-incf count))))
 		((get-text-property (line-beginning-position) 'sort-ind)
-		 (setf (alist-get (ts-format "%Y-%m-%d" date)
+		 (setf (alist-get (org-timeblock-format-time "%Y-%m-%d" date)
 				  org-timeblock-list-sortline-pos
 				  nil nil 'equal)
 		       (cl-incf count))))
@@ -1036,7 +1037,7 @@ Time format is \"HHMM\""
       (while (null ts-type)
 	(pcase (read-char-from-minibuffer
 		(format "Schedule (%s): time[s]tamp, time[r]ange, other [d]ay"
-			(ts-format "%Y-%m-%d" date))
+			(org-timeblock-format-time "%Y-%m-%d" date))
 		'(?s ?r ?d))
 	  (?r (setq ts-type 'timerange))
 	  (?s (setq ts-type 'timestamp))
@@ -1359,21 +1360,35 @@ Leave point where the timestamp was."
 	      (re-search-forward org-ts-regexp end t))
       (replace-match ""))))
 
+(defsubst org-timeblock-format-time (format-string time)
+  "Use FORMAT-STRING to format the time value TIME."
+  (let ((time (copy-sequence time)))
+    (unless (decoded-time-second time)
+      (setf (decoded-time-second time) 0))
+    (unless (decoded-time-minute time)
+      (setf (decoded-time-minute time) 0))
+    (unless (decoded-time-hour time)
+      (setf (decoded-time-hour time) 0))
+    (format-time-string format-string (encode-time time))))
+
 (defun org-timeblock-ts-to-org-timerange
     (ts-start &optional ts-end repeat-string warning-string)
   "Create an Org timestamp range string.
 
-TS-START and TS-END are ts.el time objects.
+TS-START and TS-END are decoded time values.
 REPEAT-STRING is a repeater string.
 WARNING-STRING is a warning string of the form \"-[0-9]+[hdwmy]\""
-  (when-let ((start-date (ts-format "%Y-%m-%d %a" ts-start)))
+  (when-let ((start-date (org-timeblock-format-time "%Y-%m-%d %a" ts-start)))
     (let ((start-time
-	   (let ((res (ts-format "%R" ts-start)))
-	     (and (not (string= res "00:00")) res)))
-	  (end-date (and ts-end (ts-format "%Y-%m-%d %a" ts-end)))
+	   (and (decoded-time-hour ts-start)
+		(decoded-time-minute ts-start)
+		(org-timeblock-format-time "%R" ts-start)))
+	  (end-date (and ts-end (org-timeblock-format-time
+				 "%Y-%m-%d %a" ts-end)))
 	  (end-time (and ts-end
-			 (let ((res (ts-format "%R" ts-end)))
-			   (and (not (string= res "00:00")) res))))
+			 (and (decoded-time-hour ts-end)
+			      (decoded-time-minute ts-end)
+			      (org-timeblock-format-time "%R" ts-end))))
 	  (timestamp-end
            (concat
             (and (org-string-nw-p repeat-string) (concat " " repeat-string))
@@ -1603,9 +1618,9 @@ The new task is created in `org-timeblock-inbox-file'"
 	     (string-match-p "\\([01][0-9]\\|2[0-3]\\):[0-5][0-9]"
 			     org-timeblock-new-task-time)
 	   (user-error "Wrong time format specified in `org-timeblock-new-task-time'"))
-	 (org-schedule nil (concat (ts-format "%Y-%m-%d " date)
+	 (org-schedule nil (concat (org-timeblock-format-time "%Y-%m-%d " date)
 				   org-timeblock-new-task-time)))
-	(`nil (org-schedule nil (ts-format "%Y-%m-%d" date)))
+	(`nil (org-schedule nil (org-timeblock-format-time "%Y-%m-%d" date)))
 	(_ (user-error "Invalid custom variable value")))
       (save-buffer)))
   (org-timeblock-redraw-buffers))
@@ -2240,21 +2255,22 @@ Available view options:
 					 'day)
 					((and _ u) u))))
 			    ;; TODO rewrite
-			    (while (org-timeblock-ts-date< start date)
-			      (setq start (ts-inc unit value start)))
-			    (org-timeblock-ts-date= start date)))
-		     (org-timeblock-ts-date= start-ts date)
-		     (when-let ((end-ts (org-timeblock--parse-org-element-ts
+			    (while (org-timeblock-date< start date)
+			      (setq start (org-timeblock-time-inc
+					   unit value start)))
+			    (org-timeblock-date= start date)))
+		     (org-timeblock-date= start-ts date)
+		     (when-let ((end-ts (org-timeblock-timestamp-to-time
 					 timestamp t)))
-		       (and (org-timeblock-ts-date< start-ts date)
-			    (org-timeblock-ts-date<= date end-ts))))))
+		       (and (org-timeblock-date< start-ts date)
+			    (org-timeblock-date<= date end-ts))))))
 		entries))
 	      (date-beg (point)))
 	  (insert
 	   (propertize
 	    (concat
-	     (ts-format "[%Y-%m-%d %a]" date)
-	     (and (org-timeblock-ts-date= date (ts-now)) " Today"))
+	     (org-timeblock-format-time "[%Y-%m-%d %a]" date)
+	     (and (org-timeblock-date= date (decode-time)) " Today"))
 	    'face 'org-timeblock-list-header))
 	  (insert "\n")
 	  (dolist (entry entries)
@@ -2270,7 +2286,7 @@ Available view options:
 	  (when (eq org-timeblock-sort-function #'org-timeblock-order<)
 	    (goto-char date-beg)
 	    (forward-line
-	     (alist-get (ts-format "%Y-%m-%d" date)
+	     (alist-get (org-timeblock-format-time "%Y-%m-%d" date)
 			org-timeblock-list-sortline-pos nil nil #'equal))
 	    (insert (propertize (format "% 37s" "^^^ SORTED ^^^\n")
 				'sort-ind t
@@ -2317,7 +2333,7 @@ SVG image (.svg), PDF (.pdf) is produced."
 	   (cons 'fill (face-attribute 'default :background)))))
 	(dotimes (iter (length dates))
 	  (svg-text
-	   org-timeblock-svg (ts-format date-format (nth iter dates))
+	   org-timeblock-svg (org-timeblock-format-time date-format (nth iter dates))
 	   :y org-timeblock-svg-height
 	   :x (+ 5 (* (/ org-timeblock-svg-width (length dates)) iter))
 	   :fill (face-attribute 'default :foreground)))
