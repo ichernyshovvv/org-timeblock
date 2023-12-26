@@ -432,8 +432,8 @@ Compare only hours and minutes."
   (or (get-text-property 0 'order item) 1))
 
 (defsubst org-timeblock-get-ts (item)
-  "Return ITEM's \\='sched or \\='event text property as ts.el object."
-  (org-timeblock--parse-org-element-ts (org-timeblock-get-sched-or-event item)))
+  "Return ITEM's \\='sched or \\='event text property as decoded time."
+  (org-timeblock-timestamp-to-time (org-timeblock-get-sched-or-event item)))
 
 (defun org-timeblock-order< (a b)
   "Return t, if A's \\='order is less then B's \\='order."
@@ -565,7 +565,7 @@ Default background color is used when BASE-COLOR is nil."
 			 (lambda (x)
 			   (let* ((timestamp (org-timeblock-get-sched-or-event x))
 				  (date (nth iter dates))
-				  (start-ts (org-timeblock--parse-org-element-ts timestamp)))
+				  (start-ts (org-timeblock-timestamp-to-time timestamp)))
 			     (and
 			      (or (not (consp org-timeblock-scale-options))
 				  (<= (car org-timeblock-scale-options)
@@ -618,7 +618,7 @@ Default background color is used when BASE-COLOR is nil."
 					      (mapcar
 					       (lambda (entry)
 						 (let ((s-or-e (org-timeblock-get-sched-or-event entry)))
-						   (if (and (org-timeblock-ts-date< (org-timeblock--parse-org-element-ts s-or-e) (nth iter dates))
+						   (if (and (org-timeblock-date< (org-timeblock-timestamp-to-time s-or-e) (nth iter dates))
 							    (not (org-element-property :repeater-type s-or-e)))
 						       0
 						     (org-element-property :hour-start s-or-e))))
@@ -660,9 +660,9 @@ Default background color is used when BASE-COLOR is nil."
 		      (let* ((timestamp (org-timeblock-get-sched-or-event entry))
 			     (repeated (org-element-property
 					:repeater-type timestamp))
-			     (start-ts (org-timeblock--parse-org-element-ts
+			     (start-ts (org-timeblock-timestamp-to-time
 					timestamp))
-			     (end-ts (org-timeblock--parse-org-element-ts
+			     (end-ts (org-timeblock-timestamp-to-time
 				      timestamp t))
 			     (start-date-earlier-p (org-timeblock-date<
 						    start-ts (nth iter dates)))
@@ -1051,8 +1051,8 @@ Time format is \"HHMM\""
 			(car org-timeblock-daterange) date))
 		(org-timeblock-jump-to-day date)))))
       (let* ((timestamp (org-timeblock-get-timestamp eventp))
-	     (start-ts (org-timeblock--parse-org-element-ts timestamp))
-	     (end-ts (org-timeblock--parse-org-element-ts timestamp t))
+	     (start-ts (org-timeblock-timestamp-to-time timestamp))
+	     (end-ts (org-timeblock-timestamp-to-time timestamp t))
 	     (duration (when (and start-ts end-ts)
 			 (org-timeblock-time-diff end-ts start-ts)))
 	     (new-start-ts (org-timeblock-read-ts date "START-TIME: "))
@@ -1275,8 +1275,8 @@ Return value is of the form (\"background color\" \"foreground color\")."
 					org-timeblock-tag-colors))))
 	(throw 'found colors)))))
 
-(defun org-timeblock--parse-org-element-ts (ts &optional end)
-  "Convert TS to ts.el ts object.
+(defun org-timeblock-timestamp-to-time (ts &optional end)
+  "Convert TS into an Emacs decoded time value.
 If END is non-nil, use end part of the timestamp.
 
 TS is a org-element timestamp object."
@@ -1297,15 +1297,16 @@ TS is a org-element timestamp object."
 		   (/= year-start year-end)
 		   (and hour-end hour-start (/= hour-start hour-end))
 		   (and minute-end minute-start (/= minute-start minute-end)))
-	      (make-ts :year year-end :month month-end :day day-end
-		       :hour (or hour-end 0)
-		       :minute (or minute-end 0) :second 0))))
-      (make-ts :year year-start :month month-start :day day-start
-	       :hour (or hour-start 0) :minute (or minute-start 0) :second 0))))
+	      (make-decoded-time
+	       :year year-end :month month-end :day day-end
+	       :hour (or hour-end 0) :minute (or minute-end 0) :second 0))))
+      (make-decoded-time
+       :year year-start :month month-start :day day-start
+       :hour (or hour-start 0) :minute (or minute-start 0) :second 0))))
 
 (defun org-timeblock--schedule (start-ts &optional end-ts eventp)
   "Schedule org entry at point.
-START-TS and END-TS are ts.el time objects.
+START-TS and END-TS are Emacs decoded time values.
 
 If EVENTP is non-nil, reschedule event.
 Otherwise, change SCHEDULED property
@@ -1675,8 +1676,9 @@ The blocks may be events or tasks with SCHEDULED property."
 			(cl-macrolet
 			    ((get-ts (x)
 			       `(org-with-point-at
-				    (org-timeblock-get-marker-by-id (car (split-string (dom-attr ,x 'id) "_")))
-				  (org-timeblock--parse-org-element-ts
+				    (org-timeblock-get-marker-by-id
+				     (car (split-string (dom-attr ,x 'id) "_")))
+				  (org-timeblock-timestamp-to-time
 				   (org-timeblock-get-timestamp
 				    (eq (dom-attr ,x 'type) 'event))))))
 			  (or
@@ -1707,12 +1709,12 @@ The blocks may be events or tasks with SCHEDULED property."
 		(org-with-point-at marker
 		  (org-timeblock-get-timestamp eventp)))
 	       (prev-end-or-start-ts
-		(or (org-timeblock--parse-org-element-ts prev-timestamp t)
-		    (org-timeblock--parse-org-element-ts prev-timestamp)))
+		(or (org-timeblock-timestamp-to-time prev-timestamp t)
+		    (org-timeblock-timestamp-to-time prev-timestamp)))
 	       (timestamp (org-timeblock--schedule-time date marker eventp))
 	       (new-end-or-start-ts
-		(or (org-timeblock--parse-org-element-ts timestamp t)
-		    (org-timeblock--parse-org-element-ts timestamp))))
+		(or (org-timeblock-timestamp-to-time timestamp t)
+		    (org-timeblock-timestamp-to-time timestamp))))
 	  (pop mark-data)
 	  (pcase interval
 	    ((pred integerp)
@@ -1723,11 +1725,12 @@ The blocks may be events or tasks with SCHEDULED property."
 		   (let* ((eventp (eq (dom-attr block 'type) 'event))
 			  (timestamp (org-timeblock-get-timestamp eventp))
 			  (start-ts
-			   (org-timeblock--parse-org-element-ts timestamp))
+			   (org-timeblock-timestamp-to-time timestamp))
 			  (end-ts
-			   (org-timeblock--parse-org-element-ts timestamp t))
-			  (duration (when (and start-ts end-ts)
-				      (/ (round (ts-diff end-ts start-ts)) 60)))
+			   (org-timeblock-timestamp-to-time timestamp t))
+			  (duration
+			   (when (and start-ts end-ts)
+			     (org-timeblock-time-diff end-ts start-ts)))
 			  (new-start-ts
 			   (org-timeblock-time-inc
 			    'minute
@@ -1746,9 +1749,9 @@ The blocks may be events or tasks with SCHEDULED property."
 		 (org-with-point-at marker
 		   (let* ((eventp (eq (dom-attr block 'type) 'event))
 			  (timestamp (org-timeblock-get-timestamp eventp))
-			  (start-ts (org-timeblock--parse-org-element-ts
+			  (start-ts (org-timeblock-timestamp-to-time
 				     timestamp))
-			  (end-ts (org-timeblock--parse-org-element-ts
+			  (end-ts (org-timeblock-timestamp-to-time
 				   timestamp t))
 			  (duration
 			   (when (and start-ts end-ts)
@@ -2063,12 +2066,11 @@ Return t on success, otherwise - nil."
 When called interactively, prompt for the date.
 When called from Lisp, DATE should be a date as returned by
 `org-read-date'"
-  (interactive (list (org-read-date
-		      nil nil nil nil
-		      (ts-internal
-		       (nth (1- org-timeblock-column)
-			    (org-timeblock-get-dates))))))
-  (when-let ((date (ts-parse date)))
+  (interactive (list (decode-time (org-read-date
+				   nil t nil nil
+				   (nth (1- org-timeblock-column)
+					(org-timeblock-get-dates))))))
+  (when date
     (setq org-timeblock-daterange
 	  (cons date
 		(org-timeblock-time-inc
@@ -2235,7 +2237,7 @@ Available view options:
 	       (seq-filter
 		(lambda (x)
 		  (let* ((timestamp (org-timeblock-get-sched-or-event x))
-			 (start-ts (org-timeblock--parse-org-element-ts
+			 (start-ts (org-timeblock-timestamp-to-time
 				    timestamp)))
 		    (or
 		     (and
