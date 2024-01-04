@@ -4,7 +4,7 @@
 
 ;; Author: Ilya Chernyshov <ichernyshovvv@gmail.com>
 ;; Version: 0.2-pre
-;; Package-Requires: ((emacs "28.1") (compat "29.1.4.1") (org "9.0") (svg "1.1") (persist "0.5"))
+;; Package-Requires: ((emacs "28.1") (compat "29.1.4.1") (org "9.0") (svg "1.1"))
 ;; Keywords: org, calendar, timeblocking, agenda
 ;; URL: https://github.com/ichernyshovvv/org-timeblock
 
@@ -37,14 +37,13 @@
 (require 'svg)
 (require 'color)
 (require 'seq)
-(require 'persist)
 (require 'compat)
 (require 'compat-macs)
 
 ;;;; Faces
 
 (defface org-timeblock-list-header '((t (:inherit org-agenda-structure)))
-  "Face used in agenda for `org-super-agenda' group name header."
+  "Face used in org-timeblock-list for dates."
   :group 'org-timeblock)
 
 ;;;; Custom Variables
@@ -74,11 +73,6 @@ When set to the symbol `next' only the first future repeat is shown."
   "Number of days displayed in `org-timeblock'."
   :group 'org-timeblock
   :type 'integer)
-
-(defcustom org-timeblock-list-sortline-face 'org-agenda-dimmed-todo-face
-  "Number of days displayed in `org-timeblock'."
-  :group 'org-timeblock
-  :type 'face)
 
 (defcustom org-timeblock-display-time t
   "Non-nil means show end and start time of events or tasks inside timeblocks."
@@ -157,16 +151,10 @@ are tagged with a tag in car."
 (defvar org-timeblock-column 1
   "Currently selected column.")
 
+(defvar org-timeblock-cache nil)
 (defvar org-timeblock-svg nil)
 (defvar org-timeblock-svg-width 0)
 (defvar org-timeblock-svg-height 0)
-
-(persist-defvar org-timeblock-list-entries-pos nil
-  "Saved positions for entries in `org-timeblock-list-mode'.
-Nested alist of saved positions of the entries for each date that
-a user have previously opened in `org-timeblock-list-mode'.")
-
-(defvar org-timeblock-sort-function #'org-timeblock-order<)
 
 (defvar org-timeblock-daterange nil
   "The date range that is used to get and display schedule data.")
@@ -183,13 +171,6 @@ a user have previously opened in `org-timeblock-list-mode'.")
 
 (defvar org-timeblock-list-buffer "*org-timeblock-list*"
   "The name of the buffer displaying the list of tasks and events.")
-
-(persist-defvar org-timeblock-list-sortline-pos nil
-  "Sort indicator line position.
-The line position of the sort line which is displayed in
-`org-timeblock-list-mode' when orgmode tasks are manually
-placed.  Used as a simple separator to distinguish manually sorted
-tasks and those tasks that have not been sorted yet.")
 
 ;;;; Keymaps
 
@@ -209,7 +190,7 @@ tasks and those tasks that have not been sorted yet.")
   "o" #'org-clock-out
   "g" #'org-timeblock-redraw-buffers
   "j" #'org-timeblock-jump-to-day
-  "C-s" #'org-timeblock-save
+  "C-s" #'org-save-all-org-buffers
   "s" #'org-timeblock-schedule
   "T" #'org-timeblock-toggle-timeblock-list
   "t" #'org-timeblock-todo
@@ -227,12 +208,9 @@ tasks and those tasks that have not been sorted yet.")
   "<up>" #'org-timeblock-list-previous-line
   "C-<down>" #'org-timeblock-day-later
   "C-<up>" #'org-timeblock-day-earlier
-  "C-s" #'org-timeblock-save
-  "M-<down>" #'org-timeblock-list-drag-line-forward
-  "M-<up>" #'org-timeblock-list-drag-line-backward
+  "C-s" #'org-save-all-org-buffers
   "RET" #'org-timeblock-list-goto
   "TAB" #'org-timeblock-list-goto-other-window
-  "S" #'org-timeblock-list-toggle-sort-function
   "d" #'org-timeblock-list-set-duration
   "i" #'org-timeblock-list-clock-in
   "o" #'org-clock-out
@@ -436,17 +414,9 @@ Compare only hours and minutes."
 	     (and (org-timeblock-on decoded-time-month = a b)
 		  (org-timeblock-on decoded-time-day <= a b))))))))
 
-(defsubst org-timeblock-get-order (item)
-  "Return ITEM's \\='order text property or return 1."
-  (or (get-text-property 0 'order item) 1))
-
 (defsubst org-timeblock-get-ts (item)
   "Return ITEM's \\='sched or \\='event text property as decoded time."
   (org-timeblock-timestamp-to-time (org-timeblock-get-sched-or-event item)))
-
-(defun org-timeblock-order< (a b)
-  "Return t, if A's \\='order is less then B's \\='order."
-  (org-timeblock-on org-timeblock-get-order < a b))
 
 (defun org-timeblock-sched-or-event< (a b)
   "Return t, if A's \\='sched or \\='event is less then B's.
@@ -993,63 +963,12 @@ Default background color is used when BASE-COLOR is nil."
   (switch-to-buffer-other-window org-timeblock-list-buffer)
   (other-window 1))
 
-(defun org-timeblock-list-toggle-sort-function ()
-  "Toggle the sorting strategy in *org-timeblock-list*.
-Available sorting strategies:
-1. Sort by SCHEDULED property.\\<org-timeblock-list-mode-map>
-2. Sort by \\='order text property applied to each entry inside
-*org-timeblock-list* which can be changed via `\\[org-timeblock-list-drag-line-forward]'/`\\[org-timeblock-list-drag-line-backward]'
-commands"
-  (interactive)
-  (setq org-timeblock-sort-function
-	(if (eq org-timeblock-sort-function #'org-timeblock-order<)
-            #'org-timeblock-sched-or-event<
-	  #'org-timeblock-order<))
-  (org-timeblock-redraw-buffers))
-
-(defun org-timeblock-save ()
-  "Save org files, sorting line and tasks positions in `org-timeblock-list' buffer."
-  (interactive)
-  (with-current-buffer (get-buffer-create org-timeblock-list-buffer)
-    (unless (eq major-mode 'org-timeblock-list-mode)
-      (user-error "Not in org-timeblock-list buffer"))
-    (let ((count 0)
-	  (inhibit-read-only t)
-	  date
-	  (dates (org-timeblock-get-dates)))
-      (save-excursion
-	(goto-char (point-min))
-	(while (not (eobp))
-	  (cond ((eq (get-text-property (line-beginning-position) 'face)
-		     'org-timeblock-list-header)
-		 (setq count 0
-		       date (pop dates)))
-		((get-text-property (line-beginning-position) 'marker)
-		 (when-let ((m (get-text-property
-				(line-beginning-position) 'marker))
-			    (id (org-timeblock-construct-id
-				 m (org-timeblock-get-event
-				    nil (line-beginning-position)))))
-		   (setf (alist-get id (alist-get
-					(org-timeblock-format-time "%Y-%m-%d" date)
-					org-timeblock-list-entries-pos
-					nil nil #'equal)
-				    nil nil #'equal)
-			 (cl-incf count))))
-		((get-text-property (line-beginning-position) 'sort-ind)
-		 (setf (alist-get (org-timeblock-format-time "%Y-%m-%d" date)
-				  org-timeblock-list-sortline-pos
-				  nil nil 'equal)
-		       (cl-incf count))))
-	  (forward-line)))))
-  (org-save-all-org-buffers))
-
 (defun org-timeblock-quit ()
   "Exit `org-timeblock-list-mode'."
   (interactive)
   (quit-window t))
 
-(cl-defun org-timeblock--schedule-time (date &optional marker eventp)
+(defun org-timeblock--schedule-time (date &optional marker eventp)
   "Interactively change time in DATE for Org entry timestamp at MARKER.
 If MARKER is nil, use entry at point.
 If EVENTP is non-nil, change timestamp of the event.
@@ -1203,8 +1122,6 @@ If EVENTP is non-nil, use entry's TIMESTAMP property."
       (insert ts)
       (goto-char (point-min))
       (org-element-timestamp-parser))))
-
-(defvar org-timeblock-cache nil)
 
 (defun org-timeblock-get-buffer-entries (buffer from to &optional timeblocks)
   "Get entries in [FROM;TO] timerange in BUFFER.
@@ -1515,11 +1432,6 @@ If EVENTP is non-nil, use entry's timestamp."
 	(user-error "No scheduled time specified for this entry"))
       (org-timeblock--schedule start-ts new-end-ts eventp))))
 
-(defun org-timeblock-list-drag-line-backward ()
-  "Drag an agenda line backward by ARG lines."
-  (interactive)
-  (org-timeblock-list-drag-line-forward t))
-
 (defun org-timeblock-todo (&optional arg)
   "Change the TODO state of an item in org-timeblock.
 
@@ -1534,33 +1446,6 @@ ARG."
     (org-with-point-at marker
       (funcall-interactively #'org-todo arg))
     (org-timeblock-redraw-buffers)))
-
-(defun org-timeblock-list-drag-line-forward (&optional backward)
-  "Drag an agenda line forward by ARG lines.
-When BACKWARD is non-nil, move backward."
-  (interactive)
-  (unless (eq org-timeblock-sort-function #'org-timeblock-order<)
-    (user-error "Can't drag lines if entries aren't displayed and sorted by `SORTING-PROPERTY' property"))
-  (unless (or (get-text-property (point) 'marker)
-	      (get-text-property (point) 'sort-ind))
-    (user-error "Can not move this line"))
-  (when (or (and backward (= (line-number-at-pos) 2))
-	    (and (not backward) (= (count-lines (point-min) (point-max))
-				   (line-number-at-pos)))
-	    (save-excursion
-	      (if backward (forward-line -1) (forward-line))
-	      (eq (get-text-property (line-beginning-position) 'face)
-		  'org-timeblock-list-header)))
-    (user-error "Can not move further"))
-  (let ((inhibit-read-only t)
-	(end (save-excursion (move-beginning-of-line 2) (point)))
-	line)
-    (move-beginning-of-line 1)
-    (setq line (buffer-substring (point) end))
-    (delete-region (point) end)
-    (move-beginning-of-line (funcall (if backward '1- '1+) 1))
-    (insert line)
-    (move-beginning-of-line 0)))
 
 ;;;; Main commands
 
@@ -1917,7 +1802,7 @@ If EVENTP is non-nil the entry is considered as an event."
 
 (defun org-timeblock-unselect-block ()
   "Unselect selected block.
-Return the numerical order of theunselected block on success.
+Return the numerical order of the unselected block on success.
 Otherwise, return nil."
   (when-let ((node (car (dom-search
 			 org-timeblock-svg
@@ -2275,14 +2160,6 @@ Available view options:
 	  (dates (org-timeblock-get-dates)))
       (erase-buffer)
       (org-timeblock-list-mode)
-      (setq
-       header-line-format
-       (substitute-command-keys
-	(format "\\<org-timeblock-list-mode-map>Sorted by %s property. Toggle sorting: `\\[org-timeblock-list-toggle-sort-function]'"
-		(pcase org-timeblock-sort-function
-		  (`org-timeblock-order< "SORTING-ORDER")
-		  (`org-timeblock-sched-or-event< "SCHEDULED")
-		  ((pred symbolp) (symbol-name org-timeblock-sort-function))))))
       (dolist (date dates)
 	(let ((entries
 	       (seq-filter
@@ -2317,8 +2194,7 @@ Available view options:
 					 timestamp t)))
 		       (and (org-timeblock-date< start-ts date)
 			    (org-timeblock-date<= date end-ts))))))
-		entries))
-	      (date-beg (point)))
+		entries)))
 	  (insert
 	   (propertize
 	    (concat
@@ -2336,14 +2212,6 @@ Available view options:
 					  (list :background (car colors)))
 				 ,@(and (cadr colors)
 					(list :foreground (cadr colors))))))))
-	  (when (eq org-timeblock-sort-function #'org-timeblock-order<)
-	    (goto-char date-beg)
-	    (forward-line
-	     (alist-get (org-timeblock-format-time "%Y-%m-%d" date)
-			org-timeblock-list-sortline-pos nil nil #'equal))
-	    (insert (propertize (format "% 37s" "^^^ SORTED ^^^\n")
-				'sort-ind t
-				'face org-timeblock-list-sortline-face)))
 	  (goto-char (point-max))))
       (goto-char (point-min))
       (when (get-buffer-window org-timeblock-buffer)

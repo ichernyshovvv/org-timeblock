@@ -58,7 +58,7 @@ There are two major modes provided by the package:
 
 - ~org-timeblock-mode~.  Displays visual schedule (timeblocks) of org
   tasks that are scheduled or have an active timestamp in their body
-  (orgmode events) for selected day (Currently, only day view is available).  Available commands:
+  (orgmode events) for selected days.  Available commands:
   - org-timeblock-day-earlier/later ~[C-<down>/<up>]~
   - org-timeblock-set-duration ~[d]~
   - org-timeblock-reschedule ~[s]~
@@ -71,19 +71,11 @@ There are two major modes provided by the package:
   - org-timeblock-write ~[w]~
   - org-timeblock-jump-to-day ~[j]~
 
-- ~org-timeblock-list-mode~.  Displays a list of org tasks that are
-  scheduled or orgmode events for selected day.  It's sort of like a
-  light org-agenda.  The tasks can be sorted via ~SCHEDULED~ org
-  property or manually placed by user via commands
-  ~org-timeblock-list-drag-line-forward/backward [M-<up>/<down>]~.  The
-  order can be saved in a cache file via ~org-timeblock-list-save
-  [C-s]~ command.  The sorting algorithm can be changed via
-  ~org-timeblock-list-toggle-sort-function [S]~ command.
+- ~org-timeblock-list-mode~.  Displays a list of org tasks for selected days.
+  The tasks are sorted by time.
   - org-timeblock-list-schedule ~[s]~
   - org-timeblock-list-set-duration ~[d]~
   - org-timeblock-todo ~[t]~
-  - org-timeblock-list-drag-line-forward/backward ~[M-<down>/<up>]~
-  - org-timeblock-list-toggle-sort-function ~[S]~
   - org-timeblock-list-clock-in ~[i]~ (to clock out, press ~o~)
   - org-timeblock-switch-scaling ~[v]~
   - org-timeblock-switch-view ~[V]~
