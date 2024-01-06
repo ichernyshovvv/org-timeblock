@@ -316,13 +316,13 @@ Cursor position is of the form (X . Y)."
   "Return a marker of entry with ID."
   (cadr (seq-find (lambda (x) (string= (car x) id)) org-timeblock-data)))
 
-(defun org-timeblock-get-dates ()
-  "Return a list of time values between org-timeblock-daterange."
-  (let (dates (start-date (car org-timeblock-daterange)))
+(defun org-timeblock-get-dates (from to)
+  "Return a list of decoded-time dates between FROM and TO."
+  (let (dates)
     (while (and
-	    (push start-date dates)
-	    (setq start-date (org-timeblock-time-inc 'day 1 start-date))
-	    (org-timeblock-date<= start-date (cdr org-timeblock-daterange))))
+	    (push from dates)
+	    (setq from (org-timeblock-time-inc 'day 1 from))
+	    (org-timeblock-date<= from to)))
     (nreverse dates)))
 
 (defun org-timeblock-selected-block ()
@@ -525,7 +525,9 @@ Default background color is used when BASE-COLOR is nil."
 			 (car org-timeblock-daterange)
 			 (cdr org-timeblock-daterange)
 			 t))
-	       (dates (org-timeblock-get-dates))
+	       (dates (org-timeblock-get-dates
+		       (car org-timeblock-daterange)
+		       (cdr org-timeblock-daterange)))
 	       (window (get-buffer-window org-timeblock-buffer))
 	       ((setq org-timeblock-svg-height (window-body-height window t)
 		      org-timeblock-svg-width (window-body-width window t))))
@@ -927,7 +929,9 @@ Default background color is used when BASE-COLOR is nil."
 	      (< (window-body-width window t) org-timeblock-svg-width))
 	  (org-timeblock-redraw-timeblocks)
 	(setq header-line-format
-	      (let* ((dates (org-timeblock-get-dates))
+	      (let* ((dates (org-timeblock-get-dates
+			     (car org-timeblock-daterange)
+			     (cdr org-timeblock-daterange)))
 		     (left-fringe (/ (car (window-fringes window))
 				     (default-font-width)))
 		     (max-length (/ (+ (/ (window-body-width window t)
@@ -1507,7 +1511,9 @@ SELECT prefix argument provides."
     (&optional (date (pcase major-mode
 		       (`org-timeblock-mode
 			(nth (1- org-timeblock-column)
-			     (org-timeblock-get-dates)))
+			     (org-timeblock-get-dates
+			      (car org-timeblock-daterange)
+			      (cdr org-timeblock-daterange))))
 		       (`org-timeblock-list-mode
 			(org-timeblock-list-get-current-date)))))
   "Create a task scheduled to DATE.
@@ -1597,7 +1603,9 @@ Duration format:
 The blocks may be events or tasks with SCHEDULED property."
   (interactive)
   (let ((date (nth (1- org-timeblock-column)
-		   (org-timeblock-get-dates))))
+		   (org-timeblock-get-dates
+		    (car org-timeblock-daterange)
+		    (cdr org-timeblock-daterange)))))
     (if (> org-timeblock-mark-count 0)
 	(let* ((mark-data
 		(sort (dom-search
@@ -2005,7 +2013,9 @@ When called from Lisp, DATE should be a date as returned by
 				   nil t nil nil
 				   (encode-time
 				    (nth (1- org-timeblock-column)
-					 (org-timeblock-get-dates)))))))
+					 (org-timeblock-get-dates
+					  (car org-timeblock-daterange)
+					  (cdr org-timeblock-daterange))))))))
   (when date
     (setq org-timeblock-daterange
 	  (cons date
@@ -2122,7 +2132,9 @@ Available view options:
   "Switch current view to 1-7-days view."
   (interactive)
   (let ((cur-date (nth (1- org-timeblock-column)
-		       (org-timeblock-get-dates)))
+		       (org-timeblock-get-dates
+			(car org-timeblock-daterange)
+			(cdr org-timeblock-daterange))))
 	(span (- (read-char-from-minibuffer
 		  "Span span [1-7]: " '(?1 ?2 ?3 ?4 ?5 ?6 ?7))
 		 48)))
@@ -2157,7 +2169,9 @@ Available view options:
 	  (entries (org-timeblock-get-entries
 		    (car org-timeblock-daterange)
 		    (cdr org-timeblock-daterange)))
-	  (dates (org-timeblock-get-dates)))
+	  (dates (org-timeblock-get-dates
+		  (car org-timeblock-daterange)
+		  (cdr org-timeblock-daterange))))
       (erase-buffer)
       (org-timeblock-list-mode)
       (dolist (date dates)
@@ -2233,7 +2247,9 @@ SVG image (.svg), PDF (.pdf) is produced."
       (user-error "Cannot write agenda to file %s" file))
   (let ((file (expand-file-name file)))
     (with-temp-buffer
-      (let* ((dates (org-timeblock-get-dates))
+      (let* ((dates (org-timeblock-get-dates
+		     (car org-timeblock-daterange)
+		     (cdr org-timeblock-daterange)))
 	     (max-length (/ (+ (/ org-timeblock-svg-width (default-font-width)))
 			    (length dates)))
 	     (date-format
