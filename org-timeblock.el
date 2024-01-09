@@ -135,6 +135,10 @@ are tagged with a tag in car."
 
 (defvar org-timeblock-mark-color "#7b435c")
 
+(defvar org-timeblock-markers nil)
+
+(defvar org-timeblock-buffers nil)
+
 (defvar org-timeblock-mark-count 0)
 
 (defvar org-timeblock-select-color-light "#f3d000")
@@ -1127,71 +1131,65 @@ If EVENTP is non-nil, use entry's TIMESTAMP property."
       (goto-char (point-min))
       (org-element-timestamp-parser))))
 
-(defun org-timeblock-get-buffer-entries (buffer from to &optional timeblocks)
-  "Get entries in [FROM;TO] timerange in BUFFER.
-FROM and TO are decoded-time values.
-
-When TIMEBLOCKS is non-nil, exclude entries with daterange or
-without time."
-  (let (entries)
+(defun org-timeblock-get-buffer-entries-all (buffer)
+  "Get all not done and not archived entries with any active timestamp in BUFFER."
+  (let (entries tags
+		update-markers-alist-p
+		(buffer-markers
+		 (alist-get buffer
+			    org-timeblock-markers nil nil #'equal)))
     (with-current-buffer buffer
       (org-with-wide-buffer
        (goto-char (point-min))
        (while (re-search-forward org-ts-regexp nil t)
-	 (let (title marker tags
-		     (element (save-excursion
-				(org-back-to-heading-or-point-min t)
-				(org-element-at-point))))
-	   (if (or (org-in-archived-heading-p t element)
-		   (org-entry-is-done-p))
-	       (org-get-next-sibling)
-	     (cl-macrolet
-		 ((check (func &optional eventp)
-		    `(when-let
-			 ((timestamp ,func)
-			  ((or (not timeblocks)
-			       (and
-				(not (org-timeblock--daterangep timestamp))
-				(org-element-property :hour-start timestamp))))
-			  (start-ts (org-timeblock-timestamp-to-time
-				     timestamp))
-			  ((or
-			    (and
-			     (org-element-property
-			      :repeater-type timestamp)
-			     (org-timeblock-date<= start-ts from))
-			    (and
-			     (org-timeblock-date<= from start-ts)
-			     (org-timeblock-date<= start-ts to))
-			    (let ((end-ts
-				   (org-timeblock-timestamp-to-time
-				    timestamp t)))
-			      (and
-			       end-ts
-			       (org-timeblock-date<= from end-ts)
-			       (org-timeblock-date<= end-ts to))))))
-		       (unless marker
-			 (setq title (org-get-heading t nil t t)
-			       marker (save-excursion
-					(org-back-to-heading-or-point-min t)
-					(copy-marker (point) t))
-			       tags (mapcar #'substring-no-properties
-					    (org-get-tags))))
-		       (push
-			(propertize
-			 (concat
-			  (org-timeblock--construct-prefix timestamp ,eventp)
-			  title)
-			 ',(if eventp 'event 'sched) timestamp
-			 'marker marker
-			 'tags tags
-			 'id (save-excursion
-			       (org-back-to-heading-or-point-min t)
-			       (org-timeblock-construct-id nil ,eventp))
-			 'title title)
-			entries))))
-	       (check (org-element-property :scheduled element))
-	       (check (org-timeblock-get-event-timestamp) t)))))))
+	 (if (save-match-data
+	       (or (org-entry-is-done-p)
+		   (progn
+		     (setq tags
+			   (mapcar #'substring-no-properties
+				   (org-get-tags)))
+		     (member org-archive-tag tags))))
+	     (org-get-next-sibling)
+	   (when-let
+	       ((timestamp-and-type
+		 (save-excursion
+		   (goto-char (match-beginning 0))
+		   (cons
+		    (org-element-timestamp-parser)
+		    (cond
+		     ((re-search-backward
+		       (concat org-scheduled-regexp "[ \t]*\\=")
+		       nil
+		       t)
+		      'sched)
+		     (t 'event)))))
+		(timestamp (car timestamp-and-type))
+		(type (cdr timestamp-and-type))
+		(start-ts (org-timeblock-timestamp-to-time
+			   timestamp))
+		(title (or (org-get-heading t nil t t) "no title")))
+	     (save-excursion
+	       (org-back-to-heading-or-point-min t)
+	       (push
+		(propertize
+		 (concat
+		  (org-timeblock--construct-prefix timestamp (eq type 'event))
+		  title)
+		 type timestamp
+		 'marker (or (seq-find (lambda (x) (= x (point))) buffer-markers)
+			     (let ((marker (copy-marker (point) t)))
+			       (setq update-markers-alist-p t)
+			       (push marker buffer-markers)
+			       marker))
+		 'tags tags
+		 'id (org-timeblock-construct-id nil (eq type 'event))
+		 'title title)
+		entries)))))))
+    (when update-markers-alist-p
+      (setf
+       (alist-get buffer
+		  org-timeblock-markers nil nil #'equal)
+       buffer-markers))
     entries))
 
 (defun org-timeblock-get-entries (from to &optional timeblocks)
@@ -1200,31 +1198,66 @@ FROM and TO are decoded-time values.
 
 When TIMEBLOCKS is non-nil, exclude entries with daterange or
 without time."
-  (let ((query-cache
-	 (alist-get (list from to timeblocks) org-timeblock-cache
-		    nil nil #'equal)))
-    (dolist (file (org-agenda-files))
-      (let* ((buffer (find-file-noselect file))
-	     (cache (alist-get file query-cache nil nil #'equal))
-	     (modified-tick (cadr cache))
-	     (new-modified-tick (buffer-chars-modified-tick buffer)))
-	(when (or
-	       (not cache)
-	       (/= new-modified-tick modified-tick))
-	  (setf
-	   (alist-get file query-cache nil nil #'equal)
-	   (list
-	    (org-timeblock-get-buffer-entries buffer from to timeblocks)
-	    new-modified-tick)))))
-    (setf (alist-get (list from to timeblocks) org-timeblock-cache
-		     nil nil #'equal)
-	  query-cache)
-    (sort
-     (flatten-list
-      (mapcar #'cadr
-	      (alist-get (list from to timeblocks) org-timeblock-cache
-			 nil nil #'equal)))
-     #'org-timeblock-sched-or-event<)))
+  (org-timeblock-update-cache)
+  (seq-filter
+   (lambda (x)
+     (when-let
+	 ((timestamp (org-timeblock-get-sched-or-event x))
+	  ((or (not timeblocks)
+	       (and
+		(not (org-timeblock--daterangep timestamp))
+		(org-element-property :hour-start timestamp))))
+	  (start-ts (org-timeblock-timestamp-to-time
+		     timestamp)))
+       (or
+	(and
+	 (org-element-property
+	  :repeater-type timestamp)
+	 (org-timeblock-date<= start-ts from))
+	(and
+	 (org-timeblock-date<= from start-ts)
+	 (org-timeblock-date<= start-ts to))
+	(let ((end-ts
+	       (org-timeblock-timestamp-to-time
+		timestamp t)))
+	  (and
+	   end-ts
+	   (org-timeblock-date<= from end-ts)
+	   (org-timeblock-date<= end-ts to))))))
+   org-timeblock-cache))
+
+(defun org-timeblock-update-cache ()
+  "Update org-timeblock-cache.
+Return nil if buffers are up-to-date."
+  (when-let
+      ((buffers-to-update
+	(mapcar
+	 #'find-file-noselect
+	 (seq-filter
+	  (lambda (file)
+	    (let* ((buffer (find-file-noselect file))
+		   (modified-tick
+		    (alist-get file org-timeblock-buffers nil nil #'equal))
+		   (new-modified-tick (buffer-chars-modified-tick buffer)))
+	      (and (not (eq new-modified-tick modified-tick))
+		   (setf
+		    (alist-get file org-timeblock-buffers nil nil #'equal)
+		    new-modified-tick))))
+	  (org-agenda-files)))))
+    (setq org-timeblock-cache
+	  (sort
+	   (apply
+	    #'append
+	    (seq-remove
+	     (lambda (x)
+	       (member (marker-buffer (get-text-property 0 'marker x))
+		       buffers-to-update))
+	     org-timeblock-cache)
+	    (mapcar
+	     #'org-timeblock-get-buffer-entries-all
+	     buffers-to-update))
+	   #'org-timeblock-sched-or-event<))
+    t))
 
 (defun org-timeblock-get-colors (tags)
   "Return the colors for TAGS.
