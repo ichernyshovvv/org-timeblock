@@ -75,7 +75,7 @@ When set to the symbol `next' only the first future repeat is shown."
   :type 'integer)
 
 (defcustom org-timeblock-display-time t
-  "Non-nil means show end and start time of events or tasks inside timeblocks."
+  "Non-nil means show end and start time inside timeblocks."
   :group 'org-timeblock
   :type '(choice
 	  (const :tag "Show time." t)
@@ -267,34 +267,13 @@ are tagged with a tag in car."
       (setf (decoded-time-hour time) 0))
     (format-time-string format-string (encode-time time))))
 
-(cl-defsubst org-timeblock-get-sched (&optional object (position 0))
-  "Return the value of POSITION's \\='sched property, in OBJECT.
-If OBJECT is nil, try to get the property from current buffer at POSITION.
+(cl-defsubst org-timeblock-get-ts-prop (&optional object (position 0))
+  "Return POSITION's \\='timestamp property, in OBJECT."
+  (get-text-property position 'timestamp object))
 
-\\='sched property is an org-element timestamp object."
-  (get-text-property position 'sched object))
-
-(cl-defsubst org-timeblock-get-event (&optional object (position 0))
-  "Return the value of POSITION's \\='event property, in OBJECT.
-If OBJECT is nil, try to get the property from current buffer at POSITION.
-
-\\='event property is an org-element timestamp object."
-  (get-text-property position 'event object))
-
-(cl-defsubst org-timeblock-get-sched-or-event (&optional object (position 0))
-  "Return POSITION's \\='sched or \\='event property, in OBJECT."
-  (or (org-timeblock-get-sched object position)
-      (org-timeblock-get-event object position)))
-
-(cl-defsubst org-timeblock-get-timestamp (&optional eventp)
-  "Return active timestamp of the entry at point.
-If EVENTP is non-nil, return event timestamp.
-Otherwise, return SCHEDULED property.
-
-Returned value is org-element timestamp object."
-  (if eventp
-      (org-timeblock-get-event-timestamp)
-    (org-element-property :scheduled (org-element-at-point))))
+(cl-defsubst org-timeblock-get-ts-type (&optional object (position 0))
+  "Return POSITION's \\='type property, in OBJECT."
+  (get-text-property position 'type object))
 
 (defun org-timeblock-cursor-pos ()
   "Return cursor position in the window of the *org-timeblock* buffer.
@@ -419,18 +398,17 @@ Compare only hours and minutes."
 		  (org-timeblock-on decoded-time-day <= a b))))))))
 
 (defsubst org-timeblock-get-ts (item)
-  "Return ITEM's \\='sched or \\='event text property as decoded time."
-  (org-timeblock-timestamp-to-time (org-timeblock-get-sched-or-event item)))
+  "Return ITEM's \\='timestamp text property as decoded time."
+  (org-timeblock-timestamp-to-time (org-timeblock-get-ts-prop item)))
 
-(defun org-timeblock-sched-or-event< (a b)
-  "Return t, if A's \\='sched or \\='event is less then B's.
-\\='sched or \\='event are transformed Emacs decoded time values."
+(defun org-timeblock-timestamp< (a b)
+  "Return t, if A's \\='timestamp is less then B's."
   (org-timeblock-on org-timeblock-get-ts org-timeblock-time< a b))
 
 (defun org-timeblock-select-block-for-current-entry ()
   "Select block for the entry at point in `org-timeblock-list-mode'."
   (when-let (((get-buffer-window org-timeblock-buffer))
-	     (timestamp (org-timeblock-get-sched-or-event
+	     (timestamp (org-timeblock-get-ts-prop
 			 nil (line-beginning-position)))
 	     ((org-element-property :hour-start timestamp))
 	     ((not (org-timeblock--daterangep timestamp)))
@@ -549,7 +527,7 @@ Default background color is used when BASE-COLOR is nil."
 	      (if-let ((entries
 			(seq-filter
 			 (lambda (x)
-			   (let* ((timestamp (org-timeblock-get-sched-or-event x))
+			   (let* ((timestamp (org-timeblock-get-ts-prop x))
 				  (date (nth iter dates))
 				  (start-ts (org-timeblock-timestamp-to-time timestamp)))
 			     (and
@@ -603,7 +581,7 @@ Default background color is used when BASE-COLOR is nil."
 					      (list (unless (eq org-timeblock-scale-options 'hide-all) (decoded-time-hour (decode-time))))
 					      (mapcar
 					       (lambda (entry)
-						 (let ((s-or-e (org-timeblock-get-sched-or-event entry)))
+						 (let ((s-or-e (org-timeblock-get-ts-prop entry)))
 						   (if (and (org-timeblock-date< (org-timeblock-timestamp-to-time s-or-e) (nth iter dates))
 							    (not (org-element-property :repeater-type s-or-e)))
 						       0
@@ -643,7 +621,7 @@ Default background color is used when BASE-COLOR is nil."
 			 (hour-lines-color
 			  (if (> bg-rgb-sum 550) "#7b435c" "#cdcdcd")))
 		    (dolist (entry entries)
-		      (let* ((timestamp (org-timeblock-get-sched-or-event entry))
+		      (let* ((timestamp (org-timeblock-get-ts-prop entry))
 			     (repeated (org-element-property
 					:repeater-type timestamp))
 			     (start-ts (org-timeblock-timestamp-to-time
@@ -713,7 +691,7 @@ Default background color is used when BASE-COLOR is nil."
 					    start-ts))
 					 scale)))
 				  (default-font-height))
-				(if (org-timeblock-get-event entry) 2 1))
+				(if (eq 'event (org-timeblock-get-ts-type entry)) 2 1))
 			    y
 			    ,(if-let ((value (+ (round (* (if (or (and start-date-earlier-p (not repeated))
 								  (org-timeblock-decoded<
@@ -730,7 +708,7 @@ Default background color is used when BASE-COLOR is nil."
 								  (org-element-property :minute-start timestamp))
 							       (* min-hour 60)))
 							  scale))
-						(if (org-timeblock-get-event entry) 2 1)))
+						(if (eq 'event (org-timeblock-get-ts-type entry)) 2 1)))
 				      ((< (- org-timeblock-svg-height value) (default-font-height))))
 				 (- org-timeblock-svg-height (default-font-height))
 			       value)
@@ -807,10 +785,10 @@ Default background color is used when BASE-COLOR is nil."
 						    columns)))
 					      (/ block-max-width length))))
 				       (* column-width iter)
-				       (if (org-timeblock-get-event entry) 2 1)))
+				       (if (eq 'event (org-timeblock-get-ts-type entry)) 2 1)))
 				 (block-width
 				  (- (round (/ block-max-width length))
-				     (if (org-timeblock-get-event entry) 2 1)))
+				     (if (eq 'event (org-timeblock-get-ts-type entry)) 2 1)))
 				 (title
 				  (concat (get-text-property 0 'title entry)
 					  (get-text-property 0 'n-day-indicator entry)))
@@ -855,25 +833,41 @@ Default background color is used when BASE-COLOR is nil."
 			  (svg-rectangle
 			   org-timeblock-svg x y block-width block-height
 			   :column (1+ iter)
-			   :stroke (if (org-timeblock-get-event entry)
-				       "#5b0103" "#cdcdcd")
-			   :stroke-width (if (org-timeblock-get-event entry) 2 1)
+			   :stroke
+			   (if (eq 'event (org-timeblock-get-ts-type entry))
+			       "#5b0103" "#cdcdcd")
+			   :stroke-width
+			   (if (eq 'event (org-timeblock-get-ts-type entry))
+			       2 1)
 			   :opacity "0.7"
 			   :order (cl-incf order)
-			   :fill (or (car colors) (funcall get-color title))
+			   :fill
+			   (or
+			    (and
+			     (eq 'deadline
+				 (org-timeblock-get-ts-type entry)) "#5b0103")
+			    (car colors) (funcall get-color title))
+			   ;; Same timestamp can be displayed in multiple
+			   ;; columns, so _column-number postfix is used to tell
+			   ;; that blocks apart
 			   :id (format "%s_%d"
 				       (get-text-property 0 'id entry)
 				       (1+ iter))
-			   :type (cond ((org-timeblock-get-event entry) 'event)
-				       (t 'sched)))
+			   :type (org-timeblock-get-ts-type entry))
 			  ;; Setting the title of current entry
 			  (let ((y (- y 5)))
 			    (dolist (heading-part heading-list)
 			      (svg-text org-timeblock-svg heading-part
 					:x x
 					:y (cl-incf y (default-font-height))
-					:fill (or (cadr colors)
-						  (face-attribute 'default :foreground))
+					:fill
+					(or
+					 (and
+					  (eq 'deadline
+					      (org-timeblock-get-ts-type entry))
+					  "#ffffff")
+					 (cadr colors)
+					 (face-attribute 'default :foreground))
 					:font-size
 					(aref (font-info (face-font 'default)) 2))))
 			  (when time-string
@@ -882,7 +876,13 @@ Default background color is used when BASE-COLOR is nil."
 					    (* (length time-string)
 					       (default-font-width)))
 				      :y (- (+ y block-height) 2)
-				      :fill (or (cadr colors) hour-lines-color)
+				      :fill
+				      (or
+				       (and
+					(eq 'deadline
+					    (org-timeblock-get-ts-type entry))
+					"#ffffff")
+				       (cadr colors) hour-lines-color)
 				      :font-size
 				      (aref (font-info (face-font 'default)) 2))))))
 		    ;; Drawing current time indicator
@@ -976,14 +976,13 @@ Default background color is used when BASE-COLOR is nil."
   (interactive)
   (quit-window t))
 
-(defun org-timeblock--schedule-time (date &optional marker eventp)
+(defun org-timeblock--schedule-time (date &optional marker)
   "Interactively change time in DATE for Org entry timestamp at MARKER.
 If MARKER is nil, use entry at point.
-If EVENTP is non-nil, change timestamp of the event.
 If DATE is not specified, use `org-timeblock-date'.
 
-Schedule or event date won't be changed.  The time might be a
-timerange which depends on user interactive choice.
+Date won't be changed.  The time might be a
+timerange which depends on user choice.
 
 Time format is \"HHMM\""
   (when marker
@@ -1007,7 +1006,7 @@ Time format is \"HHMM\""
 		       (org-timeblock-date<=
 			(car org-timeblock-daterange) date))
 		(org-timeblock-jump-to-day date)))))
-      (let* ((timestamp (org-timeblock-get-timestamp eventp))
+      (let* ((timestamp (org-element-timestamp-parser))
 	     (start-ts (org-timeblock-timestamp-to-time timestamp))
 	     (end-ts (org-timeblock-timestamp-to-time timestamp t))
 	     (duration (when (and start-ts end-ts)
@@ -1025,7 +1024,7 @@ Time format is \"HHMM\""
 			 (org-timeblock-date<=
 			  (car org-timeblock-daterange) date))))
 	  (org-timeblock-jump-to-day prev-date))
-	  (org-timeblock--schedule new-start-ts new-end-ts eventp)))))
+	  (org-timeblock--schedule new-start-ts new-end-ts)))))
 
 (defun org-timeblock--daterangep (timestamp)
   "Return t if org timestamp object TIMESTAMP is a daterange with no time."
@@ -1040,19 +1039,23 @@ Time format is \"HHMM\""
      (null (org-element-property :hour-start timestamp))
      (null (org-element-property :hour-end timestamp)))))
 
-(defun org-timeblock--construct-prefix (timestamp &optional eventp)
+(defun org-timeblock--construct-prefix (timestamp type)
   "Construct an entry prefix for *org-timeblock-list* buffer.
 
 TIMESTAMP is org-element timestamp object which is used to
-construct a timerange inside the prefix.  If EVENTP is non-nil,
-insert \"EVENT\" in the prefix."
+construct a timerange inside the prefix."
   (let ((hstart (org-element-property :hour-start timestamp))
 	(mstart (org-element-property :minute-start timestamp))
 	(hend (org-element-property :hour-end timestamp))
-	(mend (org-element-property :minute-end timestamp)))
+	(mend (org-element-property :minute-end timestamp))
+	(type-str (pcase type
+		    (`event "EVENT")
+		    (`sched "SCHED")
+		    (`deadline "DEADL"))))
     (propertize
      (format
-      (if eventp " EVENT % -12s % -6s " "       % -12s % -6s ")
+      " %s % -12s % -6s "
+      type-str
       (if (org-timeblock--daterangep timestamp)
 	  ""
 	(concat (and hstart mstart
@@ -1106,30 +1109,19 @@ PROMPT can overwrite the default prompt."
        :minute (+ (pop-digit) (* 10 (pop-digit)))
        :hour (+ (pop-digit) (* 10 (pop-digit)))))))
 
-(defun org-timeblock-construct-id (&optional marker eventp)
-  "Construct identifier for the org entry at MARKER.
-If MARKER is nil, use entry at point.
-If EVENTP is non-nil, use entry's TIMESTAMP property."
-  (let ((element (org-with-point-at marker (org-element-at-point))))
+(defun org-timeblock-construct-id (&optional marker)
+  "Construct identifier for the timestamp at MARKER.
+If MARKER is nil, use timestamp at point."
+  (org-with-point-at (or marker (point))
     (md5
-     (concat
-      (org-element-property :raw-value element)
-      (if eventp
-	  (org-entry-get marker "TIMESTAMP")
-	(concat
-	 "S"
-	 (org-element-property
-	  :raw-value
-	  (org-element-property :scheduled element)))))
+     (format
+      "%s%d%s"
+      (buffer-file-name (buffer-base-buffer))
+      (point)
+      (when (or (looking-at org-tr-regexp)
+		(looking-at org-ts-regexp))
+	(match-string 0)))
      nil nil 'utf-8)))
-
-(defun org-timeblock-get-event-timestamp ()
-  "Return an org-element timestamp object of an event at point."
-  (when-let ((ts (org-entry-get nil "TIMESTAMP")))
-    (with-temp-buffer
-      (insert ts)
-      (goto-char (point-min))
-      (org-element-timestamp-parser))))
 
 (defun org-timeblock-get-buffer-entries-all (buffer)
   "Get all not done and not archived entries with any active timestamp in BUFFER."
@@ -1154,7 +1146,7 @@ If EVENTP is non-nil, use entry's TIMESTAMP property."
 	       ((timestamp-and-type
 		 (save-excursion
 		   (goto-char (match-beginning 0))
-		   (cons
+		   (list
 		    (org-element-timestamp-parser)
 		    (cond
 		     ((re-search-backward
@@ -1162,9 +1154,20 @@ If EVENTP is non-nil, use entry's TIMESTAMP property."
 		       nil
 		       t)
 		      'sched)
-		     (t 'event)))))
+		     ((re-search-backward
+		       (concat org-deadline-regexp "[ \t]*\\=")
+		       nil
+		       t)
+		      'deadline)
+		     (t 'event))
+		    (or (seq-find (lambda (x) (= x (point))) buffer-markers)
+			(let ((marker (copy-marker (point) t)))
+			  (setq update-markers-alist-p t)
+			  (push marker buffer-markers)
+			  marker)))))
 		(timestamp (car timestamp-and-type))
-		(type (cdr timestamp-and-type))
+		(type (cadr timestamp-and-type))
+		(marker (caddr timestamp-and-type))
 		(start-ts (org-timeblock-timestamp-to-time
 			   timestamp))
 		(title (or (org-get-heading t nil t t) "no title")))
@@ -1173,16 +1176,18 @@ If EVENTP is non-nil, use entry's TIMESTAMP property."
 	       (push
 		(propertize
 		 (concat
-		  (org-timeblock--construct-prefix timestamp (eq type 'event))
+		  (org-timeblock--construct-prefix timestamp type)
 		  title)
-		 type timestamp
-		 'marker (or (seq-find (lambda (x) (= x (point))) buffer-markers)
+		 'type type
+		 'timestamp timestamp
+		 'hd-marker (or (seq-find (lambda (x) (= x (point))) buffer-markers)
 			     (let ((marker (copy-marker (point) t)))
 			       (setq update-markers-alist-p t)
 			       (push marker buffer-markers)
 			       marker))
+		 'marker marker
 		 'tags tags
-		 'id (org-timeblock-construct-id nil (eq type 'event))
+		 'id (org-timeblock-construct-id marker)
 		 'title title)
 		entries)))))))
     (when update-markers-alist-p
@@ -1202,7 +1207,7 @@ without time."
   (seq-filter
    (lambda (x)
      (when-let
-	 ((timestamp (org-timeblock-get-sched-or-event x))
+	 ((timestamp (org-timeblock-get-ts-prop x))
 	  ((or (not timeblocks)
 	       (and
 		(not (org-timeblock--daterangep timestamp))
@@ -1256,7 +1261,7 @@ Return nil if buffers are up-to-date."
 	    (mapcar
 	     #'org-timeblock-get-buffer-entries-all
 	     buffers-to-update))
-	   #'org-timeblock-sched-or-event<))
+	   #'org-timeblock-timestamp<))
     t))
 
 (defun org-timeblock-get-colors (tags)
@@ -1297,62 +1302,73 @@ TS is a org-element timestamp object."
        :year year-start :month month-start :day day-start
        :hour (or hour-start 0) :minute (or minute-start 0) :second 0))))
 
-(defun org-timeblock--schedule (start-ts &optional end-ts eventp)
+(defun org-timeblock--schedule (start-ts &optional end-ts)
   "Schedule org entry at point.
 START-TS and END-TS are Emacs decoded time values.
 
-If EVENTP is non-nil, reschedule event.
-Otherwise, change SCHEDULED property
-
 Return new org-element timestamp object."
-  (if eventp
-      (progn
+  (let* ((planning-func
+	  (cond ((save-excursion
+		   (re-search-backward
+		    (concat org-deadline-regexp "[ \t]*\\=")
+		    nil
+		    t))
+		 #'org-deadline)
+		((save-excursion
+		   (re-search-backward
+		    (concat org-scheduled-regexp "[ \t]*\\=")
+		    nil
+		    t))
+		 #'org-schedule)))
+	 (regexp-with-ts
+	  (if (eq planning-func #'org-schedule)
+	      org-scheduled-time-regexp
+	    org-deadline-time-regexp))
+	 (keyword-regexp
+	  (concat
+	   (if (eq planning-func #'org-schedule)
+	       org-scheduled-regexp
+	     org-deadline-regexp)
+	   "[ \t]*")))
+    (if planning-func
 	(save-excursion
-	  (org-timeblock-delete-event-timestamp)
-	  (insert
-	   (org-timeblock-ts-to-org-timerange start-ts end-ts)))
-	(org-timeblock-get-event-timestamp))
-    (let* ((timestamp (org-element-property :scheduled (org-element-at-point)))
-	   (repeat-string (org-get-repeat))
-	   (warning-string
-	    (concat
-	     (pcase (org-element-property :warning-type timestamp)
-	       (`first "--") (`all "-"))
-	     (let ((val (org-element-property :warning-value timestamp)))
-	       (and val (number-to-string val)))
-	     (pcase (org-element-property :warning-unit timestamp)
-	       (`hour "h") (`day "d") (`week "w") (`month "m") (`year "y"))))
-	   (dates-equal-p (org-timeblock-date= start-ts end-ts)))
-      (cond
-       ((or (not end-ts) dates-equal-p)
-	(org-schedule nil (org-timeblock-ts-to-org-timerange start-ts end-ts)))
-       ((and end-ts (not dates-equal-p))
-	(org-schedule nil (org-timeblock-ts-to-org-timerange start-ts))
-	(org-back-to-heading t)
-	(forward-line)
-	(when (re-search-forward org-scheduled-time-regexp
-				 (line-end-position) t)
-	  (insert "--"
-		  (org-timeblock-ts-to-org-timerange
-		   end-ts
-		   nil repeat-string warning-string)))))
-      (org-element-property :scheduled (org-element-at-point)))))
-
-(defun org-timeblock-delete-event-timestamp ()
-  "Delete event timestamp for the entry at point.
-Leave point where the timestamp was."
-  (let ((end (save-excursion (outline-next-heading) (point))))
-    (while
-	(not (and
-	      (or (re-search-forward org-tr-regexp end t)
-		  (re-search-forward org-ts-regexp end t))
-	      (not (org-in-regexp org-scheduled-time-regexp))
-	      (not (org-in-regexp org-deadline-time-regexp))))
-      t)
-    (beginning-of-line)
-    (when (or (re-search-forward org-tr-regexp end t)
-	      (re-search-forward org-ts-regexp end t))
-      (replace-match ""))))
+	  (let* ((timestamp (org-element-timestamp-parser))
+		 (repeat-string (org-get-repeat
+				 (org-element-property :raw-value timestamp)))
+		 (warning-string
+		  (concat
+		   (pcase (org-element-property :warning-type timestamp)
+		     (`first "--") (`all "-"))
+		   (let ((val (org-element-property :warning-value timestamp)))
+		     (and val (number-to-string val)))
+		   (pcase (org-element-property :warning-unit timestamp)
+		     (`hour "h") (`day "d") (`week "w") (`month "m") (`year "y"))))
+		 (dates-equal-p (org-timeblock-date= start-ts end-ts)))
+	    (cond
+	     ((or (not end-ts) dates-equal-p)
+	      (funcall-interactively
+	       planning-func nil
+	       (org-timeblock-ts-to-org-timerange start-ts end-ts)))
+	     ((and end-ts (not dates-equal-p))
+	      (funcall-interactively
+	       planning-func nil
+	       (org-timeblock-ts-to-org-timerange start-ts))
+	      (when (re-search-forward
+		     regexp-with-ts
+		     (line-end-position) t)
+		(insert "--"
+			(org-timeblock-ts-to-org-timerange
+			 end-ts
+			 nil repeat-string warning-string)))))
+	    (org-back-to-heading t)
+	    (forward-line)
+	    (re-search-forward keyword-regexp (line-end-position) t)
+	    (org-element-timestamp-parser)))
+      (when (or (looking-at org-tr-regexp)
+		(looking-at org-ts-regexp))
+	(replace-match
+	 (org-timeblock-ts-to-org-timerange start-ts end-ts)))
+      (org-element-timestamp-parser))))
 
 (defun org-timeblock-ts-to-org-timerange
     (ts-start &optional ts-end repeat-string warning-string)
@@ -1451,23 +1467,22 @@ Valid duration formats:
 	  (setq dur (substring dur 0 -1)))
 	 (t (ding)))))))
 
-(defun org-timeblock--duration (duration marker &optional eventp)
+(defun org-timeblock--duration (duration marker)
   "Set SCHEDULED duration to DURATION for the org entry at MARKER.
 Change SCHEDULED timestamp duration of the org entry at MARKER.
-Return the changed org-element timestamp object.
-If EVENTP is non-nil, use entry's timestamp."
+Return the changed org-element timestamp object."
   (unless (marker-buffer marker)
     (user-error "Non-existent marker's buffer"))
   (org-with-point-at marker
     (org-timeblock-show-context)
-    (let* ((timestamp (org-timeblock-get-timestamp eventp))
+    (let* ((timestamp (org-element-timestamp-parser))
 	   (start-ts (decode-time (org-timestamp-to-time timestamp)))
 	   (new-end-ts (when duration (org-timeblock-time-inc
 				       'minute duration start-ts))))
       (unless (and (org-element-property :hour-start timestamp)
 		   (org-element-property :minute-start timestamp))
 	(user-error "No scheduled time specified for this entry"))
-      (org-timeblock--schedule start-ts new-end-ts eventp))))
+      (org-timeblock--schedule start-ts new-end-ts))))
 
 (defun org-timeblock-todo (&optional arg)
   "Change the TODO state of an item in org-timeblock.
@@ -1618,18 +1633,16 @@ Duration format:
 45"
   (interactive)
   (when (org-timeblock--daterangep
-	 (org-timeblock-get-sched-or-event nil (line-beginning-position)))
+	 (org-timeblock-get-ts-prop nil (line-beginning-position)))
     (user-error "Can not reschedule entries with daterange timestamp"))
-  (let ((eventp (org-timeblock-get-event nil (line-beginning-position))))
-    (when-let ((duration (org-timeblock-read-duration))
-	       (timestamp
-		(org-timeblock--duration
-		 duration
-		 (get-text-property (line-beginning-position) 'marker)
-		 eventp)))
-      (org-timeblock-list-update-entry eventp)
-      (when (get-buffer-window org-timeblock-buffer)
-	(org-timeblock-redraw-timeblocks)))))
+  (when-let ((duration (org-timeblock-read-duration))
+	     (timestamp
+	      (org-timeblock--duration
+	       duration
+	       (get-text-property (line-beginning-position) 'marker))))
+    (org-timeblock-list-update-entry)
+    (when (get-buffer-window org-timeblock-buffer)
+      (org-timeblock-redraw-timeblocks))))
 
 (defun org-timeblock-schedule ()
   "Change the timestamp for selected block or all marked blocks.
@@ -1651,8 +1664,7 @@ The blocks may be events or tasks with SCHEDULED property."
 				    (org-timeblock-get-marker-by-id
 				     (car (split-string (dom-attr ,x 'id) "_")))
 				  (org-timeblock-timestamp-to-time
-				   (org-timeblock-get-timestamp
-				    (eq (dom-attr ,x 'type) 'event))))))
+				   (org-element-timestamp-parser)))))
 			  (or
 			   (org-timeblock-decoded< (get-ts x) (get-ts y))
 			   (org-timeblock-decoded= (get-ts x) (get-ts y)))))))
@@ -1676,14 +1688,13 @@ The blocks may be events or tasks with SCHEDULED property."
 			  (seq-find (lambda (x) (eq (cadr x) answer)) choices))
 		    (`user-input (read-number "Interval (minutes): "))
 		    ((and n _) n))))
-	       (eventp (eq (dom-attr (car mark-data) 'type) 'event))
 	       (prev-timestamp
 		(org-with-point-at marker
-		  (org-timeblock-get-timestamp eventp)))
+		  (org-element-timestamp-parser)))
 	       (prev-end-or-start-ts
 		(or (org-timeblock-timestamp-to-time prev-timestamp t)
 		    (org-timeblock-timestamp-to-time prev-timestamp)))
-	       (timestamp (org-timeblock--schedule-time date marker eventp))
+	       (timestamp (org-timeblock--schedule-time date marker))
 	       (new-end-or-start-ts
 		(or (org-timeblock-timestamp-to-time timestamp t)
 		    (org-timeblock-timestamp-to-time timestamp))))
@@ -1694,8 +1705,7 @@ The blocks may be events or tasks with SCHEDULED property."
 	       (let* ((id (car (split-string (dom-attr block 'id) "_")))
 		      (marker (org-timeblock-get-marker-by-id id)))
 		 (org-with-point-at marker
-		   (let* ((eventp (eq (dom-attr block 'type) 'event))
-			  (timestamp (org-timeblock-get-timestamp eventp))
+		   (let* ((timestamp (org-element-timestamp-parser))
 			  (start-ts
 			   (org-timeblock-timestamp-to-time timestamp))
 			  (end-ts
@@ -1711,7 +1721,7 @@ The blocks may be events or tasks with SCHEDULED property."
 			   (when duration
 			     (org-timeblock-time-inc
 			      'minute duration new-start-ts))))
-		     (org-timeblock--schedule new-start-ts new-end-ts eventp)
+		     (org-timeblock--schedule new-start-ts new-end-ts)
 		     (setq new-end-or-start-ts
 			   (or new-end-ts new-start-ts)))))))
 	    (`savetime
@@ -1719,8 +1729,7 @@ The blocks may be events or tasks with SCHEDULED property."
 	       (let* ((id (car (split-string (dom-attr block 'id) "_")))
 		      (marker (org-timeblock-get-marker-by-id id)))
 		 (org-with-point-at marker
-		   (let* ((eventp (eq (dom-attr block 'type) 'event))
-			  (timestamp (org-timeblock-get-timestamp eventp))
+		   (let* ((timestamp (org-element-timestamp-parser))
 			  (start-ts (org-timeblock-timestamp-to-time
 				     timestamp))
 			  (end-ts (org-timeblock-timestamp-to-time
@@ -1737,13 +1746,12 @@ The blocks may be events or tasks with SCHEDULED property."
 			   (when duration
 			     (org-timeblock-time-inc
 			      'minute duration new-start-ts))))
-		     (org-timeblock--schedule new-start-ts new-end-ts eventp)
+		     (org-timeblock--schedule new-start-ts new-end-ts)
 		     (setq new-end-or-start-ts (or new-end-ts new-start-ts))
 		     (setq prev-end-or-start-ts (or end-ts start-ts)))))))))
       (when-let ((block (org-timeblock-selected-block))
 		 (marker (org-timeblock-selected-block-marker)))
-	(org-timeblock--schedule-time
-	 date marker (eq (dom-attr block 'type) 'event))))
+	(org-timeblock--schedule-time date marker)))
     (org-timeblock-redraw-buffers)))
 
 (defun org-timeblock-set-duration ()
@@ -1771,38 +1779,38 @@ The org-element timestamp object may be from an event or from a
 SCHEDULED property."
   (interactive)
   (when (org-timeblock--daterangep
-	 (org-timeblock-get-sched nil (line-beginning-position)))
+	 (org-timeblock-get-ts-prop nil (line-beginning-position)))
     (user-error "Can not reschedule entries with daterange timestamp"))
-  (let ((eventp (org-timeblock-get-event nil (line-beginning-position))))
-    (when-let ((date (org-timeblock-list-get-current-date))
-	       (timestamp (org-timeblock--schedule-time
-			   date
-			   (get-text-property (line-beginning-position) 'marker)
-			   eventp)))
-      (org-timeblock-list-update-entry eventp)
-      (when (get-buffer-window org-timeblock-buffer)
-	(org-timeblock-redraw-timeblocks)))))
+  (when-let ((date (org-timeblock-list-get-current-date))
+	     (timestamp (org-timeblock--schedule-time
+			 date
+			 (get-text-property (line-beginning-position) 'marker))))
+    (org-timeblock-list-update-entry)
+    (when (get-buffer-window org-timeblock-buffer)
+      (org-timeblock-redraw-timeblocks))))
 
-(defun org-timeblock-list-update-entry (eventp)
-  "Update text and text properties for the entry at point in *org-timeblock-list*.
-If EVENTP is non-nil the entry is considered as an event."
+;; TODO get type from text properties
+;; TODO hd-marker
+(defun org-timeblock-list-update-entry ()
+  "Update text and text properties for the entry at point in *org-timeblock-list*."
   (let ((marker (get-text-property (line-beginning-position) 'marker)) colors)
     (unless (marker-buffer marker)
       (user-error "Non-existent marker's buffer"))
     (let ((inhibit-read-only t)
 	  (new-entry
 	   (org-with-point-at marker
-	     (let ((timestamp (org-timeblock-get-timestamp eventp))
+	     (let ((timestamp (org-element-timestamp-parser))
 		   (title (org-get-heading t nil t t))
 		   (tags (mapcar #'substring-no-properties (org-get-tags))))
 	       (setq colors (org-timeblock-get-colors tags))
 	       (propertize
-		(concat (org-timeblock--construct-prefix timestamp eventp)
+		(concat (org-timeblock--construct-prefix timestamp type)
 			title)
-		(if eventp 'event 'sched) timestamp
+		'timestamp timestamp
+		'type type
 		'marker marker
 		'tags tags
-		'id (org-timeblock-construct-id nil eventp)
+		'id (org-timeblock-construct-id marker)
 		'title title)))))
       (delete-region (line-beginning-position) (1+ (line-end-position)))
       (insert (propertize
@@ -2211,7 +2219,7 @@ Available view options:
 	(let ((entries
 	       (seq-filter
 		(lambda (x)
-		  (let* ((timestamp (org-timeblock-get-sched-or-event x))
+		  (let* ((timestamp (org-timeblock-get-ts-prop x))
 			 (start-ts (org-timeblock-timestamp-to-time
 				    timestamp)))
 		    (or
