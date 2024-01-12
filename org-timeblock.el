@@ -976,7 +976,7 @@ Default background color is used when BASE-COLOR is nil."
   (interactive)
   (quit-window t))
 
-(defun org-timeblock--schedule-time (date &optional marker)
+(defun org-timeblock--schedule-time (&optional marker)
   "Interactively change time in DATE for Org entry timestamp at MARKER.
 If MARKER is nil, use entry at point.
 If DATE is not specified, use `org-timeblock-date'.
@@ -990,41 +990,43 @@ Time format is \"HHMM\""
       (user-error "Non-existent marker's buffer")))
   (org-with-point-at (or marker (point))
     (org-timeblock-show-context)
-    (let (ts-type prev-date)
+    (let* (ts-type
+	   go-back-p
+	   prev-date
+	   (timestamp (org-element-timestamp-parser))
+	   (date (org-timeblock-timestamp-to-time timestamp)))
       (while (null ts-type)
 	(pcase (read-char-from-minibuffer
-		(format "Schedule (%s): time[s]tamp, time[r]ange, other [d]ay"
-			(org-timeblock-format-time "%Y-%m-%d" date))
+		"Change timestamp: time[s]tamp, time[r]ange, other [d]ay"
 		'(?s ?r ?d))
 	  (?r (setq ts-type 'timerange))
 	  (?s (setq ts-type 'timestamp))
 	  (?d (setq prev-date date
 		    date (decode-time (org-read-date nil t nil nil (encode-time date))))
-	      (unless (or
+	      (unless (and
 		       (org-timeblock-date<=
 			date (cdr org-timeblock-daterange))
 		       (org-timeblock-date<=
 			(car org-timeblock-daterange) date))
-		(org-timeblock-jump-to-day date)))))
-      (let* ((timestamp (org-element-timestamp-parser))
-	     (start-ts (org-timeblock-timestamp-to-time timestamp))
+		(org-timeblock-jump-to-day date)
+		(setq go-back-p t)))))
+      (let* ((start-ts (org-timeblock-timestamp-to-time timestamp))
 	     (end-ts (org-timeblock-timestamp-to-time timestamp t))
 	     (duration (when (and start-ts end-ts)
 			 (org-timeblock-time-diff end-ts start-ts)))
 	     (new-start-ts (org-timeblock-read-ts date "START-TIME: "))
 	     (new-end-ts
 	      (if (eq ts-type 'timerange)
-		  (org-timeblock-read-ts date "END-TIME: ")
+		  (let (ts)
+		    (while (progn (setq ts (org-timeblock-read-ts date "END-TIME: "))
+				  (org-timeblock-decoded< ts new-start-ts))
+		      (ding))
+		    ts)
 		(when duration (org-timeblock-time-inc
 				'minute duration new-start-ts)))))
-	(when (and prev-date
-		   (not (or
-			 (org-timeblock-date<=
-			  date (cdr org-timeblock-daterange))
-			 (org-timeblock-date<=
-			  (car org-timeblock-daterange) date))))
+	(when (and prev-date go-back-p)
 	  (org-timeblock-jump-to-day prev-date))
-	  (org-timeblock--schedule new-start-ts new-end-ts)))))
+	(org-timeblock--schedule new-start-ts new-end-ts)))))
 
 (defun org-timeblock--daterangep (timestamp)
   "Return t if org timestamp object TIMESTAMP is a daterange with no time."
@@ -1148,18 +1150,19 @@ If MARKER is nil, use timestamp at point."
 		   (goto-char (match-beginning 0))
 		   (list
 		    (org-element-timestamp-parser)
-		    (cond
-		     ((re-search-backward
-		       (concat org-scheduled-regexp "[ \t]*\\=")
-		       nil
-		       t)
-		      'sched)
-		     ((re-search-backward
-		       (concat org-deadline-regexp "[ \t]*\\=")
-		       nil
-		       t)
-		      'deadline)
-		     (t 'event))
+		    (save-excursion
+		      (cond
+		       ((re-search-backward
+			 (concat org-scheduled-regexp "[ \t]*\\=")
+			 nil
+			 t)
+			'sched)
+		       ((re-search-backward
+			 (concat org-deadline-regexp "[ \t]*\\=")
+			 nil
+			 t)
+			'deadline)
+		       (t 'event)))
 		    (or (seq-find (lambda (x) (= x (point))) buffer-markers)
 			(let ((marker (copy-marker (point) t)))
 			  (setq update-markers-alist-p t)
@@ -1475,14 +1478,14 @@ Return the changed org-element timestamp object."
     (user-error "Non-existent marker's buffer"))
   (org-with-point-at marker
     (org-timeblock-show-context)
-    (let* ((timestamp (org-element-timestamp-parser))
-	   (start-ts (decode-time (org-timestamp-to-time timestamp)))
-	   (new-end-ts (when duration (org-timeblock-time-inc
-				       'minute duration start-ts))))
+    (let ((timestamp (org-element-timestamp-parser)))
       (unless (and (org-element-property :hour-start timestamp)
 		   (org-element-property :minute-start timestamp))
-	(user-error "No scheduled time specified for this entry"))
-      (org-timeblock--schedule start-ts new-end-ts))))
+	(user-error "The timestamp does not have time"))
+      (let* ((start-ts (org-timeblock-timestamp-to-time timestamp))
+	     (new-end-ts (org-timeblock-time-inc
+			  'minute duration start-ts)))
+	(org-timeblock--schedule start-ts new-end-ts)))))
 
 (defun org-timeblock-todo (&optional arg)
   "Change the TODO state of an item in org-timeblock.
@@ -1580,7 +1583,7 @@ The new task is created in `org-timeblock-inbox-file'"
       (org-insert-heading nil t t)
       (insert "TODO " title " ")
       (pcase org-timeblock-new-task-time
-	(`pick (org-timeblock--schedule-time date))
+	(`pick (funcall-interactively #'org-schedule nil))
 	((pred stringp)
 	 (unless
 	     (string-match-p "\\([01][0-9]\\|2[0-3]\\):[0-5][0-9]"
@@ -1645,8 +1648,7 @@ Duration format:
       (org-timeblock-redraw-timeblocks))))
 
 (defun org-timeblock-schedule ()
-  "Change the timestamp for selected block or all marked blocks.
-The blocks may be events or tasks with SCHEDULED property."
+  "Change the timestamp for selected block or all marked blocks."
   (interactive)
   (let ((date (nth (1- org-timeblock-column)
 		   (org-timeblock-get-dates
@@ -1694,7 +1696,7 @@ The blocks may be events or tasks with SCHEDULED property."
 	       (prev-end-or-start-ts
 		(or (org-timeblock-timestamp-to-time prev-timestamp t)
 		    (org-timeblock-timestamp-to-time prev-timestamp)))
-	       (timestamp (org-timeblock--schedule-time date marker))
+	       (timestamp (org-timeblock--schedule-time marker))
 	       (new-end-or-start-ts
 		(or (org-timeblock-timestamp-to-time timestamp t)
 		    (org-timeblock-timestamp-to-time timestamp))))
@@ -1751,7 +1753,7 @@ The blocks may be events or tasks with SCHEDULED property."
 		     (setq prev-end-or-start-ts (or end-ts start-ts)))))))))
       (when-let ((block (org-timeblock-selected-block))
 		 (marker (org-timeblock-selected-block-marker)))
-	(org-timeblock--schedule-time date marker)))
+	(org-timeblock--schedule-time marker)))
     (org-timeblock-redraw-buffers)))
 
 (defun org-timeblock-set-duration ()
@@ -1769,8 +1771,7 @@ Duration format:
   (when-let ((marker (org-timeblock-selected-block-marker))
 	     (block (org-timeblock-selected-block))
 	     (duration (org-timeblock-read-duration)))
-    (org-timeblock--duration duration marker
-			     (eq (dom-attr block 'type) 'event))
+    (org-timeblock--duration duration marker)
     (org-timeblock-redraw-buffers)))
 
 (defun org-timeblock-list-schedule ()
@@ -1783,7 +1784,6 @@ SCHEDULED property."
     (user-error "Can not reschedule entries with daterange timestamp"))
   (when-let ((date (org-timeblock-list-get-current-date))
 	     (timestamp (org-timeblock--schedule-time
-			 date
 			 (get-text-property (line-beginning-position) 'marker))))
     (org-timeblock-list-update-entry)
     (when (get-buffer-window org-timeblock-buffer)
