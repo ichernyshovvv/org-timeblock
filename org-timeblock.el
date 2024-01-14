@@ -597,11 +597,12 @@ DATE is decoded-time value."
 					       entries)))))))
 			 (scale (/ org-timeblock-svg-height (float (* (- max-hour min-hour) 60))))
 			 (cur-time-indicator
-			  (* scale
-			     (-
-			      (+ (* (decoded-time-hour cur-time) 60)
-				 (decoded-time-minute cur-time)) ;; minutes
-			      (* min-hour 60))))
+			  (and org-timeblock-current-time-indicator
+			       (* scale
+				  (-
+				   (+ (* (decoded-time-hour cur-time) 60)
+				      (decoded-time-minute cur-time)) ;; minutes
+				   (* min-hour 60)))))
 			 (columns
 			  (mapcar (lambda (x) (cons (get-text-property 0 'id x) 1)) entries))
 			 placed
@@ -762,6 +763,17 @@ DATE is decoded-time value."
 			 :y (+ y 5)
 			 :x (* column-width iter)
 			 :fill (face-attribute 'default :foreground))))
+		    ;; Drawing current time indicator
+		    (and cur-time-indicator
+			 (org-timeblock-date= (nth iter dates) cur-time)
+			 ;; HERE
+			 (svg-line
+			  org-timeblock-svg
+			  (+ timeline-left-padding (* column-width iter))
+			  cur-time-indicator
+			  (+ column-width (* column-width iter))
+			  cur-time-indicator
+			  :stroke "red"))
 		    ;; Drawing all the entries inside the timeline
 		    (dolist (entry entries)
 		      (when-let ((length
@@ -892,20 +904,7 @@ DATE is decoded-time value."
 					"#ffffff")
 				       (cadr colors) hour-lines-color)
 				      :font-size
-				      (aref (font-info (face-font 'default)) 2))))))
-		    ;; Drawing current time indicator
-		    (and org-timeblock-current-time-indicator
-			 (org-timeblock-date= (nth iter dates) cur-time)
-			 (svg-polygon
-			  org-timeblock-svg
-			  (list
-			   (cons (+ (* column-width iter) (- block-max-width 5))
-				 cur-time-indicator)
-			   (cons (+ (* column-width iter) block-max-width 25)
-				 (- cur-time-indicator 5))
-			   (cons (+ (* column-width iter) block-max-width 25)
-				 (+ cur-time-indicator 5)))
-			  :fill-color "red")))
+				      (aref (font-info (face-font 'default)) 2)))))))
 		(let ((message "No data."))
 		  (svg-text org-timeblock-svg message
 			    :y (/ org-timeblock-svg-height 2)
@@ -1910,7 +1909,7 @@ Otherwise, return nil."
       (dom-set-attribute node 'fill org-timeblock-mark-color)
       (dom-set-attribute node 'mark t)
       (cl-incf org-timeblock-mark-count)))
-    (org-timeblock-redisplay))
+  (org-timeblock-redisplay))
 
 (defun org-timeblock-unmark-block ()
   "Unmark selected block."
