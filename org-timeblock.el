@@ -498,6 +498,39 @@ Default background color is used when BASE-COLOR is nil."
            (b (funcall fn 2)))
       (format "#%02x%02x%02x" r g b))))
 
+(defun org-timeblock--timestamp-relevant-p (timestamp date)
+  "Check if org-element TIMESTAMP is relevant to DATE.
+DATE is decoded-time value."
+  (let ((start-ts (org-timeblock-timestamp-to-time timestamp)))
+    (or
+     (org-timeblock-date= start-ts date)
+     (when-let ((org-timeblock-show-future-repeats)
+		(value (org-element-property
+			:repeater-value timestamp))
+		(unit
+		 (pcase (org-element-property
+			 :repeater-unit timestamp)
+		   (`week
+		    (setq value (* value 7))
+		    'day)
+		   ((and _ u) u)))
+		(start start-ts))
+       (or
+	(and (eq unit 'day)
+	     (= value 1)
+	     (if (eq org-timeblock-show-future-repeats 'next)
+		 (org-timeblock-date= (org-timeblock-time-inc 'day 1 start) date)
+	       (org-timeblock-date<= start date)))
+	(progn
+	  (if (eq org-timeblock-show-future-repeats 'next)
+	      (setq start (org-timeblock-time-inc unit value start))
+	    (while (org-timeblock-date< start date)
+	      (setq start (org-timeblock-time-inc unit value start))))
+	  (org-timeblock-date= start date))))
+     (when-let ((end-ts (org-timeblock-timestamp-to-time timestamp t)))
+       (and (org-timeblock-date< start-ts date)
+	    (org-timeblock-date<= date end-ts))))))
+
 (defun org-timeblock-redraw-timeblocks ()
   "Redraw *org-timeblock* buffer."
   (with-current-buffer (get-buffer-create org-timeblock-buffer)
@@ -527,10 +560,10 @@ Default background color is used when BASE-COLOR is nil."
 	      (if-let ((entries
 			(seq-filter
 			 (lambda (x)
-			   (let* ((timestamp (org-timeblock-get-ts-prop x))
-				  (date (nth iter dates))
-				  (start-ts (org-timeblock-timestamp-to-time timestamp)))
+			   (let ((timestamp (org-timeblock-get-ts-prop x)))
 			     (and
+			      (org-timeblock--timestamp-relevant-p
+			       timestamp (nth iter dates))
 			      (or (not (consp org-timeblock-scale-options))
 				  (<= (car org-timeblock-scale-options)
 				      (org-element-property :hour-start timestamp)
@@ -543,32 +576,7 @@ Default background color is used when BASE-COLOR is nil."
 					(org-element-property :hour-end timestamp))
 				       (<= (car org-timeblock-scale-options)
 					   (org-element-property :hour-end timestamp)
-					   (cdr org-timeblock-scale-options)))))
-			      (or
-			       (org-timeblock-date= start-ts date)
-			       (when-let ((org-timeblock-show-future-repeats)
-					  (value (org-element-property :repeater-value timestamp))
-					  (unit (org-element-property :repeater-unit timestamp))
-					  (start start-ts))
-				 (or
-				  (and (eq unit 'day)
-				       (= value 1)
-				       (if (eq org-timeblock-show-future-repeats 'next)
-					   (org-timeblock-date= (org-timeblock-time-inc 'day 1 start) date)
-					 (and org-timeblock-show-future-repeats
-					      (org-timeblock-date<= start date))))
-				  (progn
-				    (when (eq 'week unit)
-				      (setq value (* value 7)
-					    unit 'day))
-				    (if (eq org-timeblock-show-future-repeats 'next)
-					(setq start (org-timeblock-time-inc unit value start))
-				      (while (org-timeblock-date< start date)
-					(setq start (org-timeblock-time-inc unit value start))))
-				    (org-timeblock-date= start date))))
-			       (when-let ((end-ts (org-timeblock-timestamp-to-time timestamp t)))
-				 (and (org-timeblock-date< start-ts date)
-				      (org-timeblock-date<= date end-ts)))))))
+					   (cdr org-timeblock-scale-options))))))))
 			 entries)))
 		  (let* ((order -1)
 			 (min-hour
@@ -1183,11 +1191,6 @@ If MARKER is nil, use timestamp at point."
 		  title)
 		 'type type
 		 'timestamp timestamp
-		 'hd-marker (or (seq-find (lambda (x) (= x (point))) buffer-markers)
-			     (let ((marker (copy-marker (point) t)))
-			       (setq update-markers-alist-p t)
-			       (push marker buffer-markers)
-			       marker))
 		 'marker marker
 		 'tags tags
 		 'id (org-timeblock-construct-id marker)
@@ -1789,29 +1792,28 @@ SCHEDULED property."
     (when (get-buffer-window org-timeblock-buffer)
       (org-timeblock-redraw-timeblocks))))
 
-;; TODO get type from text properties
-;; TODO hd-marker
 (defun org-timeblock-list-update-entry ()
   "Update text and text properties for the entry at point in *org-timeblock-list*."
   (let ((marker (get-text-property (line-beginning-position) 'marker)) colors)
     (unless (marker-buffer marker)
       (user-error "Non-existent marker's buffer"))
-    (let ((inhibit-read-only t)
-	  (new-entry
-	   (org-with-point-at marker
-	     (let ((timestamp (org-element-timestamp-parser))
-		   (title (org-get-heading t nil t t))
-		   (tags (mapcar #'substring-no-properties (org-get-tags))))
-	       (setq colors (org-timeblock-get-colors tags))
-	       (propertize
-		(concat (org-timeblock--construct-prefix timestamp type)
-			title)
-		'timestamp timestamp
-		'type type
-		'marker marker
-		'tags tags
-		'id (org-timeblock-construct-id marker)
-		'title title)))))
+    (let* ((inhibit-read-only t)
+	   (type (get-text-property (line-beginning-position) 'type))
+	   (new-entry
+	    (org-with-point-at marker
+	      (let ((timestamp (org-element-timestamp-parser))
+		    (title (org-get-heading t nil t t))
+		    (tags (mapcar #'substring-no-properties (org-get-tags))))
+		(setq colors (org-timeblock-get-colors tags))
+		(propertize
+		 (concat (org-timeblock--construct-prefix timestamp type)
+			 title)
+		 'timestamp timestamp
+		 'type type
+		 'marker marker
+		 'tags tags
+		 'id (org-timeblock-construct-id marker)
+		 'title title)))))
       (delete-region (line-beginning-position) (1+ (line-end-position)))
       (insert (propertize
 	       (concat new-entry "\n")
@@ -2219,36 +2221,8 @@ Available view options:
 	(let ((entries
 	       (seq-filter
 		(lambda (x)
-		  (let* ((timestamp (org-timeblock-get-ts-prop x))
-			 (start-ts (org-timeblock-timestamp-to-time
-				    timestamp)))
-		    (or
-		     (and
-		      (member (org-element-property :repeater-type timestamp)
-			      '(restart catch-up))
-		      (org-timeblock-date<= start-ts date))
-		     (and (eq (org-element-property :repeater-type timestamp)
-			      'cumulate)
-			  (when-let ((start start-ts)
-				     (value (org-element-property
-					     :repeater-value timestamp))
-				     (unit
-				      (pcase (org-element-property
-					      :repeater-unit timestamp)
-					(`week
-					 (setq value (* value 7))
-					 'day)
-					((and _ u) u))))
-			    ;; TODO rewrite
-			    (while (org-timeblock-date< start date)
-			      (setq start (org-timeblock-time-inc
-					   unit value start)))
-			    (org-timeblock-date= start date)))
-		     (org-timeblock-date= start-ts date)
-		     (when-let ((end-ts (org-timeblock-timestamp-to-time
-					 timestamp t)))
-		       (and (org-timeblock-date< start-ts date)
-			    (org-timeblock-date<= date end-ts))))))
+		  (org-timeblock--timestamp-relevant-p
+		   (org-timeblock-get-ts-prop x) date))
 		entries)))
 	  (insert
 	   (propertize
