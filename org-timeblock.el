@@ -53,7 +53,7 @@
   :group 'org
   :link '(url-link "https://github.com/ichernyshovvv/org-timeblock"))
 
-(defcustom org-timeblock-show-future-repeats t
+(defcustom org-timeblock-show-future-repeats nil
   "Non-nil shows repeated entries in the future dates of repeat.
 When set to the symbol `next' only the first future repeat is shown."
   :group 'org-timeblock
