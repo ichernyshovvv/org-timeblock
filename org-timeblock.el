@@ -213,7 +213,7 @@ are tagged with a tag in car."
   "T" #'org-timeblock-toggle-timeblock-list
   "t" #'org-timeblock-todo
   "v" #'org-timeblock-switch-scaling
-  "V" #'org-timeblock-switch-view
+  "V" #'org-timeblock-change-span
   "m" #'org-timeblock-mark-block
   "%" #'org-timeblock-mark-by-regexp
   "u" #'org-timeblock-unmark-block
@@ -243,7 +243,7 @@ are tagged with a tag in car."
   "T" #'org-timeblock-list-toggle-timeblock
   "t" #'org-timeblock-todo
   "v" #'org-timeblock-switch-scaling
-  "V" #'org-timeblock-switch-view)
+  "V" #'org-timeblock-change-span)
 
 ;;;; Modes
 
@@ -2192,8 +2192,8 @@ Available view options:
 	    ((and n _) n)))
     (org-timeblock-redraw-timeblocks)))
 
-(defun org-timeblock-switch-view ()
-  "Switch current view to 1-7-days view."
+(defun org-timeblock-change-span ()
+  "Change view span."
   (interactive)
   (let ((cur-date (nth (1- org-timeblock-column)
 		       (org-timeblock-get-dates
