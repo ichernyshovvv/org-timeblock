@@ -77,7 +77,7 @@ When set to the symbol `next' only the first future repeat is shown."
 	  (const :tag "Don't show outline path with prepended file name." nil)
 	  (const :tag "Show outline path." t)))
 
-(defcustom org-timeblock-n-days-view 3
+(defcustom org-timeblock-span 3
   "Number of days displayed in `org-timeblock'."
   :group 'org-timeblock
   :type 'integer)
@@ -252,7 +252,7 @@ are tagged with a tag in car."
   (setq
    org-timeblock-daterange
    (cons (decode-time)
-	 (org-timeblock-time-inc 'day (1- org-timeblock-n-days-view)
+	 (org-timeblock-time-inc 'day (1- org-timeblock-span)
 				 (decode-time)))
    cursor-type nil
    buffer-read-only t)
@@ -1535,7 +1535,7 @@ ARG."
   (switch-to-buffer org-timeblock-list-buffer)
   (setq org-timeblock-daterange
 	(cons (decode-time)
-	      (org-timeblock-time-inc 'day (1- org-timeblock-n-days-view)
+	      (org-timeblock-time-inc 'day (1- org-timeblock-span)
 				      (decode-time))))
   (org-timeblock-redraw-buffers))
 
@@ -1868,7 +1868,7 @@ SCHEDULED property."
       (dom-set-attribute node 'fill org-timeblock-select-color)
       (dom-set-attribute node 'select t))
     (setq org-timeblock-column
-	  (1+ (/ (car pos) (/ window-width org-timeblock-n-days-view))))
+	  (1+ (/ (car pos) (/ window-width org-timeblock-span))))
     (org-timeblock-redisplay)
     (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))))
 
@@ -1991,7 +1991,7 @@ Otherwise, return nil."
 (defun org-timeblock-forward-column ()
   "Select the next column in *org-timeblock* buffer."
   (interactive)
-  (if (= org-timeblock-column org-timeblock-n-days-view)
+  (if (= org-timeblock-column org-timeblock-span)
       (setq org-timeblock-column 1)
     (cl-incf org-timeblock-column))
   (org-timeblock-forward-block)
@@ -2001,7 +2001,7 @@ Otherwise, return nil."
   "Select the next column in *org-timeblock* buffer."
   (interactive)
   (if (= org-timeblock-column 1)
-      (setq org-timeblock-column org-timeblock-n-days-view)
+      (setq org-timeblock-column org-timeblock-span)
     (cl-decf org-timeblock-column))
   (org-timeblock-forward-block)
   (org-timeblock-redisplay))
@@ -2084,7 +2084,7 @@ When called from Lisp, DATE should be a date as returned by
     (setq org-timeblock-daterange
 	  (cons date
 		(org-timeblock-time-inc
-		 'day (1- org-timeblock-n-days-view) date)))
+		 'day (1- org-timeblock-span) date)))
     (org-timeblock-redraw-buffers)))
 
 (defun org-timeblock-day-earlier ()
@@ -2095,7 +2095,7 @@ When called from Lisp, DATE should be a date as returned by
 	 (org-timeblock-time-inc 'day -1 (car org-timeblock-daterange))
 	 (and (cdr org-timeblock-daterange)
 	      (org-timeblock-time-inc 'day -1 (cdr org-timeblock-daterange)))))
-  (unless (= org-timeblock-column org-timeblock-n-days-view)
+  (unless (= org-timeblock-column org-timeblock-span)
     (org-timeblock-forward-column))
   (org-timeblock-redraw-buffers))
 
@@ -2204,7 +2204,7 @@ Available view options:
 		 48)))
     (setq org-timeblock-daterange
 	  (cons cur-date (org-timeblock-time-inc 'day (1- span) cur-date))
-	  org-timeblock-n-days-view span
+	  org-timeblock-span span
 	  org-timeblock-column 1))
   (org-timeblock-redraw-buffers))
 
