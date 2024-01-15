@@ -776,10 +776,9 @@ DATE is decoded-time value."
 		    ;; Drawing current time indicator
 		    (and cur-time-indicator
 			 (org-timeblock-date= (nth iter dates) cur-time)
-			 ;; HERE
 			 (svg-line
 			  org-timeblock-svg
-			  (+ timeline-left-padding (* column-width iter))
+			  (* column-width iter)
 			  cur-time-indicator
 			  (+ column-width (* column-width iter))
 			  cur-time-indicator
