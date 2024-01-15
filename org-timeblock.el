@@ -62,6 +62,14 @@ When set to the symbol `next' only the first future repeat is shown."
 	  (const :tag "Show next repeated entry" next)
 	  (const :tag "Do not show repeated entries" nil)))
 
+(defcustom org-timeblock-files 'agenda
+  "Non-nil shows repeated entries in the future dates of repeat.
+When set to the symbol `next' only the first future repeat is shown."
+  :group 'org-timeblock
+  :type '(choice
+	  (repeat :tag "List of files" file)
+	  (const :tag "Files from (org-agenda-files)" 'agenda)))
+
 (defcustom org-timeblock-show-outline-path nil
   "Non-nil means show outline path in echo area for the selected item."
   :group 'org-timeblock
@@ -1141,6 +1149,11 @@ If MARKER is nil, use timestamp at point."
 	(match-string 0)))
      nil nil 'utf-8)))
 
+(defun org-timeblock-files ()
+  (pcase org-timeblock-files
+    (`agenda (org-agenda-files))
+    ((and list (pred listp)) list)))
+
 (defun org-timeblock-get-buffer-entries-all (buffer)
   "Get all not done and not archived entries with any active timestamp in BUFFER."
   (let (entries tags
@@ -1262,7 +1275,7 @@ Return nil if buffers are up-to-date."
 		   (setf
 		    (alist-get file org-timeblock-buffers nil nil #'equal)
 		    new-modified-tick))))
-	  (org-agenda-files)))))
+	  (org-timeblock-files)))))
     (setq org-timeblock-cache
 	  (sort
 	   (apply
@@ -1583,8 +1596,8 @@ If DATE is nil, use the date in the current view.
 
 The new task is created in `org-timeblock-inbox-file'"
   (interactive)
-  (unless (member org-timeblock-inbox-file (org-agenda-files))
-    (user-error "`org-timeblock-inbox-file' must be present in `org-agenda-files'"))
+  (unless (member org-timeblock-inbox-file (org-timeblock-files))
+    (user-error "`org-timeblock-inbox-file' must be present in `org-timeblock-files'"))
   (let ((title ""))
     (while (string-empty-p title)
       (setq title (read-string "Heading: ")))
