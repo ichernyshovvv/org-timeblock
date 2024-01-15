@@ -182,11 +182,17 @@ are tagged with a tag in car."
   "+" #'org-timeblock-new-task
   "<mouse-1>" #'org-timeblock-select-block-with-cursor
   "<down>" #'org-timeblock-forward-block
-  "<right>" #'org-timeblock-forward-column
-  "<left>" #'org-timeblock-backward-column
+  "n" #'org-timeblock-forward-block
   "<up>" #'org-timeblock-backward-block
-  "C-<down>" #'org-timeblock-day-later
-  "C-<up>" #'org-timeblock-day-earlier
+  "p" #'org-timeblock-backward-block
+  "<right>" #'org-timeblock-forward-column
+  "f" #'org-timeblock-forward-column
+  "<left>" #'org-timeblock-backward-column
+  "b" #'org-timeblock-backward-column
+  "C-<right>" #'org-timeblock-day-later
+  "C-f" #'org-timeblock-day-later
+  "C-<left>" #'org-timeblock-day-earlier
+  "C-b" #'org-timeblock-day-earlier
   "RET" #'org-timeblock-goto
   "TAB" #'org-timeblock-goto-other-window
   "d" #'org-timeblock-set-duration
@@ -208,10 +214,14 @@ are tagged with a tag in car."
 
 (defvar-keymap org-timeblock-list-mode-map
   "+" #'org-timeblock-new-task
-  "<down>" #'org-timeblock-list-next-line
-  "<up>" #'org-timeblock-list-previous-line
-  "C-<down>" #'org-timeblock-day-later
-  "C-<up>" #'org-timeblock-day-earlier
+  "<remap> <next-line>" #'org-timeblock-list-next-line
+  "n" #'org-timeblock-list-next-line
+  "<remap> <previous-line>" #'org-timeblock-list-previous-line
+  "p" #'org-timeblock-list-previous-line
+  "C-<right>" #'org-timeblock-day-later
+  "f" #'org-timeblock-day-later
+  "C-<left>" #'org-timeblock-day-earlier
+  "b" #'org-timeblock-day-earlier
   "C-s" #'org-save-all-org-buffers
   "RET" #'org-timeblock-list-goto
   "TAB" #'org-timeblock-list-goto-other-window
