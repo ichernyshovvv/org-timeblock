@@ -18,15 +18,11 @@
                        #:select? (git-predicate %source-dir)))
    (build-system emacs-build-system)
    (arguments (list #:emacs emacs))
-   (propagated-inputs (list emacs-compat emacs-persist))
+   (propagated-inputs (list emacs-compat))
    (home-page "https://github.com/ichernyshovvv/org-timeblock")
-   (synopsis "Schedule your day visually, using timeblocking technique inside Emacs")
-   (description "The builtin orgmode package for viewing tasks or events
-for a particular day, org-agenda, does not help you to quickly understand,
-where, for example, you have free time in your day or where you have overlapping
-tasks. Just a list of tasks is not sufficient. This package is created to
-fix this problem and provide some of the functionality that modern calendars
-provide.")
+   (synopsis "Timeblocking tool for orgmode inside Emacs")
+   (description "Emacs package that provides interactive multiple-day timeblock
+view for orgmode tasks.")
    (license license:gpl3+)))
 
 emacs-org-timeblock

@@ -68,7 +68,7 @@ When set to the symbol `next' only the first future repeat is shown."
   :group 'org-timeblock
   :type '(choice
 	  (repeat :tag "List of files" file)
-	  (const :tag "Files from (org-agenda-files)" 'agenda)))
+	  (const :tag "Files from (org-agenda-files)" agenda)))
 
 (defcustom org-timeblock-show-outline-path nil
   "Non-nil means show outline path in echo area for the selected item."
@@ -1066,7 +1066,7 @@ Time format is \"HHMM\""
      (null (org-element-property :hour-end timestamp)))))
 
 (defun org-timeblock--construct-prefix (timestamp type)
-  "Construct an entry prefix for *org-timeblock-list* buffer.
+  "Construct prefix for TIMESTAMP of type TYPE.
 
 TIMESTAMP is org-element timestamp object which is used to
 construct a timerange inside the prefix."
@@ -1150,6 +1150,7 @@ If MARKER is nil, use timestamp at point."
      nil nil 'utf-8)))
 
 (defun org-timeblock-files ()
+  "Get a list of files in which tasks are searched."
   (pcase org-timeblock-files
     (`agenda (org-agenda-files))
     ((and list (pred listp)) list)))
@@ -1674,111 +1675,107 @@ Duration format:
 (defun org-timeblock-schedule ()
   "Change the timestamp for selected block or all marked blocks."
   (interactive)
-  (let ((date (nth (1- org-timeblock-column)
-		   (org-timeblock-get-dates
-		    (car org-timeblock-daterange)
-		    (cdr org-timeblock-daterange)))))
-    (if (> org-timeblock-mark-count 0)
-	(let* ((mark-data
-		(sort (dom-search
-		       org-timeblock-svg
-		       (lambda (node) (dom-attr node 'mark)))
-		      (lambda (x y)
-			(cl-macrolet
-			    ((get-ts (x)
-			       `(org-with-point-at
-				    (org-timeblock-get-marker-by-id
-				     (car (split-string (dom-attr ,x 'id) "_")))
-				  (org-timeblock-timestamp-to-time
-				   (org-element-timestamp-parser)))))
-			  (or
-			   (org-timeblock-decoded< (get-ts x) (get-ts y))
-			   (org-timeblock-decoded= (get-ts x) (get-ts y)))))))
-	       (id (car (split-string (dom-attr (car mark-data) 'id) "_")))
-	       (marker (org-timeblock-get-marker-by-id id))
-	       (interval
-		(let* ((choices '(("side-by-side (0 mins between blocks)" ?s 0)
-				  ("save time between blocks" ?b savetime)
-				  ("enter your interval" ?i user-input)))
-		       (answer
-			(read-char-from-minibuffer
-			 (mapconcat
-			  (lambda (x)
-			    (concat
-			     (propertize (char-to-string (cadr x)) 'face 'error)
-			     " " (car x) "\n"))
-			  choices)
-			 (mapcar #'cadr choices))))
-		  (message "")
-		  (pcase (caddr
-			  (seq-find (lambda (x) (eq (cadr x) answer)) choices))
-		    (`user-input (read-number "Interval (minutes): "))
-		    ((and n _) n))))
-	       (prev-timestamp
-		(org-with-point-at marker
-		  (org-element-timestamp-parser)))
-	       (prev-end-or-start-ts
-		(or (org-timeblock-timestamp-to-time prev-timestamp t)
-		    (org-timeblock-timestamp-to-time prev-timestamp)))
-	       (timestamp (org-timeblock--schedule-time marker))
-	       (new-end-or-start-ts
-		(or (org-timeblock-timestamp-to-time timestamp t)
-		    (org-timeblock-timestamp-to-time timestamp))))
-	  (pop mark-data)
-	  (pcase interval
-	    ((pred integerp)
-	     (dolist (block mark-data)
-	       (let* ((id (car (split-string (dom-attr block 'id) "_")))
-		      (marker (org-timeblock-get-marker-by-id id)))
-		 (org-with-point-at marker
-		   (let* ((timestamp (org-element-timestamp-parser))
-			  (start-ts
-			   (org-timeblock-timestamp-to-time timestamp))
-			  (end-ts
-			   (org-timeblock-timestamp-to-time timestamp t))
-			  (duration
-			   (when (and start-ts end-ts)
-			     (org-timeblock-time-diff end-ts start-ts)))
-			  (new-start-ts
+  (if (> org-timeblock-mark-count 0)
+      (let* ((mark-data
+	      (sort (dom-search
+		     org-timeblock-svg
+		     (lambda (node) (dom-attr node 'mark)))
+		    (lambda (x y)
+		      (cl-macrolet
+			  ((get-ts (x)
+			     `(org-with-point-at
+				  (org-timeblock-get-marker-by-id
+				   (car (split-string (dom-attr ,x 'id) "_")))
+				(org-timeblock-timestamp-to-time
+				 (org-element-timestamp-parser)))))
+			(or
+			 (org-timeblock-decoded< (get-ts x) (get-ts y))
+			 (org-timeblock-decoded= (get-ts x) (get-ts y)))))))
+	     (id (car (split-string (dom-attr (car mark-data) 'id) "_")))
+	     (marker (org-timeblock-get-marker-by-id id))
+	     (interval
+	      (let* ((choices '(("side-by-side (0 mins between blocks)" ?s 0)
+				("save time between blocks" ?b savetime)
+				("enter your interval" ?i user-input)))
+		     (answer
+		      (read-char-from-minibuffer
+		       (mapconcat
+			(lambda (x)
+			  (concat
+			   (propertize (char-to-string (cadr x)) 'face 'error)
+			   " " (car x) "\n"))
+			choices)
+		       (mapcar #'cadr choices))))
+		(message "")
+		(pcase (caddr
+			(seq-find (lambda (x) (eq (cadr x) answer)) choices))
+		  (`user-input (read-number "Interval (minutes): "))
+		  ((and n _) n))))
+	     (prev-timestamp
+	      (org-with-point-at marker
+		(org-element-timestamp-parser)))
+	     (prev-end-or-start-ts
+	      (or (org-timeblock-timestamp-to-time prev-timestamp t)
+		  (org-timeblock-timestamp-to-time prev-timestamp)))
+	     (timestamp (org-timeblock--schedule-time marker))
+	     (new-end-or-start-ts
+	      (or (org-timeblock-timestamp-to-time timestamp t)
+		  (org-timeblock-timestamp-to-time timestamp))))
+	(pop mark-data)
+	(pcase interval
+	  ((pred integerp)
+	   (dolist (block mark-data)
+	     (let* ((id (car (split-string (dom-attr block 'id) "_")))
+		    (marker (org-timeblock-get-marker-by-id id)))
+	       (org-with-point-at marker
+		 (let* ((timestamp (org-element-timestamp-parser))
+			(start-ts
+			 (org-timeblock-timestamp-to-time timestamp))
+			(end-ts
+			 (org-timeblock-timestamp-to-time timestamp t))
+			(duration
+			 (when (and start-ts end-ts)
+			   (org-timeblock-time-diff end-ts start-ts)))
+			(new-start-ts
+			 (org-timeblock-time-inc
+			  'minute
+			  interval new-end-or-start-ts))
+			(new-end-ts
+			 (when duration
 			   (org-timeblock-time-inc
-			    'minute
-			    interval new-end-or-start-ts))
-			  (new-end-ts
-			   (when duration
-			     (org-timeblock-time-inc
-			      'minute duration new-start-ts))))
-		     (org-timeblock--schedule new-start-ts new-end-ts)
-		     (setq new-end-or-start-ts
-			   (or new-end-ts new-start-ts)))))))
-	    (`savetime
-	     (dolist (block mark-data)
-	       (let* ((id (car (split-string (dom-attr block 'id) "_")))
-		      (marker (org-timeblock-get-marker-by-id id)))
-		 (org-with-point-at marker
-		   (let* ((timestamp (org-element-timestamp-parser))
-			  (start-ts (org-timeblock-timestamp-to-time
-				     timestamp))
-			  (end-ts (org-timeblock-timestamp-to-time
-				   timestamp t))
-			  (duration
-			   (when (and start-ts end-ts)
-			     (org-timeblock-time-diff end-ts start-ts)))
-			  (int (org-timeblock-time-diff
-				start-ts prev-end-or-start-ts))
-			  (new-start-ts
+			    'minute duration new-start-ts))))
+		   (org-timeblock--schedule new-start-ts new-end-ts)
+		   (setq new-end-or-start-ts
+			 (or new-end-ts new-start-ts)))))))
+	  (`savetime
+	   (dolist (block mark-data)
+	     (let* ((id (car (split-string (dom-attr block 'id) "_")))
+		    (marker (org-timeblock-get-marker-by-id id)))
+	       (org-with-point-at marker
+		 (let* ((timestamp (org-element-timestamp-parser))
+			(start-ts (org-timeblock-timestamp-to-time
+				   timestamp))
+			(end-ts (org-timeblock-timestamp-to-time
+				 timestamp t))
+			(duration
+			 (when (and start-ts end-ts)
+			   (org-timeblock-time-diff end-ts start-ts)))
+			(int (org-timeblock-time-diff
+			      start-ts prev-end-or-start-ts))
+			(new-start-ts
+			 (org-timeblock-time-inc
+			  'minute int new-end-or-start-ts))
+			(new-end-ts
+			 (when duration
 			   (org-timeblock-time-inc
-			    'minute int new-end-or-start-ts))
-			  (new-end-ts
-			   (when duration
-			     (org-timeblock-time-inc
-			      'minute duration new-start-ts))))
-		     (org-timeblock--schedule new-start-ts new-end-ts)
-		     (setq new-end-or-start-ts (or new-end-ts new-start-ts))
-		     (setq prev-end-or-start-ts (or end-ts start-ts)))))))))
-      (when-let ((block (org-timeblock-selected-block))
-		 (marker (org-timeblock-selected-block-marker)))
-	(org-timeblock--schedule-time marker)))
-    (org-timeblock-redraw-buffers)))
+			    'minute duration new-start-ts))))
+		   (org-timeblock--schedule new-start-ts new-end-ts)
+		   (setq new-end-or-start-ts (or new-end-ts new-start-ts))
+		   (setq prev-end-or-start-ts (or end-ts start-ts)))))))))
+    (when-let ((block (org-timeblock-selected-block))
+	       (marker (org-timeblock-selected-block-marker)))
+      (org-timeblock--schedule-time marker)))
+    (org-timeblock-redraw-buffers))
 
 (defun org-timeblock-set-duration ()
   "Interactively change SCHEDULED duration of the selected block.
