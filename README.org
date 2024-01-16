@@ -1,18 +1,18 @@
-#+TITLE: org-timeblock
-
-Schedule your days visually, using [[https://en.wikipedia.org/wiki/Timeblocking][timeblocking technique]] inside Emacs.
+#+html: <div align=center><img src='img/logo.svg'>
+#+html: <h2 align=center>org-timeblock</h2>
+#+html: <p>Emacs package that provides interactive multiple-day timeblock
+#+html: view for orgmode tasks.</p></div>
 
 * Contents
 
-#+html: <img align=right src='./logo.svg'>
-
 - [[#screenshots][Screenshots]]
 - [[#screencast][Screencast]]
-- [[#description][Description]]
+- [[#why][Why I wrote this package]]
 - [[#installation][Installation]]
 - [[#usage][Usage]]
 - [[#customization][Customization]]
 - [[#todos][TODOs]]
+- [[#donations][Donations]]
 - [[#changelog][Changelog]]
 
 * Screenshots
@@ -24,14 +24,14 @@ org-timeblock-mode buffer:
 
 [[file:screenshots/org-timeblock-mode.png]]
 
-You can press ~[t]~ to toggle the display of org-timeblock-list-mode
+You can press ~[T]~ to toggle the display of org-timeblock-list-mode
 buffer.  Foreground colors for timeblocks are generated randomly, but
 you can assign specific background and foreground colors in
 customizable variable ~org-timeblock-tag-colors~: 
 
 [[file:screenshots/org-timeblock-with-list-mode.png]]
 
-You can switch to a multi-day view using ~org-timeblock-switch-view [V]~:
+You can switch to a multi-day view using ~org-timeblock-change-span [V]~:
 
 [[file:screenshots/multi-day-view.png]]
 
@@ -42,44 +42,18 @@ You can switch to a multi-day view using ~org-timeblock-switch-view [V]~:
 
 [[https://youtu.be/lVV9gVp5nxU]]
 
-* Description
+* Why
 :PROPERTIES:
-:CUSTOM_ID: description
+:CUSTOM_ID: why
 :END:
 
-The builtin orgmode package for viewing tasks or events for a
-particular day, org-agenda, does not help you to quickly understand,
-where, for example, you have free time in your day or where you have
-overlapping tasks.  Just a list of tasks is not sufficient.  This
-package is created to fix this problem and provide some of the
-functionality that modern calendars provide.
+The builtin orgmode package for collecting and displaying open
+tasks/events/deadlines relevant for a particular set of dates, org-agenda, does
+not have a timeblock representation which is available in almost all modern
+calendars.
 
-There are two major modes provided by the package:
-
-- ~org-timeblock-mode~.  Displays visual schedule (timeblocks) of org
-  tasks that are scheduled or have an active timestamp in their body
-  (orgmode events) for selected days.  Available commands:
-  - org-timeblock-day-earlier/later ~[C-<down>/<up>]~
-  - org-timeblock-set-duration ~[d]~
-  - org-timeblock-reschedule ~[s]~
-  - org-timeblock-new-task ~[+]~
-  - org-timeblock-toggle-timeblock-list ~[T]~
-  - org-timeblock-clock-in ~[i]~ (to clock out, press ~o~)
-  - org-timeblock-todo ~[t]~
-  - org-timeblock-switch-scaling ~[v]~
-  - org-timeblock-switch-view ~[V]~
-  - org-timeblock-write ~[w]~
-  - org-timeblock-jump-to-day ~[j]~
-
-- ~org-timeblock-list-mode~.  Displays a list of org tasks for selected days.
-  The tasks are sorted by time.
-  - org-timeblock-list-schedule ~[s]~
-  - org-timeblock-list-set-duration ~[d]~
-  - org-timeblock-todo ~[t]~
-  - org-timeblock-list-clock-in ~[i]~ (to clock out, press ~o~)
-  - org-timeblock-switch-scaling ~[v]~
-  - org-timeblock-switch-view ~[V]~
-  - org-timeblock-list-toggle-timeblock ~[T]~
+Sometimes, a list representation (like in org-agenda) is not sufficient, because
+it can be difficult to quickly get an overview of a day or week schedule.
 
 * Installation
 :PROPERTIES:
@@ -142,38 +116,49 @@ Add this form to your init file:
 :CUSTOM_ID: usage
 :END:
 
-To enter ~org-timeblock-list-mode~, run ~M-x org-timeblock-list~.  To
-enter ~org-timeblock-mode~, run ~M-x org-timeblock~
+There are two major modes provided by the package:
 
-For both modes, the default date is today.  All the tasks and events
-are searched in ~(org-agenda-files)~.  You can change the displayed
-date via the following commands:
+- ~org-timeblock-mode~.  Displays timeblock view of ~SCHEDULED/DEADLINE~ org
+  tasks or events (entries that have active timestamps in the body or heading)
+  for specific days.
+- ~org-timeblock-list-mode~.  Displays a list of tasks (including those that are
+  not time-specific).
 
-- org-timeblock-day-later ~[C-<down>]~
-- org-timeblock-day-earlier ~[C-<up>]~
-- org-timeblock-jump-to-day ~[j]~
+Run ~M-x org-timeblock~ to open 3-day view that starts from today's date.  The
+default days span can be customized via ~org-timeblock-span~ variable.  In the
+view you will see only entries that have time specified in their timestamps.  To
+see other found tasks/events (entries that have timestamps without time), press
+~T~ (M-x org-timeblock-toggle-timeblock-list).
 
-To navigate between tasks/blocks, use these commands:
+Tasks and events are searched in ~org-timeblock-files~ which defaults to
+~(org-agenda-files)~.
 
-- org-timeblock-list-mode
-  - org-timeblock-list-previous-line ~[<up>]~
-  - org-timeblock-list-next-line ~[<down>]~
-- org-timeblock-mode
-  - org-timeblock-forward-block ~[<down>]~
-  - org-timeblock-bacward-block ~[<up>]~
+To navigate between the blocks, use ~[fbpn]~, arrow keys or mouse (yes, the
+blocks are clickable).
 
-In both modes, you can navigate via mouse clicks to select an entry or
-a block.
+To open other dates, you can run the following the following commands:
 
-To reschedule or change the duration of a task at point, use these
-commands:
+- org-timeblock-day-later ~[C-<right> / C-f]~
+- org-timeblock-day-earlier ~[C-<left> / C-b]~
+- org-timeblock-jump-to-day ~j~
+- org-timeblock-change-span ~V~
 
-- org-timeblock-list-mode
-  - org-timeblock-list-schedule ~[s]~
-  - org-timeblock-list-set-duration ~[d]~
-- org-timeblock-mode
-  - org-timeblock-schedule ~[s]~
-  - org-timeblock-set-duration ~[d]~
+To reschedule or change the duration of the task bound to the selected block,
+use these commands:
+
+- org-timeblock-schedule ~s~
+- org-timeblock-set-duration ~d~
+
+Also, you can mark the blocks and operate on them via ~M-x org-timeblock-schedule [s]~:
+- org-timeblock-mark-block ~m~
+- org-timeblock-mark-by-regexp ~%~
+- org-timeblock-unmark-block ~u~
+- org-timeblock-unmark-all-blocks ~U~
+
+If you want to add a new task, press ~+~ (M-x org-timeblock-new-task).
+
+Almost all commands with the same bindings are available in
+~org-timeblock-list~.
 
 * Customization
 :PROPERTIES:
@@ -188,6 +173,23 @@ commands:
 :END:
 - [ ] Implement caching mechanism for SVG data
 - [ ] Improve timeblocks layout algorithm
+- [ ] Split each column into a separate SVG image to improve the speed of
+  ~*org-timeblock*~ buffer redisplay
+- [ ] Create timeblock.el library that could be used for iCalendar and other
+  time data
+
+* Donations
+:PROPERTIES:
+:CUSTOM_ID: donations
+:END:
+#+html: <div align=center>
+#+html: <img src=img/monero-logo.png>
+~444GDw7rkd3Mj5hi6ZzEXZ4QN565TFw4J5ithFcywsMnJn7dFsxWTEQ4vtSMQC1sckFBu7neS8yZZRLnY8EYpS4UNMEAvpL~
+#+html: <img src=img/monero-qr-address.png><br><hr>
+#+html: <img src='https://magit.vc/assets/donate/liberapay-50px.png'><br>
+#+html: <a href="https://liberapay.com/ichernyshovvv">liberapay.com/ichernyshovvv</a>
+#+html: </div>
+
 * Changelog
 :PROPERTIES:
 :CUSTOM_ID: changelog
