@@ -197,3 +197,15 @@ Almost all commands with the same bindings are available in
 
 ** 0.1
 First tagged release.
+** 0.2
+- Added mark commands (~mark-block~, ~unmark-block~, ~mark-by-regexp~) for
+  timeblocks that can be used to reschedule multiple tasks at once
+- Replaced ts.el with built-in time API
+- Replaced org-ql with own searching and caching functions
+- dom.el is now used instead of regexps to fetch and change SVG data (much
+  cleaner code)
+- Deadline timestamps are now treated as it should be, not as events
+- Now, each active timestamp in a heading body is displayed (as event), not only
+  the first one
+- Added custom variable org-timeblock-files
+- Other minor bug fixes and improvements 8)
