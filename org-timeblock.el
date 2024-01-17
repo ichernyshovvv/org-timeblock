@@ -1775,7 +1775,7 @@ Duration format:
     (when-let ((block (org-timeblock-selected-block))
 	       (marker (org-timeblock-selected-block-marker)))
       (org-timeblock--schedule-time marker)))
-    (org-timeblock-redraw-buffers))
+  (org-timeblock-redraw-buffers))
 
 (defun org-timeblock-set-duration ()
   "Interactively change SCHEDULED duration of the selected block.
@@ -2278,7 +2278,11 @@ SVG image (.svg), PDF (.pdf) is produced."
 		   (not (y-or-n-p
 			 (format "Overwrite existing file %s? " file))))))
       (user-error "Cannot write agenda to file %s" file))
-  (let ((file (expand-file-name file)))
+  (org-timeblock-unselect-block)
+  (let ((file (expand-file-name file))
+	(svg (copy-sequence org-timeblock-svg)))
+    ;; delete marker to not trigger `svg-possibly-update-image'
+    (dom-remove-attribute svg :image)
     (with-temp-buffer
       (let* ((dates (org-timeblock-get-dates
 		     (car org-timeblock-daterange)
@@ -2292,7 +2296,7 @@ SVG image (.svg), PDF (.pdf) is produced."
 		((pred (< 6)) "[%m-%d]")
 		((pred (< 3)) "[%d]"))))
 	(dom-add-child-before
-	 org-timeblock-svg
+	 svg
 	 (dom-node
 	  'rect
 	  (list
@@ -2303,11 +2307,11 @@ SVG image (.svg), PDF (.pdf) is produced."
 	   (cons 'fill (face-attribute 'default :background)))))
 	(dotimes (iter (length dates))
 	  (svg-text
-	   org-timeblock-svg (org-timeblock-format-time date-format (nth iter dates))
+	   svg (org-timeblock-format-time date-format (nth iter dates))
 	   :y org-timeblock-svg-height
 	   :x (+ 5 (* (/ org-timeblock-svg-width (length dates)) iter))
 	   :fill (face-attribute 'default :foreground)))
-	(svg-print org-timeblock-svg))
+	(svg-print svg))
       (pcase (file-name-extension file)
 	((or "pdf" "png")
 	 (unless (executable-find "inkscape")
