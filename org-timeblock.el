@@ -1266,6 +1266,8 @@ Return nil if buffers are up-to-date."
       ((buffers-to-update
 	(mapcar
 	 #'find-file-noselect
+	 ;; This code is partially borrowed from `org-ql--select-cached'
+	 ;; function which is part of org-ql project written by Adam Porter
 	 (seq-filter
 	  (lambda (file)
 	    (let* ((buffer (find-file-noselect file))
@@ -1633,6 +1635,8 @@ SLOT should be specified as a plain symbol, not a keyword."
 (cl-defun org-timeblock-time-apply (time &key second minute hour
 					 day month year)
   "Return new timestamp based on TIME with new slot values from keys."
+  ;; This code is borrowed from `ts-apply' function which is part of ts.el
+  ;; project written by Adam Porter
   (let ((time (copy-sequence time)))
     (when second
       (setf (decoded-time-second time) second))
