@@ -1,7 +1,7 @@
 ;; -*- lexical-binding: t; -*-
-
-(require 'buttercup)
+(add-to-list 'load-path (expand-file-name "."))
 (require 'org-timeblock)
+(require 'ert)
 
 ;; The code is borrowed from `org-test-with-temp-text' which is a macro from
 ;; org-test.el
@@ -40,3 +40,6 @@ otherwise place the point at the beginning of the inserted text."
        (delete-file org-file)
        (and (get-file-buffer org-file)
 	    (kill-buffer (get-file-buffer org-file))))))
+
+(dolist (file (directory-files "test" t "^test-"))
+  (load file))

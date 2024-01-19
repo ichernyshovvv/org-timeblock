@@ -17,7 +17,10 @@
                        #:recursive? #t
                        #:select? (git-predicate %source-dir)))
    (build-system emacs-build-system)
-   (arguments (list #:emacs emacs))
+   (arguments `(#:tests? #t
+		#:test-command '("emacs" "--batch"
+				 "-l" "test/org-timeblock-test.el"
+				 "-f" "ert-run-tests-batch-and-exit")))
    (propagated-inputs (list emacs-compat))
    (home-page "https://github.com/ichernyshovvv/org-timeblock")
    (synopsis "Timeblocking tool for orgmode inside Emacs")
