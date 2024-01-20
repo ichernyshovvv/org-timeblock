@@ -143,6 +143,18 @@
   "Face used for hour lines."
   :group 'org-timeblock)
 
+(defface org-timeblock-current-time-indicator
+  '((default :extend t)
+    (((class color)
+      (min-colors 88)
+      (background light))
+     :background "red")
+    (((class color) (min-colors 88) (background dark))
+     :background "red")
+    (t :inverse-video t))
+  "Color face used for current time indicator."
+  :group 'org-timeblock)
+
 ;;;; Custom Variables
 
 (defgroup org-timeblock nil
@@ -828,7 +840,9 @@ DATE is decoded-time value."
 			  cur-time-indicator
 			  (+ column-width (* column-width iter))
 			  cur-time-indicator
-			  :stroke "red"))
+			  :stroke (face-attribute
+				   'org-timeblock-current-time-indicator
+				   :background nil t)))
 		    ;; Drawing all the entries inside the timeline
 		    (dolist (entry entries)
 		      (when-let ((length
