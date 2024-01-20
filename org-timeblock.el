@@ -46,6 +46,18 @@
   "Face used in org-timeblock-list for dates."
   :group 'org-timeblock)
 
+(defface org-timeblock-select
+  '((default :extend t)
+    (((class color)
+      (min-colors 88)
+      (background light))
+     :background "#f3d000")
+    (((class color) (min-colors 88) (background dark))
+     :background "#3f1651")
+    (t :inverse-video t))
+  "Face used for selected blocks."
+  :group 'org-timeblock)
+
 ;;;; Custom Variables
 
 (defgroup org-timeblock nil
@@ -149,13 +161,8 @@ are tagged with a tag in car."
 
 (defvar org-timeblock-mark-count 0)
 
-(defvar org-timeblock-select-color-light "#f3d000")
-
-(defvar org-timeblock-select-color-dark "#3f1651")
-
-(defvar org-timeblock-select-color org-timeblock-select-color-light)
-
-(defvar org-timeblock-background-color (face-attribute 'default :background))
+(defvar org-timeblock-background-color
+  (face-attribute 'default :background))
 
 (defvar org-timeblock-colors nil)
 
@@ -445,7 +452,10 @@ Compare only hours and minutes."
     (org-timeblock-unselect-block)
     (when-let ((node (car (dom-by-id org-timeblock-svg id))))
       (dom-set-attribute node 'orig-fill (dom-attr node 'fill))
-      (dom-set-attribute node 'fill org-timeblock-select-color)
+      (dom-set-attribute
+       node 'fill
+       (face-attribute
+	'org-timeblock-select :background))
       (dom-set-attribute node 'select t)
       (setq org-timeblock-column (dom-attr node 'column)))
     (with-current-buffer org-timeblock-buffer
@@ -633,14 +643,6 @@ DATE is decoded-time value."
 				    (alist-get title org-timeblock-colors nil nil #'equal)))
 			    (setq org-timeblock-background-color
 				  (face-attribute 'default :background))
-			    (setq org-timeblock-select-color
-				  (if (> (setq bg-rgb-sum
-					       (apply #'+
-						      (org-timeblock--parse-hex-color
-						       org-timeblock-background-color)))
-					 550)
-				      org-timeblock-select-color-light
-				    org-timeblock-select-color-dark))
 			    (lambda (title)
 			      (setf (alist-get title org-timeblock-colors
 					       nil nil #'equal)
@@ -981,7 +983,7 @@ DATE is decoded-time value."
 			     (org-timeblock-format-time date-format (nth iter dates)))
 		     'face
 		     (and (= org-timeblock-column (1+ iter))
-			  `(:background ,org-timeblock-select-color)))))
+			  'org-timeblock-select))))
 		result))))
     (svg-possibly-update-image org-timeblock-svg)))
 
@@ -1866,7 +1868,10 @@ SCHEDULED property."
 			       (> (cdr pos) y))))))))
       (unless (dom-attr node 'mark)
 	(dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
-      (dom-set-attribute node 'fill org-timeblock-select-color)
+      (dom-set-attribute
+       node 'fill
+       (face-attribute
+	'org-timeblock-select :background))
       (dom-set-attribute node 'select t))
     (setq org-timeblock-column
 	  (1+ (/ (car pos) (/ window-width org-timeblock-span))))
@@ -1984,7 +1989,10 @@ Otherwise, return nil."
 					   (= (dom-attr node 'order) 0))))))))
     (unless (dom-attr node 'mark)
       (dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
-    (dom-set-attribute node 'fill org-timeblock-select-color)
+    (dom-set-attribute
+     node 'fill
+     (face-attribute
+      'org-timeblock-select :background))
     (dom-set-attribute node 'select t)
     (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
     (org-timeblock-redisplay) t))
@@ -2051,7 +2059,10 @@ Return t on success, otherwise - nil."
 			       (= (dom-attr node 'order) (1- len))))))))))
     (unless (dom-attr node 'mark)
       (dom-set-attribute node 'orig-fill (dom-attr node 'fill)))
-    (dom-set-attribute node 'fill org-timeblock-select-color)
+    (dom-set-attribute
+     node 'fill
+     (face-attribute
+      'org-timeblock-select :background))
     (dom-set-attribute node 'select t)
     (org-timeblock-show-olp-maybe (org-timeblock-selected-block-marker))
     (org-timeblock-redisplay) t))
