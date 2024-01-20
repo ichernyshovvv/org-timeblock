@@ -35,7 +35,6 @@
 
 (require 'org)
 (require 'svg)
-(require 'color)
 (require 'seq)
 (require 'compat)
 (require 'compat-macs)
@@ -241,9 +240,6 @@ are tagged with a tag in car."
 (defvar org-timeblock-buffers nil)
 
 (defvar org-timeblock-mark-count 0)
-
-(defvar org-timeblock-background-color
-  (face-attribute 'default :background))
 
 (defvar org-timeblock-colors nil)
 
@@ -507,6 +503,14 @@ Compare only hours and minutes."
   "Return ITEM's \\='timestamp text property as decoded time."
   (org-timeblock-timestamp-to-time (org-timeblock-get-ts-prop item)))
 
+(defsubst org-timeblock-get-saved-random-face (title)
+  "Get saved random color face for TITLE.
+If not found, generate it with `org-timeblock--random-color',
+save it and return."
+  (or (alist-get title org-timeblock-colors nil nil #'equal)
+      (setf (alist-get title org-timeblock-colors nil nil #'equal)
+	    (org-timeblock--random-color))))
+
 (defun org-timeblock-timestamp< (a b)
   "Return t, if A's \\='timestamp is less then B's."
   (org-timeblock-on org-timeblock-get-ts org-timeblock-time< a b))
@@ -561,51 +565,15 @@ Otherwise, return nil.
 	(< y1 y2)
 	(< y2 y1-end))))))
 
-(defun org-timeblock--parse-hex-color (hex)
-  "Convert a HEX color code to a RGB list of form (R G B)."
-  (cl-loop for scale in (color-name-to-rgb hex) collect (* scale 255)))
-
 (defun org-timeblock--random-color ()
-  "Generate random color based on BASE-COLOR and RANGE.
-Default background color is used when BASE-COLOR is nil."
-  (let* ((default-background-color
-	  (ignore-errors (face-attribute 'default :background)))
-	 (base-color
-          (cond ((eq 'unspecified default-background-color)
-                 "#fff")
-		((string-match "^#[0-9a-fA-F]\\{3,6\\}" default-background-color)
-                 default-background-color)
-		((color-name-to-rgb default-background-color) ;; yellow, LightBlue, etc...
-                 default-background-color)
-		(t "#fff")))
-	 (range 50))
-    (when (color-name-to-rgb base-color)
-      (let (rgb (hex "#"))
-	(mapc (lambda (x)
-		(setq rgb (cons (round (* x 255)) rgb)))
-	      (color-name-to-rgb base-color))
-	(setq rgb (nreverse rgb))
-	(mapc (lambda (x)
-		(setq hex (concat hex (format "%02x" x))))
-	      rgb)
-	(setq base-color hex)))
-    (let* ((rgb (org-timeblock--parse-hex-color base-color))
-           (half-range (/ range 2))
-           (fn (lambda (n)
-		 (let ((base (nth n rgb))
-                       (min half-range)
-                       (max (- 255 half-range))
-                       result)
-                   (when (< base min) (setq base min))
-                   (when (> base max) (setq base max))
-                   (setq result (+ (- (cl-random range) half-range) base))
-                   (when (< result 0) (setq result 0))
-                   (when (> result 255) (setq result 255))
-                   result)))
-           (r (funcall fn 0))
-           (g (funcall fn 1))
-           (b (funcall fn 2)))
-      (format "#%02x%02x%02x" r g b))))
+  "Return random org-timeblock color face."
+  (seq-random-elt
+   '(org-timeblock-red
+     org-timeblock-green
+     org-timeblock-yellow
+     org-timeblock-blue
+     org-timeblock-magenta
+     org-timeblock-cyan)))
 
 (defun org-timeblock--timestamp-relevant-p (timestamp date)
   "Check if org-element TIMESTAMP is relevant to DATE.
@@ -715,18 +683,6 @@ DATE is decoded-time value."
 			 (columns
 			  (mapcar (lambda (x) (cons (get-text-property 0 'id x) 1)) entries))
 			 placed
-			 (get-color
-			  (if (string= org-timeblock-background-color
-				       (face-attribute 'default :background))
-			      (lambda (title)
-				(cl-callf (lambda (x) (or x (org-timeblock--random-color)))
-				    (alist-get title org-timeblock-colors nil nil #'equal)))
-			    (setq org-timeblock-background-color
-				  (face-attribute 'default :background))
-			    (lambda (title)
-			      (setf (alist-get title org-timeblock-colors
-					       nil nil #'equal)
-				    (org-timeblock--random-color)))))
 			 (hour-lines-color
 			  (face-attribute 'org-timeblock-hours-line :background nil t)))
 		    (dolist (entry entries)
@@ -963,11 +919,12 @@ DATE is decoded-time value."
 			   :fill
 			   (or
 			    (and
-			     (eq 'deadline
-				 (org-timeblock-get-ts-type entry))
+			     (eq 'deadline (org-timeblock-get-ts-type entry))
 			     "#5b0103")
 			    (and face (face-attribute face :background nil 'default))
-			    (funcall get-color title))
+			    (face-attribute
+			     (org-timeblock-get-saved-random-face title)
+			     :background nil 'default))
 			   ;; Same timestamp can be displayed in multiple
 			   ;; columns, so _column-number postfix is used to tell
 			   ;; that blocks apart
@@ -984,11 +941,12 @@ DATE is decoded-time value."
 					:fill
 					(or
 					 (and
-					  (eq 'deadline
-					      (org-timeblock-get-ts-type entry))
+					  (eq 'deadline (org-timeblock-get-ts-type entry))
 					  "#ffffff")
 					 (and face (face-attribute face :foreground nil 'default))
-					 (face-attribute 'default :foreground))
+					 (face-attribute
+					  (org-timeblock-get-saved-random-face title)
+					  :foreground nil 'default))
 					:font-size
 					(aref (font-info (face-font 'default)) 2))))
 			  (when time-string
