@@ -58,6 +58,18 @@
   "Face used for selected blocks."
   :group 'org-timeblock)
 
+(defface org-timeblock-mark
+  '((default :extend t)
+    (((class color)
+      (min-colors 88)
+      (background light))
+     :background "#7b435c")
+    (((class color) (min-colors 88) (background dark))
+     :background "#7b435c")
+    (t :inverse-video t))
+  "Face used for marked blocks."
+  :group 'org-timeblock)
+
 (defface org-timeblock-hours-line
   '((default :extend t)
     (((class color)
@@ -164,8 +176,6 @@ are tagged with a tag in car."
   :group 'org-timeblock)
 
 ;;;; Variables
-
-(defvar org-timeblock-mark-color "#7b435c")
 
 (defvar org-timeblock-markers nil)
 
@@ -1900,7 +1910,8 @@ Otherwise, return nil."
     (dom-set-attribute
      node
      'fill (if (dom-attr node 'mark)
-	       org-timeblock-mark-color
+	       (face-attribute
+		'org-timeblock-mark :background)
 	     (or (dom-attr node 'orig-fill) "#ffffff")))
     (dom-remove-attribute node 'select)
     (cons (dom-attr node 'order)
@@ -1927,7 +1938,10 @@ Otherwise, return nil."
   (interactive)
   (when-let ((node (org-timeblock-selected-block))
 	     ((not (dom-attr node 'mark))))
-    (dom-set-attribute node 'fill org-timeblock-mark-color)
+    (dom-set-attribute
+     node 'fill
+     (face-attribute
+      'org-timeblock-mark :background))
     (dom-set-attribute node 'mark t)
     (cl-incf org-timeblock-mark-count))
   (org-timeblock-forward-block))
@@ -1945,7 +1959,10 @@ Otherwise, return nil."
     (when-let ((id (get-text-property 0 'id entry))
 	       (node (car (dom-by-id org-timeblock-svg id))))
       (dom-set-attribute node 'orig-fill (dom-attr node 'fill))
-      (dom-set-attribute node 'fill org-timeblock-mark-color)
+      (dom-set-attribute
+       node 'fill
+       (face-attribute
+	'org-timeblock-mark :background))
       (dom-set-attribute node 'mark t)
       (cl-incf org-timeblock-mark-count)))
   (org-timeblock-redisplay))
