@@ -42,6 +42,68 @@
 
 ;;;; Faces
 
+;; The colors are borrowed from pulsar.el project written by Protesilaos Stavrou
+
+(defface org-timeblock-red
+  '((default :extend t)
+    (((class color) (min-colors 88) (background light))
+     :background "#ffcccc" :foreground "#77002a")
+    (((class color) (min-colors 88) (background dark))
+     :background "#77002a" :foreground "#ffcccc")
+    (t :inverse-video t))
+  "Red face."
+  :group 'org-timeblock)
+
+(defface org-timeblock-green
+  '((default :extend t)
+    (((class color) (min-colors 88) (background light))
+     :background "#aceaac" :foreground "#00422a")
+    (((class color) (min-colors 88) (background dark))
+     :background "#00422a" :foreground "#aceaac")
+    (t :inverse-video t))
+  "Green face."
+  :group 'org-timeblock)
+
+(defface org-timeblock-yellow
+  '((default :extend t)
+    (((class color) (min-colors 88) (background light))
+     :background "#fff29a" :foreground "#693200")
+    (((class color) (min-colors 88) (background dark))
+     :background "#693200" :foreground "#fff29a")
+    (t :inverse-video t))
+  "Yellow face."
+  :group 'org-timeblock)
+
+(defface org-timeblock-blue
+  '((default :extend t)
+    (((class color) (min-colors 88) (background light))
+     :background "#8fcfff" :foreground "#242679")
+    (((class color) (min-colors 88) (background dark))
+     :background "#242679" :foreground "#8fcfff")
+    (t :inverse-video t))
+  "Blue face."
+  :group 'org-timeblock)
+
+(defface org-timeblock-magenta
+  '((default :extend t)
+    (((class color) (min-colors 88) (background light))
+     :background "#ffccff" :foreground "#71206a")
+    (((class color) (min-colors 88) (background dark))
+     :background "#71206a" :foreground "#ffccff")
+    (t :inverse-video t))
+  "Magenta face."
+  :group 'org-timeblock)
+
+(defface org-timeblock-cyan
+  '((default :extend t)
+    (((class color) (min-colors 88) (background light))
+     :background "#8eecf4" :foreground "#004065")
+    (((class color) (min-colors 88) (background dark))
+     :background "#004065" :foreground "#8eecf4")
+    (t :inverse-video t))
+  "Cyan face."
+  :group 'org-timeblock)
+
 (defface org-timeblock-list-header '((t (:inherit org-agenda-structure)))
   "Face used in org-timeblock-list for dates."
   :group 'org-timeblock)
