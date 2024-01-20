@@ -58,6 +58,18 @@
   "Face used for selected blocks."
   :group 'org-timeblock)
 
+(defface org-timeblock-hours-line
+  '((default :extend t)
+    (((class color)
+      (min-colors 88)
+      (background light))
+     :background "#7b435c")
+    (((class color) (min-colors 88) (background dark))
+     :background "#cdcdcd")
+    (t :inverse-video t))
+  "Face used for hour lines."
+  :group 'org-timeblock)
+
 ;;;; Custom Variables
 
 (defgroup org-timeblock nil
@@ -634,7 +646,6 @@ DATE is decoded-time value."
 			 (columns
 			  (mapcar (lambda (x) (cons (get-text-property 0 'id x) 1)) entries))
 			 placed
-			 (bg-rgb-sum (apply #'+ (org-timeblock--parse-hex-color org-timeblock-background-color)))
 			 (get-color
 			  (if (string= org-timeblock-background-color
 				       (face-attribute 'default :background))
@@ -648,7 +659,7 @@ DATE is decoded-time value."
 					       nil nil #'equal)
 				    (org-timeblock--random-color)))))
 			 (hour-lines-color
-			  (if (> bg-rgb-sum 550) "#7b435c" "#cdcdcd")))
+			  (face-attribute 'org-timeblock-hours-line :background)))
 		    (dolist (entry entries)
 		      (let* ((timestamp (org-timeblock-get-ts-prop entry))
 			     (repeated (org-element-property
