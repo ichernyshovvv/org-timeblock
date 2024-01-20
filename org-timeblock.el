@@ -159,18 +159,15 @@ When set to the symbol `next' only the first future repeat is shown."
 
 (defcustom org-timeblock-tag-colors
   nil
-  "Colors for specific tags.
+  "Faces for specific tags.
 
-List of lists where each list is of the form
-  (\"tagname\" \"background color\" \"foreground color\").
-Colors are set in hex format.  Example:
-
-  ((\"tag1\" \"#f3d000\" \"#000000\")
-   (\"tag2\" \"#ff8f88\" \"#000000\"))
+Alist of the form
+  ((\"tag1\" . face-1)
+   (\"tag2\" . face-2)).
 
 In `org-timeblock-mode', timeblocks tagged with a tag in car are
-painted in background color.  In `org-timeblock-list-mode', both
-background and foreground colors are used to colorize items that
+painted in :background color of the face in cdr.  In
+`org-timeblock-list-mode', faces are used to colorize items that
 are tagged with a tag in car."
   :type 'list
   :group 'org-timeblock)
@@ -669,7 +666,7 @@ DATE is decoded-time value."
 					       nil nil #'equal)
 				    (org-timeblock--random-color)))))
 			 (hour-lines-color
-			  (face-attribute 'org-timeblock-hours-line :background)))
+			  (face-attribute 'org-timeblock-hours-line :background nil t)))
 		    (dolist (entry entries)
 		      (let* ((timestamp (org-timeblock-get-ts-prop entry))
 			     (repeated (org-element-property
@@ -865,8 +862,8 @@ DATE is decoded-time value."
 				    `(,title))))
 			(let ((time-string
 			       (get-text-property 0 'time-string entry))
-			      (colors (org-timeblock-get-colors
-				       (get-text-property 0 'tags entry))))
+			      (face (org-timeblock-get-colors
+				     (get-text-property 0 'tags entry))))
 			  (when (< (/ block-width (default-font-width))
 				   (length time-string))
 			    (setq time-string nil))
@@ -905,8 +902,10 @@ DATE is decoded-time value."
 			   (or
 			    (and
 			     (eq 'deadline
-				 (org-timeblock-get-ts-type entry)) "#5b0103")
-			    (car colors) (funcall get-color title))
+				 (org-timeblock-get-ts-type entry))
+			     "#5b0103")
+			    (and face (face-attribute face :background nil 'default))
+			    (funcall get-color title))
 			   ;; Same timestamp can be displayed in multiple
 			   ;; columns, so _column-number postfix is used to tell
 			   ;; that blocks apart
@@ -926,7 +925,7 @@ DATE is decoded-time value."
 					  (eq 'deadline
 					      (org-timeblock-get-ts-type entry))
 					  "#ffffff")
-					 (cadr colors)
+					 (and face (face-attribute face :foreground nil 'default))
 					 (face-attribute 'default :foreground))
 					:font-size
 					(aref (font-info (face-font 'default)) 2))))
@@ -942,7 +941,8 @@ DATE is decoded-time value."
 					(eq 'deadline
 					    (org-timeblock-get-ts-type entry))
 					"#ffffff")
-				       (cadr colors) hour-lines-color)
+				       (and face (face-attribute face :foreground nil 'default))
+				       hour-lines-color)
 				      :font-size
 				      (aref (font-info (face-font 'default)) 2)))))))
 		(let ((message "No data."))
@@ -1318,8 +1318,7 @@ Return nil if buffers are up-to-date."
     t))
 
 (defun org-timeblock-get-colors (tags)
-  "Return the colors for TAGS.
-Return value is of the form (\"background color\" \"foreground color\")."
+  "Return face for TAGS."
   (catch 'found
     (dolist (tag tags)
       (when-let ((colors (cdr (seq-find (lambda (x) (string= (car x) tag))
@@ -1839,17 +1838,17 @@ SCHEDULED property."
 
 (defun org-timeblock-list-update-entry ()
   "Update text and text properties for the entry at point in *org-timeblock-list*."
-  (let ((marker (get-text-property (line-beginning-position) 'marker)) colors)
+  (let ((marker (get-text-property (line-beginning-position) 'marker)))
     (unless (marker-buffer marker)
       (user-error "Non-existent marker's buffer"))
     (let* ((inhibit-read-only t)
 	   (type (get-text-property (line-beginning-position) 'type))
+	   tags
 	   (new-entry
 	    (org-with-point-at marker
 	      (let ((timestamp (org-element-timestamp-parser))
-		    (title (org-get-heading t nil t t))
-		    (tags (mapcar #'substring-no-properties (org-get-tags))))
-		(setq colors (org-timeblock-get-colors tags))
+		    (title (org-get-heading t nil t t)))
+		(setq tags (mapcar #'substring-no-properties (org-get-tags)))
 		(propertize
 		 (concat (org-timeblock--construct-prefix timestamp type)
 			 title)
@@ -1863,9 +1862,7 @@ SCHEDULED property."
       (insert (propertize
 	       (concat new-entry "\n")
 	       'face
-	       `(:extend t ,@(and (car colors) (list :background (car colors)))
-			 ,@(and (cadr colors)
-				(list :foreground (cadr colors)))))))))
+	       (org-timeblock-get-colors tags))))))
 
 ;;;; Navigation commands
 
@@ -2293,15 +2290,11 @@ Available view options:
 	    'face 'org-timeblock-list-header))
 	  (insert "\n")
 	  (dolist (entry entries)
-	    (let ((colors (org-timeblock-get-colors
-			   (get-text-property 0 'tags entry))))
-	      (insert (propertize
-		       (concat entry "\n")
-		       'face
-		       `(:extend t ,@(and (car colors)
-					  (list :background (car colors)))
-				 ,@(and (cadr colors)
-					(list :foreground (cadr colors))))))))
+	    (insert (propertize
+		     (concat entry "\n")
+		     'face
+		     (org-timeblock-get-colors
+		      (get-text-property 0 'tags entry)))))
 	  (goto-char (point-max))))
       (goto-char (point-min))
       (when (get-buffer-window org-timeblock-buffer)
