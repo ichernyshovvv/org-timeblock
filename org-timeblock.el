@@ -1222,7 +1222,7 @@ If MARKER is nil, use timestamp at point."
     (with-current-buffer buffer
       (org-with-wide-buffer
        (goto-char (point-min))
-       (while (re-search-forward org-ts-regexp nil t)
+       (while (re-search-forward org-tsr-regexp nil t)
 	 (if (save-match-data
 	       (or (org-entry-is-done-p)
 		   (progn
