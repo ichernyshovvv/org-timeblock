@@ -280,6 +280,9 @@ are tagged with a tag in car."
 (defvar org-timeblock-list-buffer "*org-timeblock-list*"
   "The name of the buffer displaying the list of tasks and events.")
 
+
+(defvar org-timeblock-keep-done nil)
+
 ;;;; Keymaps
 
 (defvar-keymap org-timeblock-mode-map
@@ -314,6 +317,7 @@ are tagged with a tag in car."
   "%" #'org-timeblock-mark-by-regexp
   "u" #'org-timeblock-unmark-block
   "U" #'org-timeblock-unmark-all-blocks
+  "a" #'org-timeblock-show-all
   "w" #'org-timeblock-write)
 
 (defvar-keymap org-timeblock-list-mode-map
@@ -1215,70 +1219,71 @@ If MARKER is nil, use timestamp at point."
 (defun org-timeblock-get-buffer-entries-all (buffer)
   "Get all not done and not archived entries with any active timestamp in BUFFER."
   (let (entries tags
-		update-markers-alist-p
-		(buffer-markers
-		 (alist-get buffer
-			    org-timeblock-markers nil nil #'equal)))
+		        update-markers-alist-p
+		        (buffer-markers
+		         (alist-get buffer
+			                org-timeblock-markers nil nil #'equal)))
     (with-current-buffer buffer
       (org-with-wide-buffer
        (goto-char (point-min))
        (while (re-search-forward org-tsr-regexp nil t)
-	 (if (save-match-data
-	       (or (org-entry-is-done-p)
-		   (progn
-		     (setq tags
-			   (mapcar #'substring-no-properties
-				   (org-get-tags)))
-		     (member org-archive-tag tags))))
-	     (org-get-next-sibling)
-	   (when-let
-	       ((timestamp-and-type
-		 (save-excursion
-		   (goto-char (match-beginning 0))
-		   (list
-		    (org-element-timestamp-parser)
-		    (save-excursion
-		      (cond
-		       ((re-search-backward
-			 (concat org-scheduled-regexp "[ \t]*\\=")
-			 nil
-			 t)
-			'sched)
-		       ((re-search-backward
-			 (concat org-deadline-regexp "[ \t]*\\=")
-			 nil
-			 t)
-			'deadline)
-		       (t 'event)))
-		    (or (seq-find (lambda (x) (= x (point))) buffer-markers)
-			(let ((marker (copy-marker (point) t)))
-			  (setq update-markers-alist-p t)
-			  (push marker buffer-markers)
-			  marker)))))
-		(timestamp (car timestamp-and-type))
-		(type (cadr timestamp-and-type))
-		(marker (caddr timestamp-and-type))
-		(start-ts (org-timeblock-timestamp-to-time
-			   timestamp))
-		(title (or (org-get-heading t nil t t) "no title")))
-	     (save-excursion
-	       (org-back-to-heading-or-point-min t)
-	       (push
-		(propertize
-		 (concat
-		  (org-timeblock--construct-prefix timestamp type)
-		  title)
-		 'type type
-		 'timestamp timestamp
-		 'marker marker
-		 'tags tags
-		 'id (org-timeblock-construct-id marker)
-		 'title title)
-		entries)))))))
+	     (if (save-match-data
+		       (progn
+		         (setq tags
+			           (mapcar #'substring-no-properties
+				               (org-get-tags)))
+		         (member org-archive-tag tags)))
+	         (org-get-next-sibling)
+	       (when-let
+	           ((timestamp-and-type
+		         (save-excursion
+		           (goto-char (match-beginning 0))
+		           (list
+		            (org-element-timestamp-parser)
+		            (save-excursion
+		              (cond
+		               ((re-search-backward
+			             (concat org-scheduled-regexp "[ \t]*\\=")
+			             nil
+			             t)
+			            'sched)
+		               ((re-search-backward
+			             (concat org-deadline-regexp "[ \t]*\\=")
+			             nil
+			             t)
+			            'deadline)
+		               (t 'event)))
+		            (or (seq-find (lambda (x) (= x (point))) buffer-markers)
+			            (let ((marker (copy-marker (point) t)))
+			              (setq update-markers-alist-p t)
+			              (push marker buffer-markers)
+			              marker)))))
+		        (timestamp (car timestamp-and-type))
+		        (type (cadr timestamp-and-type))
+		        (marker (caddr timestamp-and-type))
+		        (start-ts (org-timeblock-timestamp-to-time
+			               timestamp))
+		        (title (or (org-get-heading t nil t t) "no title"))
+                (done (if (org-entry-is-done-p) 'y 'n)))
+	         (save-excursion
+	           (org-back-to-heading-or-point-min t)
+	           (push
+		        (propertize
+		         (concat
+		          (org-timeblock--construct-prefix timestamp type)
+		          title)
+		         'type type
+		         'timestamp timestamp
+		         'marker marker
+		         'tags tags
+		         'id (org-timeblock-construct-id marker)
+		         'title title
+                 'done done)
+		        entries)))))))
     (when update-markers-alist-p
       (setf
        (alist-get buffer
-		  org-timeblock-markers nil nil #'equal)
+		          org-timeblock-markers nil nil #'equal)
        buffer-markers))
     entries))
 
@@ -1292,28 +1297,33 @@ without time."
   (seq-filter
    (lambda (x)
      (when-let
-	 ((timestamp (org-timeblock-get-ts-prop x))
-	  ((or (not timeblocks)
-	       (and
-		(not (org-timeblock--daterangep timestamp))
-		(org-element-property :hour-start timestamp))))
-	  (start-ts (org-timeblock-timestamp-to-time
-		     timestamp)))
-       (or
-	(and
-	 (org-element-property
-	  :repeater-type timestamp)
-	 (org-timeblock-date<= start-ts from))
-	(and
-	 (org-timeblock-date<= from start-ts)
-	 (org-timeblock-date<= start-ts to))
-	(let ((end-ts
-	       (org-timeblock-timestamp-to-time
-		timestamp t)))
-	  (and
-	   end-ts
-	   (org-timeblock-date<= from end-ts)
-	   (org-timeblock-date<= end-ts to))))))
+         ((timestamp (org-timeblock-get-ts-prop x))
+          (done (or (get-text-property 0 'done x) 'n))
+          ((or (not timeblocks)
+               (and
+                (not (org-timeblock--daterangep timestamp))
+                (org-element-property :hour-start timestamp))))
+          (start-ts (org-timeblock-timestamp-to-time
+                     timestamp)))
+       (and
+        (or (eq done 'n)
+            (and org-timeblock-keep-done (eq done 'y)))
+        (or
+         (and
+          (org-element-property
+           :repeater-type timestamp)
+          (org-timeblock-date<= start-ts from))
+         (and
+          (org-timeblock-date<= from start-ts)
+          (org-timeblock-date<= start-ts to))
+
+         (let ((end-ts
+                (org-timeblock-timestamp-to-time
+                 timestamp t)))
+           (and
+            end-ts
+            (org-timeblock-date<= from end-ts)
+            (org-timeblock-date<= end-ts to)))))))
    org-timeblock-cache))
 
 (defun org-timeblock-update-cache ()
@@ -2294,6 +2304,12 @@ Available view options:
       (delete-window window)
     (org-timeblock-show-timeblock-list))
   (org-timeblock-redraw-buffers))
+
+(defun org-timeblock-show-all()
+  "Redraws the timeblock buffers with DONE entries as well."
+  (interactive)
+  (let ((org-timeblock-keep-done t))
+    (org-timeblock-redraw-buffers)))
 
 (defun org-timeblock-redraw-buffers ()
   "Redraw `org-timeblock-list-mode' and `org-timeblock-timeline-mode' buffers."
