@@ -77,18 +77,7 @@ If you use Emacs 29, you can install the package via
 
 ** Guix
 
-If you use Guix, you can install the package from [[https://git.sr.ht/~sokolov/channel][this]] channel.
-
-1. To add the channel, add this to the list of channels in ~channels.scm~:
-
-#+begin_src scheme
-(channel
- (name 'sklv)
- (url "https://git.sr.ht/~sokolov/channel"))
-#+end_src
-
-2. Then, run ~guix pull~.
-3. Now you can install the package.
+If you use Guix, you can install the package from the official Guix channel.
 
 ** Quelpa
 
