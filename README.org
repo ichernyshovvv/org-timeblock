@@ -10,6 +10,7 @@
 - [[#why][Why I wrote this package]]
 - [[#installation][Installation]]
 - [[#usage][Usage]]
+  - [[#note-for-evil-mode-users][Note for evil-mode users]]
 - [[#customization][Customization]]
 - [[#todos][TODOs]]
 - [[#donations][Donations]]
@@ -148,6 +149,14 @@ If you want to add a new task, press ~+~ (M-x org-timeblock-new-task).
 
 Almost all commands with the same bindings are available in
 ~org-timeblock-list~.
+
+** Note for evil-mode users
+If you have evil mode enabled, org-timeblock keybinds don't work in the timeblock and timeblock-list buffers. Put this in your init.el to disable evil for these buffers:
+
+#+begin_src elisp
+(add-hook 'org-timeblock-mode-hook 'turn-off-evil-mode)
+(add-hook 'org-timeblock-list-mode-hook 'turn-off-evil-mode)
+#+end_src
 
 * Customization
 :PROPERTIES:
