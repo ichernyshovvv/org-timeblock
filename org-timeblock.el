@@ -172,8 +172,9 @@ When set to the symbol `next' only the first future repeat is shown."
 	  (const :tag "Do not show repeated entries" nil)))
 
 (defcustom org-timeblock-files 'agenda
-  "Non-nil shows repeated entries in the future dates of repeat.
-When set to the symbol `next' only the first future repeat is shown."
+  "Org files with agenda items to display with `org-timeblock'.
+When set to the symbol \\+`agenda', `org-agenda-files' are used.
+Otherwise, it may be set to a list of filenames."
   :group 'org-timeblock
   :type '(choice
 	  (repeat :tag "List of files" file)
