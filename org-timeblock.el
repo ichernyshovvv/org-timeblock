@@ -178,7 +178,12 @@ Otherwise, it may be set to a list of filenames."
   :group 'org-timeblock
   :type '(choice
 	  (repeat :tag "List of files" file)
-	  (const :tag "Files from (org-agenda-files)" agenda)))
+	  (const :tag "Files from (org-agenda-files)" agenda))
+  :set (lambda (option value)
+         (set-default option value)
+         (setq org-timeblock-cache nil)
+         (setq org-timeblock-buffers nil)
+         (setq org-timeblock-markers nil)))
 
 (defcustom org-timeblock-show-outline-path nil
   "Non-nil means show outline path in echo area for the selected item."
